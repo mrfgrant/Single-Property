@@ -5,6 +5,7 @@ import { HowItWorks } from "@/components/sections/HowItWorks";
 import { Pricing } from "@/components/sections/Pricing";
 import { ComparisonTable } from "@/components/sections/ComparisonTable";
 import { SocialProof } from "@/components/sections/SocialProof";
+import { DemoListings } from "@/components/sections/DemoListings";
 import { CTABanner } from "@/components/sections/CTABanner";
 import { Footer } from "@/components/sections/Footer";
 import { initScrollDepth } from "@/lib/analytics";
@@ -23,6 +24,7 @@ export default function Home() {
         <Pricing />
         <ComparisonTable />
         <SocialProof />
+        <DemoListings />
         <CTABanner />
       </main>
       <Footer />

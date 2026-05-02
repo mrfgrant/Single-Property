@@ -31,11 +31,15 @@ externalPort = 80
 localPort = 21209
 externalPort = 3000
 
+[[ports]]
+localPort = 23744
+externalPort = 3002
+
 [userenv]
 
 [userenv.shared]
-PLATFORM_HOMEPAGE_URL = "https://propsite.app"
-ADMIN_TOKEN = ""
+PLATFORM_HOMEPAGE_URL = "https://propsite.io"
+ADMIN_TOKEN = "Jamie1969!!"
 MLS_BOARD_ID = ""
-EMAIL_FROM = "noreply@propsite.app"
+EMAIL_FROM = "noreply@soracle.dev"
 EMAIL_FROM_NAME = "PropSite"

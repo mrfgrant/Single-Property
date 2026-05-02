@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { WORDMARK_PREFIX, WORDMARK_SUFFIX } from "@/lib/copy";
-import { ONBOARDING_URL, DEMO_EXAMPLE_URL } from "@/lib/config";
+import { ONBOARDING_URL } from "@/lib/config";
 import { track } from "@/lib/analytics";
 import { Menu, X } from "lucide-react";
 
 export function Nav() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [location] = useLocation();
+  const isHome = location === "/";
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
@@ -18,7 +20,11 @@ export function Nav() {
   const scrollTo = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
     e.preventDefault();
     setMobileMenuOpen(false);
-    document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth" });
+    if (isHome) {
+      document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth" });
+    } else {
+      window.location.href = `/#${targetId}`;
+    }
   };
 
   const handleGetStarted = () => {
@@ -60,13 +66,11 @@ export function Nav() {
               Pricing
             </a>
             <a
-              href={DEMO_EXAMPLE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={handleSeeExample}
+              href="#demo"
+              onClick={(e) => { scrollTo(e, "demo"); handleSeeExample(); }}
               className="text-sm font-medium text-ink hover:text-gold transition-colors"
             >
-              See an example
+              See examples
             </a>
             <a
               href={ONBOARDING_URL}
@@ -104,13 +108,14 @@ export function Nav() {
               Pricing
             </a>
             <a
-              href={DEMO_EXAMPLE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={handleSeeExample}
+              href="#demo"
+              onClick={(e) => {
+                scrollTo(e, "demo");
+                handleSeeExample();
+              }}
               className="text-lg font-medium text-ink"
             >
-              See an example
+              See examples
             </a>
             <a
               href={ONBOARDING_URL}

@@ -1,23 +1,53 @@
 import React from "react";
 import { PLATFORM_NAME } from "@/lib/copy";
+import { REGION } from "@/lib/config";
 
 export function Footer() {
+  const scrollToWaitlist = (e: React.MouseEvent) => {
+    e.preventDefault();
+    document.getElementById("waitlist")?.scrollIntoView({ behavior: "smooth" });
+  };
+
   return (
     <footer className="border-t border-border bg-warm-white py-12 px-6 lg:px-12">
-      <div className="max-w-[1200px] mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-        <div className="text-xl flex items-baseline">
-          <span className="font-serif font-normal text-ink">Prop</span>
-          <span className="font-serif text-gold">Site</span>
+      <div className="max-w-[1200px] mx-auto">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-6">
+          <div className="text-xl flex items-baseline">
+            <span className="font-serif font-normal text-ink">Prop</span>
+            <span className="font-serif text-gold">Site</span>
+          </div>
+
+          <div className="text-sm text-muted font-light">
+            &copy; {new Date().getFullYear()} {PLATFORM_NAME}. All rights reserved.
+          </div>
+
+          <div className="flex items-center gap-6 text-sm font-medium text-ink">
+            <a href="#" className="hover:text-gold transition-colors">Privacy</a>
+            <a href="#" className="hover:text-gold transition-colors">Terms</a>
+            <a href="#" className="hover:text-gold transition-colors">Support</a>
+          </div>
         </div>
-        
-        <div className="text-sm text-muted font-light">
-          &copy; {new Date().getFullYear()} {PLATFORM_NAME}. All rights reserved.
-        </div>
-        
-        <div className="flex items-center gap-6 text-sm font-medium text-ink">
-          <a href="#" className="hover:text-gold transition-colors">Privacy</a>
-          <a href="#" className="hover:text-gold transition-colors">Terms</a>
-          <a href="#" className="hover:text-gold transition-colors">Support</a>
+
+        <div className="border-t border-border/60 pt-5 text-center text-xs text-muted font-light">
+          Currently serving agents in{" "}
+          <strong className="font-medium text-ink">{REGION.marketName}</strong>
+          {" "}—{" "}
+          <a
+            href={REGION.mlsBoardUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-gold transition-colors"
+          >
+            {REGION.mlsBoardName}
+          </a>
+          .{" "}
+          <a
+            href="#waitlist"
+            onClick={scrollToWaitlist}
+            className="text-gold hover:underline font-medium"
+          >
+            Notify me when you reach my market →
+          </a>
         </div>
       </div>
     </footer>
