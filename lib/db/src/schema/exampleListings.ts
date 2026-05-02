@@ -28,6 +28,7 @@ export const exampleListingsTable = pgTable("example_listings", {
   bikeScore: integer("bike_score"),
   schoolRating: integer("school_rating"),
   transitScore: integer("transit_score"),
+  domainName: text("domain_name"),
   status: text("status").notNull().default("active"),
   featured: boolean("featured").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),

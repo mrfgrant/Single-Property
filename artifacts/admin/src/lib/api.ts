@@ -48,6 +48,7 @@ export interface ExampleListing {
   bikeScore?: number | null;
   schoolRating?: number | null;
   transitScore?: number | null;
+  domainName?: string | null;
   status: string;
   featured: boolean;
   createdAt: string;
@@ -55,6 +56,31 @@ export interface ExampleListing {
 }
 
 export type ListingInput = Omit<ExampleListing, "id" | "createdAt" | "updatedAt">;
+
+export interface DomainSearchResult {
+  domain: string;
+  available: boolean;
+}
+
+export interface DomainEntry {
+  domain: string;
+  registeredAt: string | null;
+  expiresAt: string | null;
+  autoRenew: boolean | null;
+  zoneId: string | null;
+  notes: string | null;
+  assignedTo: { listingId: string; slug: string; address: string; city: string } | null;
+  source: "cloudflare" | "local";
+}
+
+export interface DnsRecord {
+  id: string;
+  type: string;
+  name: string;
+  content: string;
+  proxied: boolean;
+  ttl: number;
+}
 
 export const api = {
   listings: {
@@ -91,6 +117,46 @@ export const api = {
     mlsLookup: (mlsId: string) =>
       request<{ available: boolean; data?: Partial<ListingInput> }>(`/api/admin/mls-lookup/${encodeURIComponent(mlsId)}`),
   },
+
+  domains: {
+    search: (body: { domain?: string; address?: string; city?: string }) =>
+      request<{ results: DomainSearchResult[] }>("/api/admin/domain/search", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    register: (body: { domain: string; notes?: string }) =>
+      request<{ domain: unknown; registration: unknown; zone: unknown }>("/api/admin/domain/register", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    assign: (body: { domain: string; listingId: string }) =>
+      request<{ listing: ExampleListing; registration: unknown; zone: unknown }>("/api/admin/domain/assign", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    unassign: (listingId: string) =>
+      request<{ listing: ExampleListing }>("/api/admin/domain/unassign", {
+        method: "POST",
+        body: JSON.stringify({ listingId }),
+      }),
+    list: () => request<{ domains: DomainEntry[] }>("/api/admin/domain/list"),
+    listDns: (domain: string) =>
+      request<{ zoneId: string; records: DnsRecord[] }>(`/api/admin/domain/dns/${encodeURIComponent(domain)}`),
+    addDns: (
+      domain: string,
+      body: { type: "A" | "TXT"; name: string; content: string; ttl?: number; proxied?: boolean },
+    ) =>
+      request<{ record: DnsRecord }>(`/api/admin/domain/dns/${encodeURIComponent(domain)}`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    deleteDns: (domain: string, recordId: string) =>
+      request<{ success: boolean }>(
+        `/api/admin/domain/dns/${encodeURIComponent(domain)}/${encodeURIComponent(recordId)}`,
+        { method: "DELETE" },
+      ),
+  },
+
   verifyPassword: (password: string) =>
     request<{ listings: ExampleListing[] }>("/api/admin/listings", {
       headers: { Authorization: `Bearer ${password}` },

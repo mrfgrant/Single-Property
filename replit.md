@@ -48,6 +48,7 @@ Express 5 API server. Serves all backend routes. No frontend.
   - `lifecycle.ts` — `handleListingClosed()` — flips domain to 301 redirect on Sold/Withdrawn/Expired
   - `index.ts` — barrel export
 - `src/routes/domainAdmin.ts` — operator-only CRUD: list runs, provision, close listing, list registered
+- `src/routes/adminDomains.ts` — domain search, standalone register, assign-to-listing, and DNS CRUD (A/TXT)
 
 **Object storage** (Task #12 — built):
 - `src/lib/objectStorage.ts` — `ObjectStorageService` class (GCS via Replit Object Storage)
@@ -58,7 +59,8 @@ Express 5 API server. Serves all backend routes. No frontend.
 
 **DB schema** (`lib/db/src/schema/`):
 - `automationRuns.ts` — `automation_runs` table: tracks every provisioning step
-- `exampleListings.ts` — `example_listings` table: demo listings for the marketing site
+- `exampleListings.ts` — `example_listings` table: demo listings (now includes `domain_name` column)
+- `standaloneDomains.ts` — `standalone_domains` table: domains registered without a listing
 - `waitlistEntries.ts` — `waitlist_entries` table: email waitlist signups
 
 **Routes**:
@@ -79,6 +81,14 @@ Express 5 API server. Serves all backend routes. No frontend.
 - `POST /api/admin/listings/:id/photos` — multipart upload, requires Bearer ADMIN_PASSWORD
 - `DELETE /api/admin/listings/:id/photos/:index` — requires Bearer ADMIN_PASSWORD
 - `GET  /api/admin/mls-lookup/:mlsId` — stub (MLS not yet connected)
+- `POST /api/admin/domain/search` — check availability for a domain or auto-generate from address+city
+- `POST /api/admin/domain/register` — register a domain standalone + ensure Cloudflare zone
+- `POST /api/admin/domain/assign` — register + assign domain to an example listing
+- `POST /api/admin/domain/unassign` — remove domain from an example listing
+- `GET  /api/admin/domain/list` — list all managed domains (Cloudflare + local)
+- `GET  /api/admin/domain/dns/:domain` — list DNS records for a domain zone
+- `POST /api/admin/domain/dns/:domain` — add/update A or TXT record
+- `DELETE /api/admin/domain/dns/:domain/:recordId` — delete a DNS record
 - `POST /api/storage/uploads/request-url`
 - `GET  /api/storage/public-objects/:filePath`
 - `GET  /api/storage/objects/:objectPath`
@@ -96,9 +106,11 @@ React + Vite SaaS marketing homepage at `/`. The public-facing page real estate 
 - `src/pages/Listing.tsx` — `/listing/:slug` individual property page
 
 ### `artifacts/admin`
-React + Vite admin panel at `/admin/`. Password-protected operator tool for managing demo listings.
-- Login screen → Listings table → Add/Edit form
-- Features: create/edit/delete listings, toggle featured/status, photo upload (Object Storage), MLS lookup stub
+React + Vite admin panel at `/admin/`. Password-protected operator tool for managing demo listings and domains.
+- Top nav: Listings | Domain Search | Domains
+- **Listings page**: table with domain column + Assign/Unassign buttons per row
+- **Domain Search page**: search by candidate domain or address+city, see availability, register standalone or assign to listing
+- **Domains page**: list all managed domains, click any to open DNS panel — add/edit/delete A and TXT records
 - Auth: password stored in `sessionStorage`, sent as `Authorization: Bearer <token>` header
 - Requires `ADMIN_PASSWORD` secret to be set
 
@@ -145,3 +157,4 @@ After any `lib/db/src/schema/` change:
 - #10 Interactive listing demo — **BUILT** ✓
 - #11 Regional scope & waitlist — **BUILT** ✓
 - #12 Admin panel — **BUILT** ✓
+- #13 Admin domain search & DNS manager — **BUILT** ✓
