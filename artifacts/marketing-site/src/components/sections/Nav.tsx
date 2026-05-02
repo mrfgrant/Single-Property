@@ -21,9 +21,9 @@ export function Nav() {
     document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const handleGetStarted = (e: React.MouseEvent<HTMLAnchorElement>) => {
+  const handleGetStarted = () => {
     track("cta_click", { label: "nav_get_started" });
-    scrollTo(e, "pricing");
+    setMobileMenuOpen(false);
   };
 
   const handleSeeExample = () => {
