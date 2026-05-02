@@ -3,6 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+
+    <!--
+      Title, description, and OG/Twitter title+description are kept here as
+      static fallbacks for crawlers that don't execute JavaScript. The single
+      source of truth is src/lib/copy.ts (PAGE_TITLE, PAGE_DESCRIPTION) and
+      these values are re-applied at runtime by src/lib/seo.ts. If you change
+      the copy, update both places — or rely on the runtime sync.
+    -->
     <title>PropSite — Automated Property Websites for Real Estate Agents</title>
     <meta name="description" content="We watch your MLS feed. The moment a new listing appears under your name, we build the full marketing site, register the domain, and start collecting leads — automatically." />
     <link rel="canonical" href="https://propsite.app/" />
