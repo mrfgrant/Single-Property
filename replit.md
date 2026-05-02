@@ -25,6 +25,13 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `cd lib/db && npx tsc -p tsconfig.json` — rebuild DB declaration files after schema changes (required before api-server typecheck)
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
 
+## Critical: api-zod export pattern
+
+`lib/api-zod/src/index.ts` must only do `export * from "./generated/api"`.
+Do NOT add `export * from "./generated/types"` — the types directory has TypeScript interfaces
+with the same names as the Zod schemas and will cause TS2308 ambiguity errors. Zod schemas
+serve as both runtime validators and type sources via `z.infer<>`.
+
 ## Artifacts
 
 ### `artifacts/api-server`
@@ -41,29 +48,59 @@ Express 5 API server. Serves all backend routes. No frontend.
   - `lifecycle.ts` — `handleListingClosed()` — flips domain to 301 redirect on Sold/Withdrawn/Expired
   - `index.ts` — barrel export
 - `src/routes/domainAdmin.ts` — operator-only CRUD: list runs, provision, close listing, list registered
-- Admin routes protected by `ADMIN_TOKEN` env var (if set); no auth if unset (MVP)
+
+**Object storage** (Task #12 — built):
+- `src/lib/objectStorage.ts` — `ObjectStorageService` class (GCS via Replit Object Storage)
+- `src/lib/objectAcl.ts` — ACL policy helpers
+- `src/routes/storage.ts` — presigned upload URL + object serving endpoints
+- `src/routes/adminListings.ts` — full CRUD for `example_listings` + photo upload/delete
+- `src/middleware/adminAuth.ts` — Bearer token check against `ADMIN_PASSWORD`
 
 **DB schema** (`lib/db/src/schema/`):
-- `automationRuns.ts` — `automation_runs` table: tracks every provisioning step with Cloudflare IDs, status, errors
+- `automationRuns.ts` — `automation_runs` table: tracks every provisioning step
+- `exampleListings.ts` — `example_listings` table: demo listings for the marketing site
+- `waitlistEntries.ts` — `waitlist_entries` table: email waitlist signups
 
 **Routes**:
-- `GET /api/healthz`
+- `GET  /api/healthz`
 - `POST /api/analytics/events`
-- `GET /api/admin/domains/runs`
-- `GET /api/admin/domains/runs/:id`
-- `POST /api/admin/domains/provision` — `{ listingId, address, city }`
-- `POST /api/admin/domains/close` — `{ listingId, status, agentWebsiteUrl? }`
-- `GET /api/admin/domains/registered`
+- `GET  /api/admin/domains/runs`
+- `GET  /api/admin/domains/runs/:id`
+- `POST /api/admin/domains/provision`
+- `POST /api/admin/domains/close`
+- `GET  /api/admin/domains/registered`
+- `POST /api/waitlist`
+- `POST /api/agents/check-market`
+- `GET  /api/listings/examples`
+- `GET  /api/admin/listings` — requires Bearer ADMIN_PASSWORD
+- `POST /api/admin/listings` — requires Bearer ADMIN_PASSWORD
+- `PATCH /api/admin/listings/:id` — requires Bearer ADMIN_PASSWORD
+- `DELETE /api/admin/listings/:id` — requires Bearer ADMIN_PASSWORD (soft-archives)
+- `POST /api/admin/listings/:id/photos` — multipart upload, requires Bearer ADMIN_PASSWORD
+- `DELETE /api/admin/listings/:id/photos/:index` — requires Bearer ADMIN_PASSWORD
+- `GET  /api/admin/mls-lookup/:mlsId` — stub (MLS not yet connected)
+- `POST /api/storage/uploads/request-url`
+- `GET  /api/storage/public-objects/:filePath`
+- `GET  /api/storage/objects/:objectPath`
 
 ### `artifacts/marketing-site`
-React + Vite SaaS marketing homepage at `/`. The public-facing page real estate agents land on before signing up.
+React + Vite SaaS marketing homepage at `/`. The public-facing page real estate agents land on.
 - Stack: React, Vite, Tailwind CSS v4, Framer Motion, Lucide React
 - Fonts: Playfair Display (headings/display) + DM Sans (body/UI) via Google Fonts
 - Palette: warm editorial luxury — `--ink #0e0e0e`, `--cream #f5f0e8`, `--warm-white #faf8f4`, `--gold #c9a84c`
-- Single-page scroll: Nav → Hero (mock browser preview) → How It Works → Pricing → Comparison Table → Social Proof → CTA Banner → Footer
+- Single-page scroll: Nav → Hero → How It Works → Pricing → Comparison Table → Social Proof → CTA Banner → Footer
 - All copy centralized in `src/lib/copy.ts`
-- URL constants in `src/lib/config.ts`: `ONBOARDING_URL` and `DEMO_EXAMPLE_URL` — stubs until Tasks #3 and #4 are live
+- URL constants in `src/lib/config.ts`: `ONBOARDING_URL` and `DEMO_EXAMPLE_URL`
 - Analytics: `src/lib/analytics.ts` tracks events, beacons to `POST /api/analytics/events`
+- `src/data/sampleListings.ts` — 40 Augusta/CSRA sample listings
+- `src/pages/Listing.tsx` — `/listing/:slug` individual property page
+
+### `artifacts/admin`
+React + Vite admin panel at `/admin/`. Password-protected operator tool for managing demo listings.
+- Login screen → Listings table → Add/Edit form
+- Features: create/edit/delete listings, toggle featured/status, photo upload (Object Storage), MLS lookup stub
+- Auth: password stored in `sessionStorage`, sent as `Authorization: Bearer <token>` header
+- Requires `ADMIN_PASSWORD` secret to be set
 
 ### `artifacts/mockup-sandbox`
 Internal design prototyping sandbox — not a user-facing product.
@@ -75,12 +112,16 @@ Real estate agent SaaS that auto-builds a property marketing site for every MLS 
 **Environment variables needed:**
 - `CLOUDFLARE_API_TOKEN` — Zone:Edit + Registrar:Edit (set ✓)
 - `CLOUDFLARE_ACCOUNT_ID` — Cloudflare account ID (set ✓)
-- `SITE_DEPLOYMENT_HOSTNAME` — production deployment hostname for DNS CNAME records (set after first deploy)
-- `PLATFORM_HOMEPAGE_URL` — fallback redirect for closed listings (set ✓: propsite.app)
-- `ADMIN_TOKEN` — protects admin API routes (optional; no auth if unset)
-- `STRIPE_SECRET_KEY` — Stripe billing
-- `STRIPE_PUBLISHABLE_KEY` — Stripe billing
+- `ADMIN_PASSWORD` — protects admin panel at /admin/ (set ✓)
+- `DEFAULT_OBJECT_STORAGE_BUCKET_ID` — Replit Object Storage bucket (set ✓)
+- `PUBLIC_OBJECT_SEARCH_PATHS` — comma-separated GCS paths for public assets (set ✓)
+- `PRIVATE_OBJECT_DIR` — GCS path prefix for uploaded objects (set ✓)
+- `RESEND_API_KEY` — email delivery (set ✓)
+- `STRIPE_SECRET_KEY` — Stripe billing (set ✓)
+- `STRIPE_PUBLISHABLE_KEY` — Stripe billing (set ✓)
 - `STRIPE_WEBHOOK_SECRET` — generated after first deploy + webhook registration
+- `SITE_DEPLOYMENT_HOSTNAME` — production hostname for DNS CNAME records
+- `PLATFORM_HOMEPAGE_URL` — fallback redirect for closed listings
 - `TELNYX_API_KEY` — SMS outreach
 - `TELNYX_PHONE_NUMBER` — outbound SMS number
 - `FRED_API_KEY` — mortgage rate data
@@ -98,9 +139,9 @@ After any `lib/db/src/schema/` change:
 - #4 Agent onboarding & Stripe billing — in progress
 - #5 Leads, notifications & cold outreach — pending #2
 - #6 Analytics & weekly seller report — pending #2, #3, #5
-- #7 Marketing site — MERGED ✓
-- #8 SEO metadata — pending
+- #7 Marketing site — **BUILT** ✓
+- #8 SEO metadata — **BUILT** ✓
 - #9 Wire up CTAs — pending #4
-- #10 Interactive listing demo — pending
-- #11 Regional scope & waitlist — pending
-- #12 Admin panel — pending
+- #10 Interactive listing demo — **BUILT** ✓
+- #11 Regional scope & waitlist — **BUILT** ✓
+- #12 Admin panel — **BUILT** ✓

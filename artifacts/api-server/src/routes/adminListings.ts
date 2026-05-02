@@ -1,6 +1,5 @@
 import { Router } from "express";
 import multer from "multer";
-import { z } from "zod/v4";
 import { db } from "@workspace/db";
 import { exampleListingsTable, insertExampleListingSchema } from "@workspace/db/schema";
 import { eq, desc } from "drizzle-orm";
@@ -84,24 +83,19 @@ router.post(
       .where(eq(exampleListingsTable.id, req.params.id));
     if (!listing) { res.status(404).json({ error: "Not found" }); return; }
 
-    const ext = req.file.originalname.split(".").pop() ?? "jpg";
-    const key = `listings/${req.params.id}/${Date.now()}.${ext}`;
+    // Get a presigned PUT URL (generates a UUID-based object path internally)
+    const presignedUrl = await objectStorage.getObjectEntityUploadURL();
 
-    const uploadUrl = await objectStorage.getObjectEntityUploadURL({
-      name: key,
-      contentType: req.file.mimetype,
-      size: req.file.size,
-    });
-
-    await fetch(uploadUrl, {
+    await fetch(presignedUrl, {
       method: "PUT",
       headers: { "Content-Type": req.file.mimetype },
       body: req.file.buffer,
     });
 
-    const publicUrl = `${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : ""}/api/storage/objects/${key}`;
+    // Normalize to a stable /objects/... path for serving via our API
+    const objectPath = objectStorage.normalizeObjectEntityPath(presignedUrl);
     const currentPhotos = listing.photoUrls ?? [];
-    const updatedPhotos = [...currentPhotos, publicUrl];
+    const updatedPhotos = [...currentPhotos, objectPath];
 
     const [updated] = await db
       .update(exampleListingsTable)
@@ -109,7 +103,7 @@ router.post(
       .where(eq(exampleListingsTable.id, req.params.id))
       .returning();
 
-    res.json({ listing: updated, photoUrl: publicUrl });
+    res.json({ listing: updated, photoUrl: objectPath });
   }
 );
 
