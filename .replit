@@ -36,3 +36,6 @@ externalPort = 3000
 [userenv.shared]
 PLATFORM_HOMEPAGE_URL = "https://propsite.app"
 ADMIN_TOKEN = ""
+MLS_BOARD_ID = ""
+EMAIL_FROM = "noreply@propsite.app"
+EMAIL_FROM_NAME = "PropSite"
