@@ -316,31 +316,31 @@ export default function Listing() {
         <div className="flex-1 flex items-center justify-center px-4 md:px-6 py-6 md:py-10">
           <div className="w-full max-w-4xl flex flex-col md:flex-row shadow-2xl rounded-sm overflow-hidden">
             {/* Left — price + address + CTA */}
-            <div className="flex-1 bg-white/95 backdrop-blur-sm px-5 md:px-8 py-6 md:py-10 flex flex-col justify-center">
-              <p className="text-3xl md:text-5xl font-bold text-gold mb-2 md:mb-3 leading-none tracking-tight">
+            <div className="flex-1 bg-white/30 backdrop-blur-md px-5 md:px-8 py-6 md:py-10 flex flex-col justify-center">
+              <p className="text-3xl md:text-5xl font-bold text-gold mb-2 md:mb-3 leading-none tracking-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.45)]">
                 {formatPrice(listing.price)}
               </p>
-              <p className="text-ink font-semibold text-base md:text-lg mb-0.5 leading-tight">{listing.address}</p>
-              <p className="text-muted text-xs md:text-sm mb-5 md:mb-7">
+              <p className="text-white font-semibold text-base md:text-lg mb-0.5 leading-tight drop-shadow-[0_1px_4px_rgba(0,0,0,0.7)]">{listing.address}</p>
+              <p className="text-white/90 text-xs md:text-sm mb-5 md:mb-7 drop-shadow-[0_1px_3px_rgba(0,0,0,0.7)]">
                 {listing.city}, {listing.state} {listing.zip}
               </p>
               <a
                 href="#contact"
-                className="block w-full text-center bg-gold hover:bg-gold/90 text-white font-bold uppercase tracking-[0.18em] text-xs py-3.5 md:py-4 transition-colors rounded-sm"
+                className="block w-full text-center bg-gold hover:bg-gold/90 text-white font-bold uppercase tracking-[0.18em] text-xs py-3.5 md:py-4 transition-colors rounded-sm shadow-lg"
               >
                 Schedule a Showing
               </a>
             </div>
 
             {/* Right — stat panel */}
-            <div className="bg-ink/95 backdrop-blur-sm grid grid-cols-4 md:grid-cols-2 md:w-[280px]">
-              <div className="border-r border-white/10 md:border-b">
+            <div className="bg-ink/40 backdrop-blur-md grid grid-cols-4 md:grid-cols-2 md:w-[280px]">
+              <div className="border-r border-white/15 md:border-b">
                 <StatTile icon={Bed} value={listing.beds} label={listing.beds === 1 ? "Bed" : "Beds"} />
               </div>
-              <div className="border-r border-white/10 md:border-b md:border-r-0">
+              <div className="border-r border-white/15 md:border-b md:border-r-0">
                 <StatTile icon={Bath} value={listing.baths} label={listing.baths === 1 ? "Bath" : "Baths"} />
               </div>
-              <div className="border-r border-white/10">
+              <div className="border-r border-white/15">
                 <StatTile icon={Car} value={listing.garage ? "Yes" : "—"} label="Garage" />
               </div>
               <div>
