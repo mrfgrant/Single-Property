@@ -43,6 +43,19 @@ export interface PublicListing extends SampleListing {
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
+/**
+ * The DB stores object-storage paths as "/objects/uploads/<id>".
+ * The actual HTTP route that serves them is "/api/storage/objects/uploads/<id>".
+ * Translate stored paths to fetchable URLs (leave http(s):// URLs untouched).
+ */
+function resolvePhotoUrl(stored: string): string {
+  if (/^https?:\/\//i.test(stored)) return stored;
+  if (stored.startsWith("/objects/")) {
+    return `${API_BASE}/api/storage${stored}`;
+  }
+  return stored;
+}
+
 export function apiToPublicListing(row: ApiListing): PublicListing {
   return {
     slug: row.slug,
@@ -67,10 +80,10 @@ export function apiToPublicListing(row: ApiListing): PublicListing {
     listedDate: row.createdAt,
     featured: row.featured,
     isLive: true,
-    photoUrls: row.photoUrls ?? undefined,
+    photoUrls: row.photoUrls?.map(resolvePhotoUrl) ?? undefined,
     agentPhone: row.agentPhone ?? undefined,
     agentEmail: row.agentEmail ?? undefined,
-    agentPhotoUrl: row.agentPhotoUrl ?? undefined,
+    agentPhotoUrl: row.agentPhotoUrl ? resolvePhotoUrl(row.agentPhotoUrl) : undefined,
     domainName: row.domainName ?? undefined,
   };
 }
