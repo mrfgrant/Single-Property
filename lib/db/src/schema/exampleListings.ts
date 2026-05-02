@@ -23,6 +23,7 @@ export const exampleListingsTable = pgTable("example_listings", {
   agentEmail: text("agent_email"),
   agentPhotoUrl: text("agent_photo_url"),
   agentBrokerage: text("agent_brokerage"),
+  brokerageLogoUrl: text("brokerage_logo_url"),
   photoUrls: text("photo_urls").array(),
   walkScore: integer("walk_score"),
   bikeScore: integer("bike_score"),

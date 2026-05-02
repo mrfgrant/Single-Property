@@ -21,6 +21,7 @@ interface ApiListing {
   agentEmail?: string | null;
   agentPhotoUrl?: string | null;
   agentBrokerage?: string | null;
+  brokerageLogoUrl?: string | null;
   photoUrls?: string[] | null;
   walkScore?: number | null;
   bikeScore?: number | null;
@@ -38,6 +39,7 @@ export interface PublicListing extends SampleListing {
   agentPhone?: string;
   agentEmail?: string;
   agentPhotoUrl?: string;
+  brokerageLogoUrl?: string;
   domainName?: string;
 }
 
@@ -84,6 +86,7 @@ export function apiToPublicListing(row: ApiListing): PublicListing {
     agentPhone: row.agentPhone ?? undefined,
     agentEmail: row.agentEmail ?? undefined,
     agentPhotoUrl: row.agentPhotoUrl ? resolvePhotoUrl(row.agentPhotoUrl) : undefined,
+    brokerageLogoUrl: row.brokerageLogoUrl ? resolvePhotoUrl(row.brokerageLogoUrl) : undefined,
     domainName: row.domainName ?? undefined,
   };
 }

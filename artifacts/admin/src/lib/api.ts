@@ -43,6 +43,7 @@ export interface ExampleListing {
   agentEmail?: string | null;
   agentPhotoUrl?: string | null;
   agentBrokerage?: string | null;
+  brokerageLogoUrl?: string | null;
   photoUrls?: string[] | null;
   walkScore?: number | null;
   bikeScore?: number | null;
@@ -112,6 +113,27 @@ export const api = {
     },
     deletePhoto: (id: string, index: number) =>
       request<{ listing: ExampleListing }>(`/api/admin/listings/${id}/photos/${index}`, {
+        method: "DELETE",
+      }),
+    uploadAsset: async (
+      id: string,
+      kind: "agent_photo" | "brokerage_logo",
+      file: File,
+    ): Promise<{ listing: ExampleListing; url: string }> => {
+      const token = getToken();
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch(`${API_BASE}/api/admin/listings/${id}/asset/${kind}`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: form,
+      });
+      if (res.status === 401) throw new Error("UNAUTHORIZED");
+      if (!res.ok) throw new Error("Upload failed");
+      return res.json();
+    },
+    deleteAsset: (id: string, kind: "agent_photo" | "brokerage_logo") =>
+      request<{ listing: ExampleListing }>(`/api/admin/listings/${id}/asset/${kind}`, {
         method: "DELETE",
       }),
     mlsLookup: (mlsId: string) =>

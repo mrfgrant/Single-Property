@@ -107,6 +107,69 @@ router.post(
   }
 );
 
+/* POST /admin/listings/:id/asset/:kind — upload agent photo or brokerage logo */
+router.post(
+  "/admin/listings/:id/asset/:kind",
+  adminAuth,
+  upload.single("file"),
+  async (req, res) => {
+    const kind = req.params.kind;
+    if (kind !== "agent_photo" && kind !== "brokerage_logo") {
+      res.status(400).json({ error: "Invalid asset kind" });
+      return;
+    }
+    if (!req.file) {
+      res.status(400).json({ error: "No file uploaded" });
+      return;
+    }
+
+    const [listing] = await db
+      .select()
+      .from(exampleListingsTable)
+      .where(eq(exampleListingsTable.id, req.params.id));
+    if (!listing) { res.status(404).json({ error: "Not found" }); return; }
+
+    const presignedUrl = await objectStorage.getObjectEntityUploadURL();
+    await fetch(presignedUrl, {
+      method: "PUT",
+      headers: { "Content-Type": req.file.mimetype },
+      body: req.file.buffer,
+    });
+    const objectPath = objectStorage.normalizeObjectEntityPath(presignedUrl);
+
+    const updateField = kind === "agent_photo"
+      ? { agentPhotoUrl: objectPath }
+      : { brokerageLogoUrl: objectPath };
+
+    const [updated] = await db
+      .update(exampleListingsTable)
+      .set({ ...updateField, updatedAt: new Date() })
+      .where(eq(exampleListingsTable.id, req.params.id))
+      .returning();
+
+    res.json({ listing: updated, url: objectPath });
+  }
+);
+
+/* DELETE /admin/listings/:id/asset/:kind */
+router.delete("/admin/listings/:id/asset/:kind", adminAuth, async (req, res) => {
+  const kind = req.params.kind;
+  if (kind !== "agent_photo" && kind !== "brokerage_logo") {
+    res.status(400).json({ error: "Invalid asset kind" });
+    return;
+  }
+  const updateField = kind === "agent_photo"
+    ? { agentPhotoUrl: null }
+    : { brokerageLogoUrl: null };
+  const [updated] = await db
+    .update(exampleListingsTable)
+    .set({ ...updateField, updatedAt: new Date() })
+    .where(eq(exampleListingsTable.id, req.params.id))
+    .returning();
+  if (!updated) { res.status(404).json({ error: "Not found" }); return; }
+  res.json({ listing: updated });
+});
+
 /* DELETE /admin/listings/:id/photos/:index */
 router.delete("/admin/listings/:id/photos/:index", adminAuth, async (req, res) => {
   const idx = parseInt(req.params.index, 10);

@@ -25,6 +25,111 @@ function Field({ label, children, hint }: { label: string; children: React.React
   );
 }
 
+function AssetUploader({
+  label,
+  hint,
+  url,
+  shape,
+  onUpload,
+  onRemove,
+  onError,
+}: {
+  label: string;
+  hint?: string;
+  url: string | null;
+  shape: "circle" | "rect";
+  onUpload: (file: File) => Promise<void>;
+  onRemove: () => Promise<void>;
+  onError: (msg: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+
+  const apiBase = import.meta.env.VITE_API_URL ?? "";
+  const displayUrl = url
+    ? url.startsWith("/objects/")
+      ? `${apiBase}/api/storage${url}`
+      : url
+    : null;
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBusy(true);
+    try {
+      await onUpload(file);
+    } catch (err: any) {
+      onError(`${label} upload failed: ${err.message}`);
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  const handleRemove = async () => {
+    if (!confirm(`Remove ${label.toLowerCase()}?`)) return;
+    setBusy(true);
+    try {
+      await onRemove();
+    } catch (err: any) {
+      onError(`Failed to remove ${label.toLowerCase()}: ${err.message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const previewClass = shape === "circle"
+    ? "w-20 h-20 rounded-full"
+    : "w-24 h-16 rounded-md";
+  const placeholderClass = shape === "circle"
+    ? "w-20 h-20 rounded-full bg-gray-100 border-2 border-dashed border-gray-300"
+    : "w-24 h-16 rounded-md bg-gray-100 border-2 border-dashed border-gray-300";
+
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-gray-700 mb-2">{label}</label>
+      <div className="flex items-center gap-3">
+        {displayUrl ? (
+          <img src={displayUrl} alt={label} className={`${previewClass} object-cover bg-gray-100 border border-gray-200`} />
+        ) : (
+          <div className={`${placeholderClass} flex items-center justify-center text-gray-300`}>
+            <Upload size={18} />
+          </div>
+        )}
+        <div className="flex flex-col gap-1.5">
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={busy}
+            className="text-xs font-medium text-amber-700 hover:text-amber-800 disabled:opacity-50 text-left"
+          >
+            {busy ? (
+              <span className="inline-flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> Working…</span>
+            ) : displayUrl ? "Replace" : "Upload"}
+          </button>
+          {displayUrl && !busy && (
+            <button
+              type="button"
+              onClick={handleRemove}
+              className="text-xs text-gray-500 hover:text-red-600 text-left"
+            >
+              Remove
+            </button>
+          )}
+          {hint && <p className="text-[10px] text-gray-400 leading-snug max-w-[140px]">{hint}</p>}
+        </div>
+      </div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={handleFile}
+      />
+    </div>
+  );
+}
+
 const inputClass = "w-full h-10 px-3 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white";
 const textareaClass = "w-full px-3 py-2.5 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white resize-none";
 
@@ -58,6 +163,8 @@ export default function ListingForm({ listing, onSave, onCancel }: Props) {
     agentPhone: listing?.agentPhone ?? "",
     agentEmail: listing?.agentEmail ?? "",
     agentBrokerage: listing?.agentBrokerage ?? "",
+    agentPhotoUrl: listing?.agentPhotoUrl ?? null,
+    brokerageLogoUrl: listing?.brokerageLogoUrl ?? null,
     walkScore: listing?.walkScore ?? undefined,
     bikeScore: listing?.bikeScore ?? undefined,
     schoolRating: listing?.schoolRating ?? undefined,
@@ -311,7 +418,7 @@ export default function ListingForm({ listing, onSave, onCancel }: Props) {
           {/* Agent Info */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
             <h3 className="text-sm font-semibold text-gray-900 mb-5 pb-3 border-b border-gray-100">Listing Agent</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 mb-5">
               <Field label="Agent Name">
                 <input className={inputClass} value={form.agentName ?? ""} onChange={(e) => set("agentName", e.target.value)} placeholder="Sarah Richardson" />
               </Field>
@@ -325,6 +432,46 @@ export default function ListingForm({ listing, onSave, onCancel }: Props) {
                 <input className={inputClass} type="email" value={form.agentEmail ?? ""} onChange={(e) => set("agentEmail", e.target.value)} placeholder="agent@example.com" />
               </Field>
             </div>
+
+            {/* Agent photo & brokerage logo uploads — only when editing */}
+            {isEdit ? (
+              <div className="grid grid-cols-2 gap-4 pt-5 border-t border-gray-100">
+                <AssetUploader
+                  label="Agent photo"
+                  hint="Square portrait, JPEG/PNG/WebP"
+                  url={form.agentPhotoUrl ?? null}
+                  shape="circle"
+                  onUpload={async (file) => {
+                    const res = await api.listings.uploadAsset(listing!.id, "agent_photo", file);
+                    setForm((p) => ({ ...p, agentPhotoUrl: res.listing.agentPhotoUrl ?? null }));
+                  }}
+                  onRemove={async () => {
+                    const res = await api.listings.deleteAsset(listing!.id, "agent_photo");
+                    setForm((p) => ({ ...p, agentPhotoUrl: res.listing.agentPhotoUrl ?? null }));
+                  }}
+                  onError={setError}
+                />
+                <AssetUploader
+                  label="Brokerage logo"
+                  hint="PNG with transparency preferred"
+                  url={form.brokerageLogoUrl ?? null}
+                  shape="rect"
+                  onUpload={async (file) => {
+                    const res = await api.listings.uploadAsset(listing!.id, "brokerage_logo", file);
+                    setForm((p) => ({ ...p, brokerageLogoUrl: res.listing.brokerageLogoUrl ?? null }));
+                  }}
+                  onRemove={async () => {
+                    const res = await api.listings.deleteAsset(listing!.id, "brokerage_logo");
+                    setForm((p) => ({ ...p, brokerageLogoUrl: res.listing.brokerageLogoUrl ?? null }));
+                  }}
+                  onError={setError}
+                />
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400 pt-5 border-t border-gray-100">
+                Save the listing first, then upload agent photo and brokerage logo.
+              </p>
+            )}
           </div>
 
           {/* Visibility */}

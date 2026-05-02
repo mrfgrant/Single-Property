@@ -4,13 +4,14 @@ import { getListingBySlug, formatPrice, type SampleListing } from "@/data/sample
 import { fetchPublicListingBySlug, type PublicListing } from "@/lib/publicListings";
 import { WORDMARK_PREFIX, WORDMARK_SUFFIX } from "@/lib/copy";
 import { ONBOARDING_URL } from "@/lib/config";
-import { Bed, Bath, Car, Square, MapPin, Calendar, Phone, Mail, Calculator } from "lucide-react";
+import { Bed, Bath, Car, Square, MapPin, Calendar, Phone, Mail, Calculator, MessageCircle } from "lucide-react";
 
 type FullListing = SampleListing & {
   photoUrls?: string[];
   agentPhone?: string;
   agentEmail?: string;
   agentPhotoUrl?: string;
+  brokerageLogoUrl?: string;
   domainName?: string;
 };
 
@@ -309,17 +310,6 @@ export default function Listing() {
             <a href="#about" className="hover:text-gold transition-colors uppercase">About</a>
             <a href="#contact" className="hover:text-gold transition-colors uppercase">Contact Agent</a>
           </div>
-          {/* Mobile: tap-to-call shortcut */}
-          {listing.agentPhone && (
-            <a
-              href={`tel:${listing.agentPhone.replace(/[^0-9+]/g, "")}`}
-              className="md:hidden inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.15em] uppercase text-white bg-white/10 backdrop-blur-sm border border-white/30 px-3 py-1.5 rounded-full hover:bg-white/20 transition-colors"
-              aria-label="Call agent"
-            >
-              <Phone size={11} />
-              Call
-            </a>
-          )}
         </nav>
 
         {/* Center floating card */}
@@ -485,7 +475,7 @@ export default function Listing() {
             </div>
 
             {/* Mortgage calculator */}
-            <div className="mb-10">
+            <div id="mortgage" className="mb-10 scroll-mt-20">
               <MortgageCalculator price={listing.price} />
             </div>
 
@@ -512,13 +502,33 @@ export default function Listing() {
             {/* Agent card */}
             {(listing.agentName || listing.agentBrokerage) && (
               <div className="border border-border rounded-md p-5 bg-cream">
-                <p className="text-[11px] uppercase tracking-wider text-muted mb-2">Listed by</p>
-                <p className="font-semibold text-ink text-base">{listing.agentName}</p>
-                {listing.agentBrokerage && (
-                  <p className="text-sm text-muted mt-0.5">{listing.agentBrokerage}</p>
+                <p className="text-[11px] uppercase tracking-wider text-muted mb-3">Listed by</p>
+                <div className="flex items-start gap-4">
+                  {listing.agentPhotoUrl && (
+                    <img
+                      src={listing.agentPhotoUrl}
+                      alt={listing.agentName ?? "Listing agent"}
+                      className="w-16 h-16 rounded-full object-cover shrink-0 border border-border"
+                    />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-ink text-base leading-tight">{listing.agentName}</p>
+                    {listing.agentBrokerage && (
+                      <p className="text-sm text-muted mt-1 leading-tight">{listing.agentBrokerage}</p>
+                    )}
+                  </div>
+                </div>
+                {listing.brokerageLogoUrl && (
+                  <div className="mt-4 pt-4 border-t border-border flex items-center justify-center">
+                    <img
+                      src={listing.brokerageLogoUrl}
+                      alt={`${listing.agentBrokerage ?? "Brokerage"} logo`}
+                      className="max-h-10 max-w-[140px] object-contain"
+                    />
+                  </div>
                 )}
                 {(listing.agentPhone || listing.agentEmail) && (
-                  <div className="mt-3 pt-3 border-t border-border space-y-1.5">
+                  <div className="mt-4 pt-4 border-t border-border space-y-1.5">
                     {listing.agentPhone && (
                       <a href={`tel:${listing.agentPhone}`} className="flex items-center gap-2 text-sm text-ink hover:text-gold transition-colors">
                         <Phone size={13} className="text-gold" />
@@ -540,7 +550,7 @@ export default function Listing() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border py-8 px-6 text-center bg-warm-white">
+      <footer className="border-t border-border py-8 px-6 text-center bg-warm-white pb-24 md:pb-8">
         <p className="text-xs text-muted">
           {fullAddress}
         </p>
@@ -552,6 +562,48 @@ export default function Listing() {
           </Link>
         </p>
       </footer>
+
+      {/* Mobile sticky action bar — Call · Text · Mortgage */}
+      <div className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-border shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.1)] grid grid-cols-3 pb-[env(safe-area-inset-bottom)]">
+        {listing.agentPhone ? (
+          <a
+            href={`tel:${listing.agentPhone.replace(/[^0-9+]/g, "")}`}
+            className="flex flex-col items-center justify-center gap-1 py-3 text-ink active:bg-cream transition-colors"
+          >
+            <Phone size={18} className="text-gold" />
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Call</span>
+          </a>
+        ) : (
+          <a href="#contact" className="flex flex-col items-center justify-center gap-1 py-3 text-ink active:bg-cream">
+            <Phone size={18} className="text-gold" />
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Call</span>
+          </a>
+        )}
+        {listing.agentPhone ? (
+          <a
+            href={`sms:${listing.agentPhone.replace(/[^0-9+]/g, "")}`}
+            className="flex flex-col items-center justify-center gap-1 py-3 text-ink active:bg-cream transition-colors border-x border-border"
+          >
+            <MessageCircle size={18} className="text-gold" />
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Text</span>
+          </a>
+        ) : (
+          <a
+            href="#contact"
+            className="flex flex-col items-center justify-center gap-1 py-3 text-ink active:bg-cream border-x border-border"
+          >
+            <MessageCircle size={18} className="text-gold" />
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Text</span>
+          </a>
+        )}
+        <a
+          href="#mortgage"
+          className="flex flex-col items-center justify-center gap-1 py-3 text-ink active:bg-cream transition-colors"
+        >
+          <Calculator size={18} className="text-gold" />
+          <span className="text-[11px] font-semibold uppercase tracking-wider">Mortgage</span>
+        </a>
+      </div>
     </div>
   );
 }
