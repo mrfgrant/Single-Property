@@ -4,7 +4,7 @@ import { getListingBySlug, formatPrice, type SampleListing } from "@/data/sample
 import { fetchPublicListingBySlug, type PublicListing } from "@/lib/publicListings";
 import { WORDMARK_PREFIX, WORDMARK_SUFFIX } from "@/lib/copy";
 import { ONBOARDING_URL } from "@/lib/config";
-import { Bed, Bath, Car, Square, MapPin, Calendar, Phone, Mail } from "lucide-react";
+import { Bed, Bath, Car, Square, MapPin, Calendar, Phone, Mail, Calculator } from "lucide-react";
 
 type FullListing = SampleListing & {
   photoUrls?: string[];
@@ -26,6 +26,157 @@ function ScoreChip({ label, score }: { label: string; score: number }) {
       <span className="font-bold">{score}</span>
       <span className="font-normal opacity-80">{label}</span>
     </span>
+  );
+}
+
+function MortgageCalculator({ price }: { price: number }) {
+  const [homePrice, setHomePrice] = useState(price);
+  const [downPct, setDownPct] = useState(20);
+  const [ratePct, setRatePct] = useState(7.0);
+  const [years, setYears] = useState<15 | 30>(30);
+
+  useEffect(() => {
+    setHomePrice(price);
+  }, [price]);
+
+  const downPayment = Math.round((homePrice * downPct) / 100);
+  const principal = Math.max(0, homePrice - downPayment);
+  const monthlyRate = ratePct / 100 / 12;
+  const n = years * 12;
+  const monthly =
+    monthlyRate === 0
+      ? principal / n
+      : (principal * monthlyRate * Math.pow(1 + monthlyRate, n)) /
+        (Math.pow(1 + monthlyRate, n) - 1);
+  const monthlyRounded = isFinite(monthly) && monthly > 0 ? Math.round(monthly) : 0;
+  const totalInterest = Math.max(0, Math.round(monthlyRounded * n - principal));
+
+  const fmt = (n: number) =>
+    n.toLocaleString("en-US", { maximumFractionDigits: 0 });
+
+  return (
+    <div className="bg-white border border-border rounded-md overflow-hidden">
+      <div className="flex items-center gap-2 bg-cream px-5 py-3 border-b border-border">
+        <Calculator size={15} className="text-gold" />
+        <h3 className="text-xs font-bold text-ink uppercase tracking-[0.2em]">
+          Mortgage Calculator
+        </h3>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_280px]">
+        {/* Inputs */}
+        <div className="p-5 md:p-6 space-y-5 border-b md:border-b-0 md:border-r border-border">
+          {/* Home price */}
+          <div>
+            <label className="flex items-center justify-between text-xs font-semibold text-ink mb-1.5">
+              <span>Home price</span>
+              <span className="text-muted font-normal">${fmt(homePrice)}</span>
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">$</span>
+              <input
+                type="number"
+                value={homePrice}
+                onChange={(e) => setHomePrice(Math.max(0, Number(e.target.value) || 0))}
+                className="w-full h-10 pl-7 pr-3 rounded border border-border text-sm bg-warm-white focus:outline-none focus:border-ink"
+              />
+            </div>
+          </div>
+
+          {/* Down payment */}
+          <div>
+            <label className="flex items-center justify-between text-xs font-semibold text-ink mb-1.5">
+              <span>Down payment</span>
+              <span className="text-muted font-normal">
+                {downPct}% — ${fmt(downPayment)}
+              </span>
+            </label>
+            <input
+              type="range"
+              min={0}
+              max={50}
+              step={1}
+              value={downPct}
+              onChange={(e) => setDownPct(Number(e.target.value))}
+              className="w-full accent-gold cursor-pointer"
+            />
+          </div>
+
+          {/* Interest rate */}
+          <div>
+            <label className="flex items-center justify-between text-xs font-semibold text-ink mb-1.5">
+              <span>Interest rate</span>
+              <span className="text-muted font-normal">{ratePct.toFixed(2)}%</span>
+            </label>
+            <input
+              type="range"
+              min={2}
+              max={12}
+              step={0.125}
+              value={ratePct}
+              onChange={(e) => setRatePct(Number(e.target.value))}
+              className="w-full accent-gold cursor-pointer"
+            />
+          </div>
+
+          {/* Loan term */}
+          <div>
+            <label className="text-xs font-semibold text-ink mb-1.5 block">
+              Loan term
+            </label>
+            <div className="flex gap-2">
+              {[15, 30].map((y) => (
+                <button
+                  key={y}
+                  type="button"
+                  onClick={() => setYears(y as 15 | 30)}
+                  className={`flex-1 h-10 text-sm font-semibold rounded border transition-colors ${
+                    years === y
+                      ? "bg-ink text-white border-ink"
+                      : "bg-warm-white text-ink border-border hover:border-ink"
+                  }`}
+                >
+                  {y} years
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Result */}
+        <div className="bg-ink/95 text-white p-6 flex flex-col justify-center">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-white/60 mb-2">
+            Estimated monthly payment
+          </p>
+          <p className="text-3xl md:text-4xl font-bold text-gold leading-none mb-1">
+            ${fmt(monthlyRounded)}
+            <span className="text-sm font-normal text-white/50">/mo</span>
+          </p>
+          <p className="text-xs text-white/60 mb-5">Principal &amp; interest</p>
+
+          <dl className="space-y-2 text-xs border-t border-white/10 pt-4">
+            <div className="flex items-center justify-between">
+              <dt className="text-white/60">Loan amount</dt>
+              <dd className="font-semibold text-white">${fmt(principal)}</dd>
+            </div>
+            <div className="flex items-center justify-between">
+              <dt className="text-white/60">Total interest</dt>
+              <dd className="font-semibold text-white">${fmt(totalInterest)}</dd>
+            </div>
+            <div className="flex items-center justify-between">
+              <dt className="text-white/60">Total of payments</dt>
+              <dd className="font-semibold text-white">
+                ${fmt(monthlyRounded * n)}
+              </dd>
+            </div>
+          </dl>
+
+          <p className="text-[10px] text-white/40 mt-4 leading-relaxed">
+            Estimate only. Excludes taxes, insurance, HOA, and PMI.
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -298,6 +449,11 @@ export default function Listing() {
                   </div>
                 ))}
               </dl>
+            </div>
+
+            {/* Mortgage calculator */}
+            <div className="mb-10">
+              <MortgageCalculator price={listing.price} />
             </div>
 
             {/* Neighborhood */}
