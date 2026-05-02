@@ -61,9 +61,11 @@ export function DemoListings() {
   const [query, setQuery] = useState("");
   const [showAll, setShowAll] = useState(false);
 
-  const results = query.trim() ? searchListings(query) : (showAll ? sampleListings : getFeaturedListings());
+  const DEFAULT_COUNT = 4;
+  const defaultListings = sampleListings.slice(0, DEFAULT_COUNT);
+  const results = query.trim() ? searchListings(query) : (showAll ? sampleListings : defaultListings);
   const isFiltering = query.trim().length > 0;
-  const hasMore = !isFiltering && !showAll && sampleListings.length > getFeaturedListings().length;
+  const hasMore = !isFiltering && !showAll && sampleListings.length > DEFAULT_COUNT;
 
   return (
     <section id="demo" className="py-20 px-6 lg:px-12 bg-cream">
@@ -92,7 +94,7 @@ export function DemoListings() {
 
         {/* Grid */}
         {results.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {results.map((listing) => (
               <ListingCard key={listing.slug} listing={listing} />
             ))}
