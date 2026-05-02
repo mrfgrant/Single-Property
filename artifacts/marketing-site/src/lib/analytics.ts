@@ -5,11 +5,21 @@ interface EventProperties {
   depth?: number;
 }
 
+declare global {
+  interface Window {
+    dataLayer?: unknown[];
+  }
+}
+
 export function track(event: AnalyticsEvent, props?: EventProperties): void {
   if (typeof window === "undefined") return;
-  if (import.meta.env.DEV) {
-    console.info("[analytics]", event, props ?? {});
-  }
+
+  console.info("[analytics]", event, props ?? {});
+
+  window.dataLayer = window.dataLayer ?? [];
+  window.dataLayer.push({ event, ...props });
+
+  window.dispatchEvent(new CustomEvent("propsite:track", { detail: { event, ...props } }));
 }
 
 export function initScrollDepth(): () => void {

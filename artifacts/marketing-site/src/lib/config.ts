@@ -1,3 +1,3 @@
-export const ONBOARDING_URL = "#pricing";
+export const ONBOARDING_URL = "/onboarding";
 
-export const DEMO_EXAMPLE_URL = "#";
+export const DEMO_EXAMPLE_URL = "https://demo.propsite.io";
