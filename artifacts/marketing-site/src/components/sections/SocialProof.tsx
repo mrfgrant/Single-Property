@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 
 const testimonials = [
   {
-    quote: "I got a text saying my new listing's site was live. I hadn't even finished writing the MLS description yet. That's when I realized this thing actually works.",
+    quote: "I got an email saying my new listing's site was live. I hadn't even finished writing the MLS description yet. That's when I realized this thing actually works.",
     initials: "SR",
     name: "Sarah R.",
     brokerage: "Keller Williams · Augusta, GA"

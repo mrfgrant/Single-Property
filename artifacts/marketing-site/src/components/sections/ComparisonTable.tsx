@@ -32,7 +32,7 @@ export function ComparisonTable() {
       photoup: "—"
     },
     {
-      feature: "Instant SMS lead alerts",
+      feature: "Instant email lead alerts",
       propsite: "✓",
       rela: "✓",
       cribflyer: "—",

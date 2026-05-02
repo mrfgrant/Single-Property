@@ -1,17 +1,23 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { MockBrowser } from "@/components/MockBrowser";
+import { ONBOARDING_URL, DEMO_EXAMPLE_URL } from "@/lib/config";
+import { track } from "@/lib/analytics";
 
 export function Hero() {
   const scrollToPricing = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
+    track("cta_click", { label: "hero_get_started" });
     document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const handleSeeExample = () => {
+    track("see_example_click", { label: "hero" });
   };
 
   return (
     <section className="min-h-[88vh] pt-32 pb-16 border-b border-border flex items-center">
       <div className="max-w-[1200px] mx-auto px-6 lg:px-12 w-full grid grid-cols-1 lg:grid-cols-2">
-        {/* Left Column - Copy */}
         <div className="flex flex-col justify-center py-12 lg:pr-12 lg:border-r border-border">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -40,15 +46,17 @@ export function Hero() {
 
             <div className="flex flex-col sm:flex-row items-center gap-6 mb-16">
               <a
-                href="#pricing"
+                href={ONBOARDING_URL}
                 onClick={scrollToPricing}
                 className="w-full sm:w-auto h-14 px-8 bg-ink text-warm-white font-medium text-base rounded flex items-center justify-center hover:bg-ink/90 transition-colors"
               >
                 Start for $49 / listing
               </a>
               <a
-                href="#"
+                href={DEMO_EXAMPLE_URL}
                 target="_blank"
+                rel="noopener noreferrer"
+                onClick={handleSeeExample}
                 className="text-ink font-medium hover:text-gold transition-colors"
               >
                 See a live example &rarr;
@@ -84,7 +92,6 @@ export function Hero() {
           </motion.div>
         </div>
 
-        {/* Right Column - Mock Browser */}
         <div className="bg-ink flex items-center justify-center py-12 lg:py-0 px-6 rounded-lg lg:rounded-none lg:rounded-r-xl overflow-hidden mt-12 lg:mt-0">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
