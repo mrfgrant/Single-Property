@@ -64,12 +64,18 @@ export default function DomainSearch({ listings, preselectedListingId, onDone }:
     setActionSuccess("");
     try {
       if (actionType === "register") {
-        await api.domains.register({ domain: actionDomain });
-        setActionSuccess(`${actionDomain} registered successfully.`);
+        const res = await api.domains.register({ domain: actionDomain });
+        const warn = (res as any).warning;
+        setActionSuccess(
+          `${actionDomain} registered.${warn ? ` Note: Cloudflare zone could not be created automatically — you may need to add Zone:Create permission to your API token. (${warn})` : ""}`
+        );
       } else {
         if (!assignListingId) { setActionError("Select a listing to assign."); setActionLoading(false); return; }
-        await api.domains.assign({ domain: actionDomain, listingId: assignListingId });
-        setActionSuccess(`${actionDomain} assigned successfully.`);
+        const res = await api.domains.assign({ domain: actionDomain, listingId: assignListingId });
+        const warn = (res as any).warning;
+        setActionSuccess(
+          `${actionDomain} assigned to listing.${warn ? ` Note: Cloudflare zone could not be created automatically — you may need to add Zone:Create permission to your API token.` : ""}`
+        );
       }
     } catch (e: any) {
       setActionError(e.message);

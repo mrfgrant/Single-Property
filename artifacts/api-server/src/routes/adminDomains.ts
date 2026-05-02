@@ -61,10 +61,15 @@ router.post("/admin/domain/register", adminAuth, async (req, res) => {
 
   const domainClean = domain.toLowerCase().trim();
 
-  const [registered, zone] = await Promise.all([
-    registerDomain(domainClean),
-    ensureZone(domainClean),
-  ]);
+  const registered = await registerDomain(domainClean);
+
+  let zone = null;
+  let zoneWarning: string | null = null;
+  try {
+    zone = await ensureZone(domainClean);
+  } catch (zoneErr: unknown) {
+    zoneWarning = (zoneErr instanceof Error ? zoneErr.message : String(zoneErr));
+  }
 
   const existing = await db
     .select()
@@ -76,19 +81,19 @@ router.post("/admin/domain/register", adminAuth, async (req, res) => {
   if (!row) {
     const inserted = await db
       .insert(standaloneDomainsTable)
-      .values({ domain: domainClean, cloudflareZoneId: zone.id, notes: notes ?? null })
+      .values({ domain: domainClean, cloudflareZoneId: zone?.id ?? null, notes: notes ?? null })
       .returning();
     row = inserted[0];
   } else {
     const updated = await db
       .update(standaloneDomainsTable)
-      .set({ cloudflareZoneId: zone.id, notes: notes ?? row.notes })
+      .set({ cloudflareZoneId: zone?.id ?? row.cloudflareZoneId, notes: notes ?? row.notes })
       .where(eq(standaloneDomainsTable.domain, domainClean))
       .returning();
     row = updated[0];
   }
 
-  res.json({ domain: row, registration: registered, zone });
+  res.json({ domain: row, registration: registered, zone, warning: zoneWarning });
 });
 
 /* POST /api/admin/domain/assign
@@ -114,10 +119,15 @@ router.post("/admin/domain/assign", adminAuth, async (req, res) => {
     return;
   }
 
-  const [registered, zone] = await Promise.all([
-    registerDomain(domainClean),
-    ensureZone(domainClean),
-  ]);
+  const registered = await registerDomain(domainClean);
+
+  let zone = null;
+  let zoneWarning: string | null = null;
+  try {
+    zone = await ensureZone(domainClean);
+  } catch (zoneErr: unknown) {
+    zoneWarning = (zoneErr instanceof Error ? zoneErr.message : String(zoneErr));
+  }
 
   const [updated] = await db
     .update(exampleListingsTable)
@@ -125,7 +135,7 @@ router.post("/admin/domain/assign", adminAuth, async (req, res) => {
     .where(eq(exampleListingsTable.id, listingId))
     .returning();
 
-  res.json({ listing: updated, registration: registered, zone });
+  res.json({ listing: updated, registration: registered, zone, warning: zoneWarning });
 });
 
 /* POST /api/admin/domain/unassign
