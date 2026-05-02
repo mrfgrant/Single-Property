@@ -37,9 +37,10 @@ React + Vite SaaS marketing homepage at `/`. The public-facing page real estate 
 - Fonts: Playfair Display (headings/display) + DM Sans (body/UI) via Google Fonts
 - Palette: warm editorial luxury — `--ink #0e0e0e`, `--cream #f5f0e8`, `--warm-white #faf8f4`, `--gold #c9a84c`
 - Single-page scroll: Nav → Hero (mock browser preview) → How It Works → Pricing → Comparison Table → Social Proof → CTA Banner → Footer
-- All copy centralized in `src/lib/copy.ts` including the `PLATFORM_NAME` constant (currently "PropSite")
-- CTA buttons (`Get started — $49/mo`) link to `#pricing` as a stub pending Task #4 (onboarding flow)
-- "See a live example" links are `#` stubs pending Task #3 (property site renderer demo)
+- All copy centralized in `src/lib/copy.ts` — PLATFORM_NAME, WORDMARK_PREFIX/SUFFIX, PAGE_TITLE, PAGE_DESCRIPTION, and all section copy (HERO, HOW_IT_WORKS, PRICING, COMPARISON, SOCIAL_PROOF, CTA_BANNER, NAV)
+- URL constants in `src/lib/config.ts`: `ONBOARDING_URL = "https://app.propsite.io/onboarding"` and `DEMO_EXAMPLE_URL = "https://demo.propsite.io"` — both are stubs to be updated to real URLs once Task #3 (property renderer) and Task #4 (onboarding/Stripe) are complete
+- CTA buttons navigate externally to ONBOARDING_URL (no scroll-intercept); "See a live example" links open DEMO_EXAMPLE_URL in a new tab
+- Analytics: `src/lib/analytics.ts` tracks `cta_click`, `see_example_click`, `scroll_depth` events; beacons to `POST /api/analytics/events` on the API server; also pushes to `window.dataLayer` for GTM and dispatches `propsite:track` CustomEvent
 - SMS removed from all copy per platform-owner decision; copy uses email-only lead alerts
 
 ### `artifacts/mockup-sandbox`
