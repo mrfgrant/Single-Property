@@ -1,11 +1,14 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
-import { sampleListings, searchListings, formatPrice, type SampleListing } from "@/data/sampleListings";
-import { Bed, Bath, Square, Search, X, ExternalLink, Eye } from "lucide-react";
+import { sampleListings, formatPrice, type SampleListing } from "@/data/sampleListings";
+import { fetchPublicListings, type PublicListing } from "@/lib/publicListings";
+import { Bed, Bath, Square, Search, X, ExternalLink, Eye, Zap } from "lucide-react";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
-function ListingCard({ listing, onPreview }: { listing: SampleListing; onPreview: (slug: string) => void }) {
+type Card = SampleListing & { isLive?: boolean; photoUrls?: string[] };
+
+function ListingCard({ listing, onPreview }: { listing: Card; onPreview: (slug: string) => void }) {
   const gradients = [
     "from-[#1a2e1a] to-[#2d4a2d]",
     "from-[#1e2a3a] to-[#2a3d52]",
@@ -15,17 +18,35 @@ function ListingCard({ listing, onPreview }: { listing: SampleListing; onPreview
     "from-[#1a2a2e] to-[#2d3d4a]",
   ];
   const grad = gradients[listing.address.length % gradients.length];
+  const heroPhoto = listing.photoUrls?.[0];
 
   return (
     <div
       className="group border border-border rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer bg-white"
       onClick={() => onPreview(listing.slug)}
     >
-      <div className={`h-44 bg-gradient-to-br ${grad} flex items-end justify-between p-4`}>
+      <div
+        className={`relative h-44 ${heroPhoto ? "" : `bg-gradient-to-br ${grad}`} flex items-end justify-between p-4`}
+        style={
+          heroPhoto
+            ? {
+                backgroundImage: `linear-gradient(to top, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0) 50%), url(${heroPhoto})`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+              }
+            : undefined
+        }
+      >
+        {listing.isLive && (
+          <span className="absolute top-3 left-3 inline-flex items-center gap-1 bg-emerald-500 text-white text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full shadow-md">
+            <Zap size={9} fill="currentColor" />
+            Live
+          </span>
+        )}
         <span className="inline-flex items-center bg-gold text-white text-sm font-bold px-3 py-1 rounded-full">
           {formatPrice(listing.price)}
         </span>
-        <span className="inline-flex items-center gap-1 bg-white/10 border border-white/20 text-white text-xs px-2.5 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+        <span className="inline-flex items-center gap-1 bg-white/10 border border-white/20 text-white text-xs px-2.5 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
           <Eye size={11} />
           Preview
         </span>
@@ -55,8 +76,8 @@ function ListingCard({ listing, onPreview }: { listing: SampleListing; onPreview
         </div>
 
         <div className="mt-3 pt-3 border-t border-border/60 flex items-center justify-between">
-          <span className="text-xs text-muted">{listing.agentBrokerage}</span>
-          <span className="text-xs text-gold font-medium group-hover:underline">View site →</span>
+          <span className="text-xs text-muted truncate">{listing.agentBrokerage || "PropSite"}</span>
+          <span className="text-xs text-gold font-medium group-hover:underline shrink-0 ml-2">View site →</span>
         </div>
       </div>
     </div>
@@ -68,15 +89,12 @@ function PreviewDrawer({ slug, onClose }: { slug: string; onClose: () => void })
 
   return (
     <div className="fixed inset-0 z-50 flex" onClick={onClose}>
-      {/* Backdrop */}
       <div className="flex-1 bg-black/40 backdrop-blur-sm" />
 
-      {/* Panel */}
       <div
         className="relative w-full max-w-[520px] bg-white shadow-2xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50 shrink-0">
           <div className="min-w-0">
             <p className="text-xs text-gray-500 mb-0.5">PropSite property preview</p>
@@ -100,7 +118,6 @@ function PreviewDrawer({ slug, onClose }: { slug: string; onClose: () => void })
           </div>
         </div>
 
-        {/* iframe */}
         <iframe
           src={url}
           className="flex-1 w-full border-0"
@@ -111,16 +128,39 @@ function PreviewDrawer({ slug, onClose }: { slug: string; onClose: () => void })
   );
 }
 
+function searchCards(cards: Card[], query: string): Card[] {
+  const q = query.toLowerCase().trim();
+  if (!q) return cards;
+  return cards.filter(
+    (l) =>
+      l.address.toLowerCase().includes(q) ||
+      l.city.toLowerCase().includes(q) ||
+      (l.zip ?? "").toString().includes(q) ||
+      l.slug.toLowerCase().includes(q),
+  );
+}
+
 export function DemoListings() {
   const [query, setQuery] = useState("");
   const [showAll, setShowAll] = useState(false);
   const [previewSlug, setPreviewSlug] = useState<string | null>(null);
+  const [liveListings, setLiveListings] = useState<PublicListing[]>([]);
+
+  useEffect(() => {
+    fetchPublicListings().then(setLiveListings);
+  }, []);
+
+  const allCards = useMemo<Card[]>(() => {
+    const liveSlugs = new Set(liveListings.map((l) => l.slug));
+    const filteredSamples = sampleListings.filter((s) => !liveSlugs.has(s.slug));
+    return [...liveListings, ...filteredSamples];
+  }, [liveListings]);
 
   const DEFAULT_COUNT = 4;
-  const defaultListings = sampleListings.slice(0, DEFAULT_COUNT);
-  const results = query.trim() ? searchListings(query) : (showAll ? sampleListings : defaultListings);
   const isFiltering = query.trim().length > 0;
-  const hasMore = !isFiltering && !showAll && sampleListings.length > DEFAULT_COUNT;
+  const filtered = isFiltering ? searchCards(allCards, query) : allCards;
+  const results = isFiltering || showAll ? filtered : filtered.slice(0, DEFAULT_COUNT);
+  const hasMore = !isFiltering && !showAll && allCards.length > DEFAULT_COUNT;
 
   return (
     <>
@@ -132,7 +172,9 @@ export function DemoListings() {
               Real sites. Real addresses.
             </h2>
             <p className="text-muted max-w-lg mx-auto">
-              Every listing below is a full property website — the same kind PropSite builds for agents automatically. Click any card to explore.
+              {liveListings.length > 0
+                ? `${liveListings.length} live PropSite${liveListings.length !== 1 ? "s" : ""} from real listings — plus examples below. Click any card to preview.`
+                : "Every listing below is a full property website — the same kind PropSite builds for agents automatically. Click any card to explore."}
             </p>
           </div>
 
@@ -172,7 +214,7 @@ export function DemoListings() {
                 onClick={() => setShowAll(true)}
                 className="h-11 px-8 border border-ink text-ink text-sm font-medium rounded hover:bg-ink hover:text-warm-white transition-colors"
               >
-                Browse all {sampleListings.length} examples →
+                Browse all {allCards.length} examples →
               </button>
             </div>
           )}
@@ -189,7 +231,6 @@ export function DemoListings() {
         </div>
       </section>
 
-      {/* Preview drawer */}
       {previewSlug && (
         <PreviewDrawer slug={previewSlug} onClose={() => setPreviewSlug(null)} />
       )}

@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useParams } from "wouter";
 import { getListingBySlug, formatPrice, type SampleListing } from "@/data/sampleListings";
+import { fetchPublicListingBySlug, type PublicListing } from "@/lib/publicListings";
 import { WORDMARK_PREFIX, WORDMARK_SUFFIX, PLATFORM_NAME } from "@/lib/copy";
 import { ONBOARDING_URL } from "@/lib/config";
 
@@ -65,7 +66,35 @@ function NotFound() {
 
 export default function Listing() {
   const params = useParams<{ slug: string }>();
-  const listing = getListingBySlug(params.slug ?? "");
+  const slug = params.slug ?? "";
+  const staticListing = getListingBySlug(slug);
+
+  const [apiListing, setApiListing] = useState<PublicListing | null>(null);
+  const [apiLoading, setApiLoading] = useState(!staticListing);
+
+  useEffect(() => {
+    if (staticListing) return;
+    let cancelled = false;
+    fetchPublicListingBySlug(slug).then((row) => {
+      if (cancelled) return;
+      setApiListing(row);
+      setApiLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, staticListing]);
+
+  const listing: (SampleListing & { photoUrls?: string[] }) | null =
+    staticListing ?? apiListing;
+
+  if (apiLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-warm-white text-muted text-sm">
+        Loading listing…
+      </div>
+    );
+  }
 
   if (!listing) return <NotFound />;
 
@@ -85,7 +114,15 @@ export default function Listing() {
       {/* Hero */}
       <div
         className="relative min-h-[480px] flex flex-col justify-end pb-12 px-6 text-white"
-        style={{ background: "linear-gradient(160deg, #1a2e1a 0%, #2d4a2d 40%, #3a5c3a 100%)" }}
+        style={
+          listing.photoUrls && listing.photoUrls.length > 0
+            ? {
+                backgroundImage: `linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.2) 100%), url(${listing.photoUrls[0]})`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+              }
+            : { background: "linear-gradient(160deg, #1a2e1a 0%, #2d4a2d 40%, #3a5c3a 100%)" }
+        }
       >
         <div className="max-w-[900px] mx-auto w-full">
           <p className="text-sm font-medium text-white/70 mb-2 uppercase tracking-wide">
@@ -107,6 +144,35 @@ export default function Listing() {
           </div>
         </div>
       </div>
+
+      {/* Photo gallery */}
+      {listing.photoUrls && listing.photoUrls.length > 1 && (
+        <div className="max-w-[900px] mx-auto px-6 pt-8">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {listing.photoUrls.slice(0, 6).map((url, i) => (
+              <a
+                key={i}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block aspect-[4/3] rounded-lg overflow-hidden bg-cream border border-border hover:opacity-95 transition-opacity"
+              >
+                <img
+                  src={url}
+                  alt={`${listing.address} photo ${i + 1}`}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </a>
+            ))}
+          </div>
+          {listing.photoUrls.length > 6 && (
+            <p className="text-center text-xs text-muted mt-3">
+              + {listing.photoUrls.length - 6} more photo{listing.photoUrls.length - 6 !== 1 ? "s" : ""}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Main content */}
       <div className="max-w-[900px] mx-auto px-6 py-12">
