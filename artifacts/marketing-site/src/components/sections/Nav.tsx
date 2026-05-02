@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { PLATFORM_NAME } from "@/lib/copy";
+import { WORDMARK_PREFIX, WORDMARK_SUFFIX } from "@/lib/copy";
 import { ONBOARDING_URL, DEMO_EXAMPLE_URL } from "@/lib/config";
 import { track } from "@/lib/analytics";
 import { Menu, X } from "lucide-react";
@@ -40,8 +40,8 @@ export function Nav() {
       >
         <div className="max-w-[1200px] mx-auto px-6 lg:px-12 h-20 flex items-center justify-between">
           <Link href="/" className="text-2xl flex items-baseline">
-            <span className="font-serif font-normal text-ink">Prop</span>
-            <span className="font-serif text-gold">Site</span>
+            <span className="font-serif font-normal text-ink">{WORDMARK_PREFIX}</span>
+            <span className="font-serif text-gold">{WORDMARK_SUFFIX}</span>
           </Link>
 
           <div className="hidden md:flex items-center gap-8">
