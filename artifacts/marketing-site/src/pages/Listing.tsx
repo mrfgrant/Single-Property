@@ -182,11 +182,11 @@ function MortgageCalculator({ price }: { price: number }) {
 
 function StatTile({ icon: Icon, value, label }: { icon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>; value: string | number; label: string }) {
   return (
-    <div className="flex items-center gap-3 px-5 py-5">
-      <Icon size={28} strokeWidth={1.4} className="text-gold/90 shrink-0" />
+    <div className="flex flex-col items-center text-center md:flex-row md:items-center md:text-left md:gap-3 gap-1 px-2 py-3 md:px-5 md:py-5">
+      <Icon size={20} strokeWidth={1.4} className="text-gold/90 shrink-0 md:w-7 md:h-7" />
       <div className="min-w-0">
-        <p className="text-xl font-bold text-white leading-none">{value}</p>
-        <p className="text-[10px] uppercase tracking-[0.15em] text-white/60 mt-1.5">{label}</p>
+        <p className="text-sm md:text-xl font-bold text-white leading-none">{value}</p>
+        <p className="text-[9px] md:text-[10px] uppercase tracking-[0.12em] md:tracking-[0.15em] text-white/60 mt-1 md:mt-1.5">{label}</p>
       </div>
     </div>
   );
@@ -283,7 +283,7 @@ export default function Listing() {
       {/* Hero */}
       <header
         id="home"
-        className="relative min-h-screen flex flex-col text-white"
+        className="relative min-h-[560px] md:min-h-screen flex flex-col text-white"
         style={
           heroPhoto
             ? {
@@ -295,10 +295,10 @@ export default function Listing() {
         }
       >
         {/* Top nav */}
-        <nav className="relative z-10 flex items-center justify-between px-6 md:px-12 py-6">
+        <nav className="relative z-10 flex items-center justify-between px-5 md:px-12 py-4 md:py-6">
           <a
             href="#home"
-            className="text-xl md:text-2xl font-serif font-bold text-white drop-shadow-md hover:opacity-90 transition-opacity"
+            className="text-base md:text-2xl font-serif font-bold text-white drop-shadow-md hover:opacity-90 transition-opacity truncate max-w-[70%]"
           >
             {displayDomain}
           </a>
@@ -309,34 +309,45 @@ export default function Listing() {
             <a href="#about" className="hover:text-gold transition-colors uppercase">About</a>
             <a href="#contact" className="hover:text-gold transition-colors uppercase">Contact Agent</a>
           </div>
+          {/* Mobile: tap-to-call shortcut */}
+          {listing.agentPhone && (
+            <a
+              href={`tel:${listing.agentPhone.replace(/[^0-9+]/g, "")}`}
+              className="md:hidden inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.15em] uppercase text-white bg-white/10 backdrop-blur-sm border border-white/30 px-3 py-1.5 rounded-full hover:bg-white/20 transition-colors"
+              aria-label="Call agent"
+            >
+              <Phone size={11} />
+              Call
+            </a>
+          )}
         </nav>
 
         {/* Center floating card */}
-        <div className="flex-1 flex items-center justify-center px-6 py-10">
+        <div className="flex-1 flex items-center justify-center px-4 md:px-6 py-6 md:py-10">
           <div className="w-full max-w-4xl flex flex-col md:flex-row shadow-2xl rounded-sm overflow-hidden">
             {/* Left — price + address + CTA */}
-            <div className="flex-1 bg-white/95 backdrop-blur-sm px-8 py-8 md:py-10 flex flex-col justify-center">
-              <p className="text-4xl md:text-5xl font-bold text-gold mb-3 leading-none tracking-tight">
+            <div className="flex-1 bg-white/95 backdrop-blur-sm px-5 md:px-8 py-6 md:py-10 flex flex-col justify-center">
+              <p className="text-3xl md:text-5xl font-bold text-gold mb-2 md:mb-3 leading-none tracking-tight">
                 {formatPrice(listing.price)}
               </p>
-              <p className="text-ink font-semibold text-lg mb-1 leading-tight">{listing.address}</p>
-              <p className="text-muted text-sm mb-7">
+              <p className="text-ink font-semibold text-base md:text-lg mb-0.5 leading-tight">{listing.address}</p>
+              <p className="text-muted text-xs md:text-sm mb-5 md:mb-7">
                 {listing.city}, {listing.state} {listing.zip}
               </p>
               <a
                 href="#contact"
-                className="block w-full text-center bg-gold hover:bg-gold/90 text-white font-bold uppercase tracking-[0.18em] text-xs py-4 transition-colors rounded-sm"
+                className="block w-full text-center bg-gold hover:bg-gold/90 text-white font-bold uppercase tracking-[0.18em] text-xs py-3.5 md:py-4 transition-colors rounded-sm"
               >
                 Schedule a Showing
               </a>
             </div>
 
             {/* Right — stat panel */}
-            <div className="bg-ink/95 backdrop-blur-sm grid grid-cols-2 md:w-[280px]">
-              <div className="border-b border-r border-white/10">
-                <StatTile icon={Bed} value={listing.beds} label={listing.beds === 1 ? "Bedroom" : "Bedrooms"} />
+            <div className="bg-ink/95 backdrop-blur-sm grid grid-cols-4 md:grid-cols-2 md:w-[280px]">
+              <div className="border-r border-white/10 md:border-b">
+                <StatTile icon={Bed} value={listing.beds} label={listing.beds === 1 ? "Bed" : "Beds"} />
               </div>
-              <div className="border-b border-white/10">
+              <div className="border-r border-white/10 md:border-b md:border-r-0">
                 <StatTile icon={Bath} value={listing.baths} label={listing.baths === 1 ? "Bath" : "Baths"} />
               </div>
               <div className="border-r border-white/10">
@@ -349,9 +360,9 @@ export default function Listing() {
           </div>
         </div>
 
-        {/* Bottom photo strip */}
+        {/* Bottom photo strip — desktop only (mobile gets a dedicated section below) */}
         {stripPhotos.length > 0 && (
-          <div className="relative grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 bg-black/40">
+          <div className="relative hidden md:grid grid-cols-3 md:grid-cols-5 bg-black/40">
             {stripPhotos.map((url, i) => (
               <a
                 key={i}
@@ -370,6 +381,28 @@ export default function Listing() {
           </div>
         )}
       </header>
+
+      {/* Mobile-only photo preview strip — horizontal scroll under the hero */}
+      {stripPhotos.length > 0 && (
+        <div className="md:hidden bg-ink py-3">
+          <div className="flex gap-2 overflow-x-auto px-4 snap-x snap-mandatory scrollbar-hide">
+            {stripPhotos.map((url, i) => (
+              <a
+                key={i}
+                href="#gallery"
+                className="flex-shrink-0 w-40 aspect-[4/3] overflow-hidden rounded snap-start block"
+              >
+                <img
+                  src={url}
+                  alt={`${listing.address} photo ${i + 2}`}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Gallery */}
       {galleryPhotos.length > 0 && (
