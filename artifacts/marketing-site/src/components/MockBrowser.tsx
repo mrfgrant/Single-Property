@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 
 export function MockBrowser() {
   return (
-    <div className="w-full max-w-[600px] mx-auto rounded-[6px] border border-[rgba(255,255,255,0.1)] bg-ink overflow-hidden shadow-2xl flex flex-col font-sans text-left">
+    <div className="w-full max-w-[600px] mx-auto rounded-[6px] border border-[rgba(255,255,255,0.1)] bg-ink overflow-hidden flex flex-col font-sans text-left">
       {/* Browser Chrome */}
       <div className="flex items-center px-4 py-3 bg-[rgba(255,255,255,0.05)] border-b border-[rgba(255,255,255,0.1)] relative">
         <div className="flex gap-2">

@@ -11,6 +11,8 @@ declare global {
   }
 }
 
+const ANALYTICS_ENDPOINT = "/api/analytics/events";
+
 export function track(event: AnalyticsEvent, props?: EventProperties): void {
   if (typeof window === "undefined") return;
 
@@ -19,7 +21,27 @@ export function track(event: AnalyticsEvent, props?: EventProperties): void {
   window.dataLayer = window.dataLayer ?? [];
   window.dataLayer.push({ event, ...props });
 
-  window.dispatchEvent(new CustomEvent("propsite:track", { detail: { event, ...props } }));
+  window.dispatchEvent(
+    new CustomEvent("propsite:track", { detail: { event, ...props } }),
+  );
+
+  try {
+    const payload = JSON.stringify({ event, ...props });
+    if (typeof navigator.sendBeacon === "function") {
+      navigator.sendBeacon(
+        ANALYTICS_ENDPOINT,
+        new Blob([payload], { type: "application/json" }),
+      );
+    } else {
+      fetch(ANALYTICS_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+        keepalive: true,
+      }).catch(() => {});
+    }
+  } catch {
+  }
 }
 
 export function initScrollDepth(): () => void {
