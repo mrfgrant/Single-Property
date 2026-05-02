@@ -225,7 +225,7 @@ router.get("/admin/domain/dns/:domain", adminAuth, async (req, res) => {
     return;
   }
   const records = await listDnsRecords(zone.id);
-  res.json({ zoneId: zone.id, records });
+  res.json({ zoneId: zone.id, nameServers: zone.name_servers ?? [], records });
 });
 
 /* POST /api/admin/domain/dns/:domain

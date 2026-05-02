@@ -8,6 +8,7 @@ import { SocialProof } from "@/components/sections/SocialProof";
 import { DemoListings } from "@/components/sections/DemoListings";
 import { CTABanner } from "@/components/sections/CTABanner";
 import { Footer } from "@/components/sections/Footer";
+import { OomBanner } from "@/components/OomBanner";
 import { initScrollDepth } from "@/lib/analytics";
 
 export default function Home() {
@@ -17,6 +18,7 @@ export default function Home() {
 
   return (
     <div className="min-h-[100dvh] bg-warm-white flex flex-col font-sans">
+      <OomBanner />
       <Nav />
       <main className="flex-1">
         <Hero />

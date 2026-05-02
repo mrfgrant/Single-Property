@@ -24,9 +24,143 @@
     <meta name="twitter:description" content="We watch your MLS feed. The moment a new listing appears under your name, we build the full marketing site, register the domain, and start collecting leads — automatically." />
     <meta name="twitter:image" content="https://propsite.app/og-image.png" />
 
-    <!-- Additional SEO -->
+    <!-- SEO -->
     <meta name="robots" content="index, follow" />
-    <meta name="keywords" content="real estate agent website, property website, single listing website, MLS automation, Augusta GA real estate, CSRA real estate, automated listing site" />
+    <meta name="keywords" content="real estate agent website, property website, single listing website, MLS automation, Augusta GA real estate, CSRA real estate, automated listing site, single property website, listing website builder" />
+    <meta name="author" content="PropSite" />
+
+    <!-- GEO targeting — Augusta GA / CSRA -->
+    <meta name="geo.region" content="US-GA" />
+    <meta name="geo.placename" content="Augusta, Georgia" />
+    <meta name="geo.position" content="33.4735;-82.0105" />
+    <meta name="ICBM" content="33.4735, -82.0105" />
+
+    <!-- Schema.org JSON-LD -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://propsite.app/#app",
+          "name": "PropSite",
+          "url": "https://propsite.app",
+          "description": "Automated single-property website platform for real estate agents. Watches your MLS feed, builds property sites, registers custom street-address domains, and sends weekly seller reports — all automatically.",
+          "applicationCategory": "BusinessApplication",
+          "operatingSystem": "Web",
+          "offers": {
+            "@type": "Offer",
+            "price": "49.00",
+            "priceCurrency": "USD",
+            "priceSpecification": {
+              "@type": "UnitPriceSpecification",
+              "price": "49.00",
+              "priceCurrency": "USD",
+              "referenceQuantity": {
+                "@type": "QuantitativeValue",
+                "value": "1",
+                "unitCode": "MON"
+              }
+            },
+            "description": "$49 per active listing per month. Billing stops automatically when the listing closes."
+          },
+          "featureList": [
+            "Custom street-address domain registration",
+            "Full property website with MLS photos, map, school data, walk scores",
+            "Instant email lead alerts under 60 seconds",
+            "Automated seller weekly report every Monday",
+            "QR code and print-ready sign rider PDF",
+            "Auto-archives when listing closes"
+          ],
+          "screenshot": "https://propsite.app/og-image.png",
+          "publisher": {
+            "@id": "https://propsite.app/#organization"
+          }
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://propsite.app/#organization",
+          "name": "PropSite",
+          "url": "https://propsite.app",
+          "logo": "https://propsite.app/favicon.svg",
+          "description": "PropSite automates single-property websites for real estate agents in the Augusta GA / CSRA market.",
+          "areaServed": [
+            {
+              "@type": "City",
+              "name": "Augusta",
+              "containedInPlace": {
+                "@type": "State",
+                "name": "Georgia",
+                "containedInPlace": {
+                  "@type": "Country",
+                  "name": "United States"
+                }
+              }
+            },
+            {
+              "@type": "DefinedRegion",
+              "name": "CSRA",
+              "description": "Central Savannah River Area — Augusta GA and surrounding counties in Georgia and South Carolina"
+            }
+          ],
+          "knowsAbout": [
+            "Real estate marketing",
+            "Single property websites",
+            "MLS automation",
+            "Domain registration",
+            "Lead generation"
+          ]
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://propsite.app/#website",
+          "url": "https://propsite.app",
+          "name": "PropSite",
+          "description": "Automated property websites for real estate agents",
+          "publisher": {
+            "@id": "https://propsite.app/#organization"
+          }
+        },
+        {
+          "@type": "FAQPage",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "How much does PropSite cost?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "$49 per active listing per month. Billing stops automatically when your listing closes or is withdrawn. No setup fees, no contracts."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "What markets does PropSite serve?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "PropSite currently serves real estate agents in the Augusta, GA / CSRA market, including members of the Augusta Metro Board of REALTORS®. Additional markets are planned."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How long does it take for a property site to go live?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Under 5 minutes from the time a new listing appears in the MLS under your agent ID. PropSite automatically registers a custom domain, builds the site, and starts collecting leads."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Does PropSite include domain registration?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes. Domain registration is included in the $49/month price. We automatically register a custom street-address domain (e.g., 412magnoliadrive.com) for each listing."
+              }
+            }
+          ]
+        }
+      ]
+    }
+    </script>
 
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com">

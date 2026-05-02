@@ -141,7 +141,7 @@ export const api = {
       }),
     list: () => request<{ domains: DomainEntry[] }>("/api/admin/domain/list"),
     listDns: (domain: string) =>
-      request<{ zoneId: string; records: DnsRecord[] }>(`/api/admin/domain/dns/${encodeURIComponent(domain)}`),
+      request<{ zoneId: string; nameServers: string[]; records: DnsRecord[] }>(`/api/admin/domain/dns/${encodeURIComponent(domain)}`),
     addDns: (
       domain: string,
       body: { type: "A" | "TXT"; name: string; content: string; ttl?: number; proxied?: boolean },

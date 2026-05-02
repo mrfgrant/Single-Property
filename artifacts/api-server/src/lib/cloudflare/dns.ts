@@ -4,6 +4,7 @@ export interface Zone {
   id: string;
   name: string;
   status: string;
+  name_servers: string[];
 }
 
 export interface DnsRecord {

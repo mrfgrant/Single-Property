@@ -31,6 +31,7 @@ export default function DomainsManager() {
 
   const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
   const [dnsRecords, setDnsRecords] = useState<DnsRecord[]>([]);
+  const [dnsNameServers, setDnsNameServers] = useState<string[]>([]);
   const [dnsLoading, setDnsLoading] = useState(false);
   const [dnsError, setDnsError] = useState("");
 
@@ -63,12 +64,14 @@ export default function DomainsManager() {
   const openDns = async (domain: string) => {
     setSelectedDomain(domain);
     setDnsRecords([]);
+    setDnsNameServers([]);
     setDnsError("");
     setDnsLoading(true);
     setShowAddForm(false);
     try {
       const res = await api.domains.listDns(domain);
       setDnsRecords(res.records);
+      setDnsNameServers(res.nameServers ?? []);
     } catch (e: any) {
       setDnsError(e.message);
     } finally {
@@ -195,23 +198,33 @@ export default function DomainsManager() {
           {/* DNS panel */}
           {selectedDomain && (
             <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-gray-800 font-mono">{selectedDomain}</p>
-                  <p className="text-xs text-gray-400">DNS Records</p>
+              <div className="px-4 py-3 border-b border-gray-100">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800 font-mono">{selectedDomain}</p>
+                    <p className="text-xs text-gray-400">DNS Records</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowAddForm(true)}
+                      className="flex items-center gap-1.5 h-8 px-3 text-xs font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800"
+                    >
+                      <Plus size={12} />
+                      Add record
+                    </button>
+                    <button onClick={() => setSelectedDomain(null)} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
+                      <X size={15} />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setShowAddForm(true)}
-                    className="flex items-center gap-1.5 h-8 px-3 text-xs font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800"
-                  >
-                    <Plus size={12} />
-                    Add record
-                  </button>
-                  <button onClick={() => setSelectedDomain(null)} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
-                    <X size={15} />
-                  </button>
-                </div>
+                {dnsNameServers.length > 0 && (
+                  <div className="mt-2.5 p-2.5 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-xs font-semibold text-blue-800 mb-1">Point your domain registrar to these nameservers:</p>
+                    {dnsNameServers.map((ns) => (
+                      <p key={ns} className="text-xs font-mono text-blue-700">NS &nbsp; {ns}</p>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {dnsLoading && (

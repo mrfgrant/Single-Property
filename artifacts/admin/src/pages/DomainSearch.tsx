@@ -28,6 +28,7 @@ export default function DomainSearch({ listings, preselectedListingId, onDone }:
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState("");
   const [actionSuccess, setActionSuccess] = useState("");
+  const [nameServers, setNameServers] = useState<string[]>([]);
 
   const handleSearch = async () => {
     setResults([]);
@@ -52,6 +53,7 @@ export default function DomainSearch({ listings, preselectedListingId, onDone }:
     setActionType(type);
     setActionError("");
     setActionSuccess("");
+    setNameServers([]);
     if (!assignListingId && listings.length > 0) {
       setAssignListingId(listings[0].id);
     }
@@ -62,19 +64,24 @@ export default function DomainSearch({ listings, preselectedListingId, onDone }:
     setActionLoading(true);
     setActionError("");
     setActionSuccess("");
+    setNameServers([]);
     try {
       if (actionType === "register") {
         const res = await api.domains.register({ domain: actionDomain });
         const warn = (res as any).warning;
+        const ns: string[] = (res as any).zone?.name_servers ?? [];
+        setNameServers(ns);
         setActionSuccess(
-          `${actionDomain} registered.${warn ? ` Note: Cloudflare zone could not be created automatically — you may need to add Zone:Create permission to your API token. (${warn})` : ""}`
+          `${actionDomain} registered.${warn ? ` Note: Zone creation issue — ${warn}` : ""}`
         );
       } else {
         if (!assignListingId) { setActionError("Select a listing to assign."); setActionLoading(false); return; }
         const res = await api.domains.assign({ domain: actionDomain, listingId: assignListingId });
         const warn = (res as any).warning;
+        const ns: string[] = (res as any).zone?.name_servers ?? [];
+        setNameServers(ns);
         setActionSuccess(
-          `${actionDomain} assigned to listing.${warn ? ` Note: Cloudflare zone could not be created automatically — you may need to add Zone:Create permission to your API token.` : ""}`
+          `${actionDomain} assigned to listing.${warn ? ` Note: Zone creation issue — ${warn}` : ""}`
         );
       }
     } catch (e: any) {
@@ -222,7 +229,20 @@ export default function DomainSearch({ listings, preselectedListingId, onDone }:
           )}
 
           {actionSuccess && (
-            <p className="text-sm text-emerald-600 font-medium">{actionSuccess}</p>
+            <div>
+              <p className="text-sm text-emerald-600 font-medium">{actionSuccess}</p>
+              {nameServers.length > 0 && (
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs font-semibold text-blue-800 mb-1.5">
+                    Point your domain registrar to these Cloudflare nameservers:
+                  </p>
+                  {nameServers.map((ns) => (
+                    <p key={ns} className="text-xs font-mono text-blue-700">NS &nbsp; {ns}</p>
+                  ))}
+                  <p className="text-xs text-blue-600 mt-1.5">Changes may take up to 24 hrs to propagate.</p>
+                </div>
+              )}
+            </div>
           )}
           {actionError && (
             <p className="text-sm text-red-600">{actionError}</p>

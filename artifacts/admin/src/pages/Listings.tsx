@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { api, type ExampleListing } from "@/lib/api";
 import { clearToken } from "@/lib/auth";
-import { Plus, Pencil, Trash2, Star, Eye, EyeOff, Link2, XCircle } from "lucide-react";
+import { Plus, Pencil, Trash2, Star, Eye, EyeOff, Link2, XCircle, ExternalLink } from "lucide-react";
 
 interface Props {
   onEdit: (listing: ExampleListing | null) => void;
@@ -211,6 +211,15 @@ export default function Listings({ onEdit, onAssignDomain, onListingsLoaded }: P
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-2 justify-end">
+                        <a
+                          href={`/listing/${l.slug}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                          title="Preview listing site"
+                        >
+                          <ExternalLink size={15} />
+                        </a>
                         <button
                           onClick={() => onEdit(l)}
                           className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
