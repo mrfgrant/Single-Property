@@ -1,58 +1,8 @@
 import React from "react";
-import { PLATFORM_NAME } from "@/lib/copy";
+import { PLATFORM_NAME, COMPARISON } from "@/lib/copy";
 
 export function ComparisonTable() {
-  const rows = [
-    {
-      feature: "Agent effort per listing",
-      propsite: "Zero",
-      rela: "Upload + write copy",
-      cribflyer: "Upload photos",
-      photoup: "Upload photos"
-    },
-    {
-      feature: "MLS-triggered automation",
-      propsite: "✓",
-      rela: "—",
-      cribflyer: "—",
-      photoup: "—"
-    },
-    {
-      feature: "Custom domain per listing",
-      propsite: "✓ Included",
-      rela: "Add-on fee",
-      cribflyer: "—",
-      photoup: "—"
-    },
-    {
-      feature: "Seller weekly traffic report",
-      propsite: "✓ Auto-sent",
-      rela: "Manual",
-      cribflyer: "—",
-      photoup: "—"
-    },
-    {
-      feature: "Instant email lead alerts",
-      propsite: "✓",
-      rela: "✓",
-      cribflyer: "—",
-      photoup: "—"
-    },
-    {
-      feature: "Auto-archives at close",
-      propsite: "✓",
-      rela: "—",
-      cribflyer: "—",
-      photoup: "—"
-    },
-    {
-      feature: "Pricing",
-      propsite: "$49 flat, everything in",
-      rela: "Tiered + domain add-on",
-      cribflyer: "Per-listing variable",
-      photoup: "Per-feature"
-    }
-  ];
+  const { headline, rows } = COMPARISON;
 
   return (
     <section className="py-20 md:py-[5rem] px-6 lg:px-12 max-w-[1200px] mx-auto border-b border-border">
@@ -61,7 +11,7 @@ export function ComparisonTable() {
           03
         </div>
         <h2 className="text-4xl md:text-5xl font-bold font-serif text-ink relative z-10">
-          How we compare
+          {headline}
         </h2>
       </div>
 
