@@ -2,12 +2,26 @@ import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "wouter";
 import { getListingBySlug, formatPrice, type SampleListing } from "@/data/sampleListings";
 import { fetchPublicListingBySlug, type PublicListing } from "@/lib/publicListings";
+import { setPageSeo, injectJsonLd } from "@/lib/seo";
 import { WORDMARK_PREFIX, WORDMARK_SUFFIX } from "@/lib/copy";
 import { ONBOARDING_URL } from "@/lib/config";
 import { Phone, Mail, MessageCircle, X, Menu as MenuIcon } from "lucide-react";
 
 // Lazy: keeps qrcode + jspdf out of the initial listing-page bundle.
 const ShareSection = lazy(() => import("@/components/ShareSection"));
+const PreviewBanner = lazy(() => import("@/components/PreviewBanner"));
+
+/**
+ * A listing page is "live" (no preview banner) when the browser's
+ * hostname matches the listing's custom domainName. Anywhere else —
+ * the marketing site demo route, a staging URL, an iframe — it's a
+ * preview that should promote activation.
+ */
+function isOnCustomDomain(domainName?: string): boolean {
+  if (!domainName) return false;
+  if (typeof window === "undefined") return false;
+  return window.location.hostname.toLowerCase() === domainName.toLowerCase();
+}
 
 type FullListing = SampleListing & {
   photoUrls?: string[];
@@ -346,6 +360,110 @@ export default function Listing() {
 
   const listing: FullListing | null = staticListing ?? apiListing;
 
+  // Per-listing SEO + RealEstateListing JSON-LD. Runs once we have the
+  // listing data; cleans up the JSON-LD when navigating away.
+  useEffect(() => {
+    if (!listing) return;
+    const fullAddress = `${listing.address}, ${listing.city}, ${listing.state} ${listing.zip}`;
+    const priceLabel = listing.price
+      ? `$${listing.price.toLocaleString("en-US")}`
+      : null;
+    const bedsBaths = [
+      listing.beds ? `${listing.beds} bd` : null,
+      listing.baths ? `${listing.baths} ba` : null,
+      listing.sqft ? `${listing.sqft.toLocaleString("en-US")} sqft` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
+    const title = priceLabel
+      ? `${listing.address} — ${priceLabel} · ${listing.city}, ${listing.state} | PropSite`
+      : `${listing.address} — ${listing.city}, ${listing.state} | PropSite`;
+    const description = `${fullAddress}. ${bedsBaths || "For sale"}.${
+      listing.description ? ` ${listing.description.slice(0, 140)}` : ""
+    }`;
+
+    setPageSeo({
+      title,
+      description,
+      path: `/listing/${listing.slug}`,
+      image: (listing.photoUrls ?? [])[0],
+    });
+
+    const cleanups: Array<() => void> = [];
+
+    cleanups.push(
+      injectJsonLd(`listing-${listing.slug}`, {
+        "@context": "https://schema.org",
+        "@type": ["Product", "Residence"],
+        name: fullAddress,
+        description: listing.description ?? `Single-family home for sale at ${fullAddress}.`,
+        image: listing.photoUrls ?? [],
+        url: listing.domainName
+          ? `https://${listing.domainName}`
+          : `https://propsite.app/listing/${listing.slug}`,
+        address: {
+          "@type": "PostalAddress",
+          streetAddress: listing.address,
+          addressLocality: listing.city,
+          addressRegion: listing.state,
+          postalCode: listing.zip,
+          addressCountry: "US",
+        },
+        ...(listing.price
+          ? {
+              offers: {
+                "@type": "Offer",
+                price: listing.price,
+                priceCurrency: "USD",
+                availability: "https://schema.org/InStock",
+                url: listing.domainName
+                  ? `https://${listing.domainName}`
+                  : `https://propsite.app/listing/${listing.slug}`,
+              },
+            }
+          : {}),
+        ...(listing.beds ? { numberOfBedrooms: listing.beds } : {}),
+        ...(listing.baths ? { numberOfBathroomsTotal: listing.baths } : {}),
+        ...(listing.sqft
+          ? {
+              floorSize: {
+                "@type": "QuantitativeValue",
+                value: listing.sqft,
+                unitCode: "FTK",
+              },
+            }
+          : {}),
+        ...(listing.yearBuilt ? { yearBuilt: listing.yearBuilt } : {}),
+      }),
+    );
+
+    cleanups.push(
+      injectJsonLd(`breadcrumb-${listing.slug}`, {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          {
+            "@type": "ListItem",
+            position: 1,
+            name: "PropSite",
+            item: "https://propsite.app/",
+          },
+          {
+            "@type": "ListItem",
+            position: 2,
+            name: listing.address,
+            item: `https://propsite.app/listing/${listing.slug}`,
+          },
+        ],
+      }),
+    );
+
+    return () => {
+      for (const fn of cleanups) fn();
+    };
+  }, [listing]);
+
   if (apiLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-warm-white text-muted text-sm">
@@ -356,6 +474,7 @@ export default function Listing() {
 
   if (!listing) return <NotFound />;
 
+  const showPreviewBanner = !isOnCustomDomain(listing.domainName);
   const fullAddress = `${listing.address}, ${listing.city}, ${listing.state} ${listing.zip}`;
   const photos = listing.photoUrls ?? [];
   const heroPhoto = photos[0];
@@ -557,6 +676,12 @@ export default function Listing() {
       {/* SHARE — QR + sign rider + flyer, all auto-generated.
           Prefer the live custom domain (canonical URL on activated sites);
           fall back to the demo route for preview/example listings. */}
+      {showPreviewBanner && (
+        <Suspense fallback={null}>
+          <PreviewBanner address={listing.address} slug={listing.slug} />
+        </Suspense>
+      )}
+
       <Suspense fallback={null}>
         <ShareSection
           listing={listing}

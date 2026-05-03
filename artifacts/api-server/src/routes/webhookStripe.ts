@@ -1,7 +1,7 @@
 import express, { Router } from "express";
 import { db, agentsTable, listingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { constructWebhookEvent, createCustomerPortalSession } from "../lib/stripe/index.js";
+import { constructWebhookEvent, createCustomerPortalSession, setDefaultPaymentMethod } from "../lib/stripe/index.js";
 import { sendEmail, paymentFailedEmail, siteDisabledEmail } from "../lib/email.js";
 import { logger } from "../lib/logger.js";
 import type Stripe from "stripe";
@@ -122,6 +122,27 @@ router.post(
               .set({ mode: "live", updatedAt: new Date() })
               .where(eq(listingsTable.id, pair.listing.id));
             logger.info({ listingId: pair.listing.id }, "Site re-enabled after payment succeeded");
+          }
+        }
+      } else if (eventType === "checkout.session.completed") {
+        const session = event.data.object as Stripe.Checkout.Session;
+        logger.info({ sessionId: session.id, mode: session.mode, customer: session.customer }, "Checkout session completed");
+        // For setup-mode onboarding sessions, the actual payment-method
+        // attachment happens on setup_intent.succeeded below.
+      } else if (eventType === "setup_intent.succeeded") {
+        const setupIntent = event.data.object as Stripe.SetupIntent;
+        const customerId = typeof setupIntent.customer === "string"
+          ? setupIntent.customer
+          : setupIntent.customer?.id;
+        const paymentMethodId = typeof setupIntent.payment_method === "string"
+          ? setupIntent.payment_method
+          : setupIntent.payment_method?.id;
+        if (customerId && paymentMethodId) {
+          try {
+            await setDefaultPaymentMethod(customerId, paymentMethodId);
+            logger.info({ customerId, paymentMethodId }, "Default payment method set from onboarding setup intent");
+          } catch (err) {
+            logger.error({ err, customerId }, "Failed to set default payment method");
           }
         }
       } else if (eventType === "customer.subscription.deleted") {

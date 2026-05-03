@@ -66,6 +66,47 @@ export async function createCustomerPortalSession(
   return session.url;
 }
 
+/**
+ * Setup-mode Checkout Session: collects + saves a card on the customer
+ * without charging. Used at the end of onboarding so we have a payment
+ * method on file before any listing is activated.
+ */
+export async function createOnboardingCheckoutSession(params: {
+  customerId: string;
+  successUrl: string;
+  cancelUrl: string;
+  agentId: string;
+}): Promise<{ url: string; id: string }> {
+  const stripe = getStripe();
+  const session = await stripe.checkout.sessions.create({
+    mode: "setup",
+    customer: params.customerId,
+    payment_method_types: ["card"],
+    success_url: params.successUrl,
+    cancel_url: params.cancelUrl,
+    metadata: { agentId: params.agentId, flow: "onboarding" },
+    setup_intent_data: {
+      metadata: { agentId: params.agentId, flow: "onboarding" },
+    },
+  });
+  if (!session.url) throw new Error("Stripe Checkout session has no url");
+  return { url: session.url, id: session.id };
+}
+
+/**
+ * After a setup_intent succeeds, attach the resulting payment method as
+ * the customer's default for future invoices/subscriptions.
+ */
+export async function setDefaultPaymentMethod(
+  customerId: string,
+  paymentMethodId: string,
+): Promise<void> {
+  const stripe = getStripe();
+  await stripe.customers.update(customerId, {
+    invoice_settings: { default_payment_method: paymentMethodId },
+  });
+}
+
 export function constructWebhookEvent(
   payload: Buffer,
   signature: string,

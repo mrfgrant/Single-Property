@@ -34,6 +34,9 @@
 
     <!-- SEO -->
     <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#0a1628" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <link rel="alternate" type="text/plain" href="/llms.txt" title="LLM-friendly summary" />
     <meta name="keywords" content="real estate agent website, property website, single listing website, MLS automation, Augusta GA real estate, CSRA real estate, automated listing site, single property website, listing website builder" />
     <meta name="author" content="PropSite" />
 
@@ -128,6 +131,73 @@
           "publisher": {
             "@id": "https://propsite.app/#organization"
           }
+        },
+        {
+          "@type": "Service",
+          "@id": "https://propsite.app/#service",
+          "name": "Automated Single-Property Websites",
+          "serviceType": "Real Estate Marketing Software",
+          "provider": { "@id": "https://propsite.app/#organization" },
+          "areaServed": [
+            { "@type": "City", "name": "Augusta", "addressRegion": "GA" },
+            { "@type": "DefinedRegion", "name": "CSRA — Central Savannah River Area" }
+          ],
+          "audience": {
+            "@type": "BusinessAudience",
+            "audienceType": "Real estate agents and brokers"
+          },
+          "offers": {
+            "@type": "Offer",
+            "price": "49.00",
+            "priceCurrency": "USD",
+            "description": "$49 per active listing per month. Includes custom domain, MLS-triggered site build, lead capture, and weekly seller reports."
+          },
+          "termsOfService": "Billing auto-cancels when a listing closes. No contracts."
+        },
+        {
+          "@type": "HowTo",
+          "@id": "https://propsite.app/#howto",
+          "name": "How to launch automated property websites with PropSite",
+          "description": "PropSite turns your MLS Agent ID into a fully automated property website pipeline in 90 seconds.",
+          "totalTime": "PT5M",
+          "estimatedCost": {
+            "@type": "MonetaryAmount",
+            "currency": "USD",
+            "value": "49"
+          },
+          "step": [
+            {
+              "@type": "HowToStep",
+              "position": 1,
+              "name": "Onboard once (90 seconds)",
+              "text": "Visit /onboarding, enter your name, email, brokerage, and MLS Agent ID, then add a card via Stripe. No charge today.",
+              "url": "https://propsite.app/onboarding"
+            },
+            {
+              "@type": "HowToStep",
+              "position": 2,
+              "name": "List a property in the MLS as you normally would",
+              "text": "PropSite continuously watches the Augusta Metro Board of REALTORS® feed under your MLS Agent ID."
+            },
+            {
+              "@type": "HowToStep",
+              "position": 3,
+              "name": "Get a preview email under 5 minutes later",
+              "text": "PropSite auto-builds the site with MLS photos, map, school data, walk score, and a custom street-address domain. You receive a preview link by email."
+            },
+            {
+              "@type": "HowToStep",
+              "position": 4,
+              "name": "Click Activate",
+              "text": "DNS goes live, billing starts at $49/mo, and your seller gets a launch email."
+            },
+            {
+              "@type": "HowToStep",
+              "position": 5,
+              "name": "Sell — billing stops automatically",
+              "text": "When the MLS marks the listing closed/sold/withdrawn, PropSite cancels the Stripe subscription, archives the site, and redirects the domain to your personal site."
+            }
+          ]
         },
         {
           "@type": "FAQPage",

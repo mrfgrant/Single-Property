@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { startMlsIngestion } from "./lib/mls/cron";
+import { initBillingLifecycleBridge } from "./lib/billing/lifecycleBridge";
 
 const rawPort = process.env["PORT"];
 
@@ -23,5 +24,6 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+  initBillingLifecycleBridge();
   startMlsIngestion();
 });

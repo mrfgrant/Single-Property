@@ -10,9 +10,13 @@ import { CTABanner } from "@/components/sections/CTABanner";
 import { Footer } from "@/components/sections/Footer";
 import { OomBanner } from "@/components/OomBanner";
 import { initScrollDepth } from "@/lib/analytics";
+import { applySeoFromCopy } from "@/lib/seo";
 
 export default function Home() {
   useEffect(() => {
+    // Reset SEO to homepage values on mount — covers SPA navigation back
+    // from per-page setPageSeo() calls (e.g. /onboarding/success noindex).
+    applySeoFromCopy();
     return initScrollDepth();
   }, []);
 

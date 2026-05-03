@@ -4,5 +4,7 @@ export {
   createListingSubscription,
   cancelListingSubscription,
   createCustomerPortalSession,
+  createOnboardingCheckoutSession,
+  setDefaultPaymentMethod,
   constructWebhookEvent,
 } from "./client.js";

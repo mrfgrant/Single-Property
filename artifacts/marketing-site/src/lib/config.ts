@@ -1,4 +1,4 @@
-export const ONBOARDING_URL = "https://app.propsite.io/onboarding";
+export const ONBOARDING_URL = "/onboarding";
 
 export const DEMO_EXAMPLE_URL = "/listing/2918-Arrowhead-Drive";
 

@@ -1,0 +1,44 @@
+# PropSite
+
+> PropSite is an automated single-property website platform for real estate agents in the Augusta, GA / CSRA market. It watches the MLS feed under an agent's ID, and the moment a new listing appears, it builds a full marketing website, registers a custom street-address domain, and starts capturing leads — with zero per-listing effort from the agent. Pricing is a flat $49 per active listing per month, and billing stops automatically when the listing closes.
+
+## Key facts
+
+- **Product**: Automated single-property websites (a.k.a. single-listing sites or property landing pages) for real estate agents.
+- **Pricing**: $49 USD per active listing, per month. No setup fees, no contracts, no per-feature tiers, no domain add-ons. Billing auto-cancels when a listing closes, sells, expires, or is withdrawn.
+- **Market served**: Augusta, GA and the CSRA (Central Savannah River Area), including the Augusta Metro Board of REALTORS®. Other markets are on a waitlist.
+- **Setup time**: ~90 seconds (one-time). After that, every future listing under the agent's MLS ID is fully automatic.
+- **Time from MLS to live site**: under 5 minutes.
+- **What's included at $49/mo per listing**: custom street-address domain (e.g. `2918arrowheaddrive.com`), full responsive property website with MLS photos / map / school data / walk score / mortgage calculator pre-loaded with current CSRA rates, instant email lead alerts (under 60 seconds), automated weekly seller traffic report (sent every Monday), QR code, print-ready sign rider PDF, and automatic archive + DNS redirect when the listing closes.
+- **Domains**: Registered through Cloudflare. Free to the agent — included in the $49/mo. When a listing closes, the domain redirects to the agent's personal website if they configured one.
+- **Differentiators vs Rela / CribFlyer / PhotoUp**: zero agent effort per listing (MLS-triggered, no upload), custom domain included (Rela charges extra), seller weekly report sent automatically (Rela is manual), single flat price with no tiers.
+
+## How it works
+
+1. Agent onboards once at `/onboarding` (90 seconds): name, email, phone, brokerage, MLS Agent ID, optional personal website.
+2. Agent adds a card via Stripe Checkout (no charge today — billing only starts when a listing activates).
+3. The PropSite system watches the MLS feed for new listings under that agent ID.
+4. When a new listing appears, PropSite auto-generates a property site, registers a custom street-address domain, and emails the agent a preview.
+5. Agent clicks "Activate" in the email — DNS goes live and billing begins for that listing.
+6. Leads come in via email and phone in under 60 seconds. Sellers get an automatic Monday traffic report.
+7. When the listing closes (sold, withdrawn, expired), the site auto-archives, DNS redirects to the agent's personal website, and Stripe billing for that listing stops automatically.
+
+## Pages
+
+- [Home](https://propsite.app/): product overview, how-it-works, pricing, comparison vs competitors, social proof, demo listings.
+- [Onboarding](https://propsite.app/onboarding): the 90-second signup form (name, email, MLS Agent ID, etc.) — handles in-market signup or out-of-market waitlist pivot.
+- [Demo listing](https://propsite.app/listing/2918-Arrowhead-Drive): a live example of what an auto-built property site looks like.
+
+## FAQ
+
+- **How much does PropSite cost?** $49 per active listing per month. Billing stops automatically when the listing closes or is withdrawn. No setup fees, no contracts.
+- **What markets does PropSite serve?** Currently Augusta, GA / CSRA only, including the Augusta Metro Board of REALTORS®. Other boards are on a waitlist.
+- **How long does it take for a property site to go live?** Under 5 minutes from the time the listing hits the MLS.
+- **Does PropSite include domain registration?** Yes — a custom street-address domain is included in the $49/mo, no add-on fees.
+- **What happens when a listing closes?** The site auto-archives, the domain redirects to the agent's personal website (if configured), and Stripe billing for that listing stops automatically.
+- **Do I need to upload photos or write copy?** No. PropSite pulls everything directly from the MLS — photos, description, beds/baths, lot size, year built, etc.
+
+## Contact
+
+- Website: https://propsite.app
+- Onboarding: https://propsite.app/onboarding

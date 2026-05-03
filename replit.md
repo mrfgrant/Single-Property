@@ -34,6 +34,23 @@ serve as both runtime validators and type sources via `z.infer<>`.
 
 ## Artifacts
 
+### `artifacts/marketing-site` — SEO / GEO
+
+- `index.html` — base meta + OG/Twitter + geo (`US-GA`, Augusta lat/lon) + JSON-LD `@graph`
+  with `SoftwareApplication`, `Organization`, `WebSite`, `Service`, `HowTo`, `FAQPage`.
+- `public/robots.txt` — allow-all + explicit allow for major AI crawlers (GPTBot, ClaudeBot,
+  PerplexityBot, Google-Extended, Applebot-Extended, etc.). Disallows `/onboarding/success`
+  (tokenized URL). Links sitemap.
+- `public/sitemap.xml` — home, /onboarding, demo listing.
+- `public/llms.txt` + `public/llms-full.txt` — GEO files for ChatGPT / Claude / Perplexity
+  ingestion (llms.txt spec: H1 + blockquote summary + sections).
+- `src/lib/seo.ts` — `applySeoFromCopy()` (home), `setPageSeo({title, description, path,
+  image?, index?})` (per-route), `injectJsonLd(id, schema)` returning a cleanup fn for
+  per-page Schema.org (RealEstate `Product`+`Residence` + `BreadcrumbList` on Listing).
+- Per-page SEO calls live in: `pages/Onboarding.tsx`, `pages/OnboardingSuccess.tsx` (noindex
+  due to magic token in URL), `pages/Listing.tsx` (dynamic title/description/JSON-LD per
+  listing).
+
 ### `artifacts/api-server`
 Express 5 API server. Serves all backend routes. No frontend.
 

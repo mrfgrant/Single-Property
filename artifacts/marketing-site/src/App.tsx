@@ -1,6 +1,8 @@
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import Home from "@/pages/Home";
 import Listing from "@/pages/Listing";
+import Onboarding from "@/pages/Onboarding";
+import OnboardingSuccess from "@/pages/OnboardingSuccess";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -8,6 +10,8 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/listing/:slug" component={Listing} />
+      <Route path="/onboarding" component={Onboarding} />
+      <Route path="/onboarding/success" component={OnboardingSuccess} />
       <Route component={NotFound} />
     </Switch>
   );
