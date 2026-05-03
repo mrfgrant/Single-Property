@@ -6,12 +6,49 @@ import {
   mlsSyncStateTable,
   type Listing,
 } from "@workspace/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { logger } from "../logger.js";
 import { mlsClient, MlsNotConfiguredError, type ResoProperty } from "./client.js";
 import { mlsEventBus } from "./eventBus.js";
 import { getMlsConfig, normalizeStatus } from "./config.js";
+import { ObjectStorageService } from "../objectStorage.js";
+
+const objectStorage = new ObjectStorageService();
+
+/**
+ * Download a remote MLS photo and upload it into Object Storage so the
+ * site renderer can serve it from our domain (and survive MLS URL churn).
+ * Returns the canonical `/objects/<entityId>` path, or `null` if either
+ * the download or upload fails. Failures are logged and swallowed — the
+ * sync loop must not crash on a single bad photo.
+ */
+async function downloadAndStorePhoto(sourceUrl: string): Promise<string | null> {
+  try {
+    const resp = await fetch(sourceUrl, { signal: AbortSignal.timeout(30_000) });
+    if (!resp.ok) {
+      logger.warn({ sourceUrl, status: resp.status }, "Photo download failed");
+      return null;
+    }
+    const contentType = resp.headers.get("content-type") || "application/octet-stream";
+    const buf = Buffer.from(await resp.arrayBuffer());
+    const uploadUrl = await objectStorage.getObjectEntityUploadURL();
+    const put = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": contentType },
+      body: buf,
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!put.ok) {
+      logger.warn({ sourceUrl, status: put.status }, "Photo upload to Object Storage failed");
+      return null;
+    }
+    return objectStorage.normalizeObjectEntityPath(uploadUrl.split("?")[0]);
+  } catch (err) {
+    logger.warn({ err, sourceUrl }, "Photo download/upload errored");
+    return null;
+  }
+}
 
 function buildAddress(p: ResoProperty): string {
   if (p.UnparsedAddress?.trim()) return p.UnparsedAddress.trim();
@@ -178,14 +215,34 @@ async function syncPhotos(listingId: string, listingKey: string): Promise<void> 
     const media = await mlsClient.fetchMediaForListing(listingKey);
     if (media.length === 0) return;
 
+    // Look up which mediaKeys we already have a stored copy for, so we
+    // don't re-download photos that haven't changed.
+    const existing = await db
+      .select({
+        mlsMediaKey: listingPhotosTable.mlsMediaKey,
+        storedUrl: listingPhotosTable.storedUrl,
+      })
+      .from(listingPhotosTable)
+      .where(eq(listingPhotosTable.listingId, listingId));
+    const storedByKey = new Map<string, string | null>();
+    for (const row of existing) {
+      if (row.mlsMediaKey) storedByKey.set(row.mlsMediaKey, row.storedUrl);
+    }
+
     for (const m of media) {
       if (!m.MediaURL) continue;
+      const previouslyStored = storedByKey.get(m.MediaKey) ?? null;
+      const storedUrl = previouslyStored
+        ? previouslyStored
+        : await downloadAndStorePhoto(m.MediaURL);
+
       await db
         .insert(listingPhotosTable)
         .values({
           listingId,
           mlsMediaKey: m.MediaKey,
           sourceUrl: m.MediaURL,
+          storedUrl,
           caption: m.ShortDescription ?? null,
           order: m.Order ?? 0,
           width: m.ImageWidth ?? null,
@@ -195,6 +252,7 @@ async function syncPhotos(listingId: string, listingKey: string): Promise<void> 
           target: [listingPhotosTable.listingId, listingPhotosTable.mlsMediaKey],
           set: {
             sourceUrl: m.MediaURL,
+            storedUrl,
             caption: m.ShortDescription ?? null,
             order: m.Order ?? 0,
             updatedAt: new Date(),
@@ -202,15 +260,25 @@ async function syncPhotos(listingId: string, listingKey: string): Promise<void> 
         });
     }
 
-    // Mirror onto listings.photoUrls for easy consumption by site renderer.
+    // Mirror onto listings.photoUrls for easy consumption by the site
+    // renderer. Prefer the Object Storage path (`/objects/...`) so the
+    // site serves photos from our own domain; fall back to the MLS
+    // source URL if upload failed.
     const photos = await db
-      .select({ url: listingPhotosTable.sourceUrl, order: listingPhotosTable.order })
+      .select({
+        sourceUrl: listingPhotosTable.sourceUrl,
+        storedUrl: listingPhotosTable.storedUrl,
+        order: listingPhotosTable.order,
+      })
       .from(listingPhotosTable)
       .where(eq(listingPhotosTable.listingId, listingId))
       .orderBy(listingPhotosTable.order);
     await db
       .update(listingsTable)
-      .set({ photoUrls: photos.map((p) => p.url), updatedAt: new Date() })
+      .set({
+        photoUrls: photos.map((p) => p.storedUrl ?? p.sourceUrl),
+        updatedAt: new Date(),
+      })
       .where(eq(listingsTable.id, listingId));
   } catch (err) {
     logger.warn({ err, listingId, listingKey }, "Failed to sync photos for listing");
@@ -366,6 +434,3 @@ export async function getSyncStatus() {
     totalMlsListings: total,
   };
 }
-
-// Suppress unused-import warning when downstream tasks haven't wired the bus yet.
-void and;
