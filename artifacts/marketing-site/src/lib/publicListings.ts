@@ -31,6 +31,8 @@ interface ApiListing {
   status: string;
   featured: boolean;
   createdAt: string;
+  /** Real listings.mode — `"preview" | "live" | "disabled"`. Absent on example rows. */
+  mode?: string | null;
 }
 
 export interface PublicListing extends SampleListing {
@@ -43,6 +45,8 @@ export interface PublicListing extends SampleListing {
   agentPhotoUrl?: string;
   brokerageLogoUrl?: string;
   domainName?: string;
+  /** Real listings.mode. Used by the activation banner to switch between claim/activate CTAs. */
+  mode?: "preview" | "live" | "disabled";
 }
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
@@ -91,8 +95,15 @@ export function apiToPublicListing(row: ApiListing): PublicListing {
     agentPhotoUrl: row.agentPhotoUrl ? resolvePhotoUrl(row.agentPhotoUrl) : undefined,
     brokerageLogoUrl: row.brokerageLogoUrl ? resolvePhotoUrl(row.brokerageLogoUrl) : undefined,
     domainName: row.domainName ?? undefined,
+    mode:
+      row.mode === "preview" || row.mode === "live" || row.mode === "disabled"
+        ? row.mode
+        : undefined,
   };
 }
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function fetchPublicListings(): Promise<PublicListing[]> {
   try {
@@ -123,6 +134,22 @@ export async function fetchFeaturedListing(): Promise<PublicListing | null> {
 export async function fetchPublicListingBySlug(
   slug: string,
 ): Promise<PublicListing | null> {
+  // If the URL segment looks like a UUID, prefer the real-listings preview
+  // route (auto-built MLS sites that aren't yet activated). Falls back to
+  // the example-listings route on 404 so demo slugs keep working.
+  if (UUID_RE.test(slug)) {
+    try {
+      const res = await fetch(`${API_BASE}/api/listings/preview/${encodeURIComponent(slug)}`, {
+        signal: AbortSignal.timeout(8000),
+      });
+      if (res.ok) {
+        const data: { listing: ApiListing } = await res.json();
+        return apiToPublicListing(data.listing);
+      }
+    } catch {
+      // fall through to example-route lookup
+    }
+  }
   try {
     const res = await fetch(`${API_BASE}/api/listings/examples/${encodeURIComponent(slug)}`, {
       signal: AbortSignal.timeout(8000),
