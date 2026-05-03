@@ -1,11 +1,26 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { MockBrowser } from "@/components/MockBrowser";
 import { HERO } from "@/lib/copy";
 import { ONBOARDING_URL, DEMO_EXAMPLE_URL } from "@/lib/config";
 import { track } from "@/lib/analytics";
+import { fetchFeaturedListing, type PublicListing } from "@/lib/publicListings";
 
 export function Hero() {
+  const [featured, setFeatured] = useState<PublicListing | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchFeaturedListing().then((l) => {
+      if (!cancelled) setFeatured(l);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const exampleHref = featured ? `/listing/${featured.slug}` : DEMO_EXAMPLE_URL;
+
   return (
     <section className="min-h-[88vh] pt-32 pb-16 border-b border-border flex items-center">
       <div className="max-w-[1200px] mx-auto px-6 lg:px-12 w-full grid grid-cols-1 lg:grid-cols-2">
@@ -41,7 +56,7 @@ export function Hero() {
                 {HERO.primaryCta}
               </a>
               <a
-                href={DEMO_EXAMPLE_URL}
+                href={exampleHref}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => track("see_example_click", { label: "hero" })}
@@ -73,7 +88,7 @@ export function Hero() {
             transition={{ duration: 1, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
             className="w-full"
           >
-            <MockBrowser />
+            <MockBrowser listing={featured} />
           </motion.div>
         </div>
       </div>

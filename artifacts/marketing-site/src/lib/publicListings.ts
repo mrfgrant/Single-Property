@@ -104,6 +104,19 @@ export async function fetchPublicListings(): Promise<PublicListing[]> {
   }
 }
 
+export async function fetchFeaturedListing(): Promise<PublicListing | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/listings/featured`, {
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return null;
+    const data: { listing: ApiListing } = await res.json();
+    return apiToPublicListing(data.listing);
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchPublicListingBySlug(
   slug: string,
 ): Promise<PublicListing | null> {

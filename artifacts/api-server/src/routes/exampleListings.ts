@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { exampleListingsTable } from "@workspace/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { z } from "zod/v4";
 import { insertExampleListingSchema } from "@workspace/db/schema";
 
@@ -15,6 +15,38 @@ router.get("/listings/examples", async (_req, res) => {
     .where(eq(exampleListingsTable.status, "active"))
     .orderBy(desc(exampleListingsTable.featured), desc(exampleListingsTable.createdAt));
   res.json({ listings: rows });
+});
+
+/* GET /api/listings/featured — single listing flagged "featured" for the
+ * landing-page mock browser. Falls back to the most recent active listing
+ * if no featured one exists. Returns 404 if no active listings at all. */
+router.get("/listings/featured", async (_req, res) => {
+  const [featured] = await db
+    .select()
+    .from(exampleListingsTable)
+    .where(
+      and(
+        eq(exampleListingsTable.status, "active"),
+        eq(exampleListingsTable.featured, true),
+      ),
+    )
+    .orderBy(desc(exampleListingsTable.createdAt))
+    .limit(1);
+  if (featured) {
+    res.json({ listing: featured });
+    return;
+  }
+  const [fallback] = await db
+    .select()
+    .from(exampleListingsTable)
+    .where(eq(exampleListingsTable.status, "active"))
+    .orderBy(desc(exampleListingsTable.createdAt))
+    .limit(1);
+  if (!fallback) {
+    res.status(404).json({ error: "No active listings" });
+    return;
+  }
+  res.json({ listing: fallback });
 });
 
 /* GET /api/listings/examples/:slug — single example listing */
