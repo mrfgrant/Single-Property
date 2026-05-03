@@ -44,7 +44,7 @@ export default function Listings({ onEdit, onAssignDomain, onListingsLoaded }: P
   useEffect(() => { load(); }, []);
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Archive this listing? It will be hidden from the marketing site.")) return;
+    if (!confirm("Permanently delete this listing? This cannot be undone.")) return;
     setDeleting(id);
     try {
       await api.listings.remove(id);

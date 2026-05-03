@@ -55,11 +55,10 @@ router.patch("/admin/listings/:id", adminAuth, async (req, res) => {
   res.json({ listing: row });
 });
 
-/* DELETE /admin/listings/:id */
+/* DELETE /admin/listings/:id — hard delete */
 router.delete("/admin/listings/:id", adminAuth, async (req, res) => {
   const [row] = await db
-    .update(exampleListingsTable)
-    .set({ status: "archived", updatedAt: new Date() })
+    .delete(exampleListingsTable)
     .where(eq(exampleListingsTable.id, req.params.id))
     .returning();
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
