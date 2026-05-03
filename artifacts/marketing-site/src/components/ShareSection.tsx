@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import QRCode from "qrcode";
 import { Download, QrCode, FileText, Printer } from "lucide-react";
 import {
   downloadQrPng,
@@ -38,15 +37,23 @@ export default function ShareSection({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!canvasRef.current) return;
-    QRCode.toCanvas(canvasRef.current, shareUrl, {
-      errorCorrectionLevel: "H",
-      margin: 1,
-      width: 320,
-      color: { dark: "#0a1e3a", light: "#ffffff" },
-    }).catch(() => {
-      /* canvas might not be mounted yet — silent */
-    });
+    let cancelled = false;
+    (async () => {
+      if (!canvasRef.current) return;
+      const QRCode = (await import("qrcode")).default;
+      if (cancelled || !canvasRef.current) return;
+      await QRCode.toCanvas(canvasRef.current, shareUrl, {
+        errorCorrectionLevel: "H",
+        margin: 1,
+        width: 320,
+        color: { dark: "#0a1e3a", light: "#ffffff" },
+      }).catch(() => {
+        /* canvas may have unmounted — silent */
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [shareUrl]);
 
   async function run(action: Busy, fn: () => Promise<void>) {

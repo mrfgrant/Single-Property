@@ -1,11 +1,13 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "wouter";
 import { getListingBySlug, formatPrice, type SampleListing } from "@/data/sampleListings";
 import { fetchPublicListingBySlug, type PublicListing } from "@/lib/publicListings";
 import { WORDMARK_PREFIX, WORDMARK_SUFFIX } from "@/lib/copy";
 import { ONBOARDING_URL } from "@/lib/config";
 import { Phone, Mail, MessageCircle, X, Menu as MenuIcon } from "lucide-react";
-import ShareSection from "@/components/ShareSection";
+
+// Lazy: keeps qrcode + jspdf out of the initial listing-page bundle.
+const ShareSection = lazy(() => import("@/components/ShareSection"));
 
 type FullListing = SampleListing & {
   photoUrls?: string[];
@@ -552,15 +554,21 @@ export default function Listing() {
         </div>
       </section>
 
-      {/* SHARE — QR + sign rider + flyer, all auto-generated */}
-      <ShareSection
-        listing={listing}
-        shareUrl={
-          typeof window !== "undefined"
-            ? `${window.location.origin}/listing/${listing.slug}`
-            : `https://${displayDomain}`
-        }
-      />
+      {/* SHARE — QR + sign rider + flyer, all auto-generated.
+          Prefer the live custom domain (canonical URL on activated sites);
+          fall back to the demo route for preview/example listings. */}
+      <Suspense fallback={null}>
+        <ShareSection
+          listing={listing}
+          shareUrl={
+            listing.domainName
+              ? `https://${listing.domainName}`
+              : typeof window !== "undefined"
+                ? `${window.location.origin}/listing/${listing.slug}`
+                : `https://${displayDomain}`
+          }
+        />
+      </Suspense>
 
       {/* SCHEDULE / CONTACT */}
       <section

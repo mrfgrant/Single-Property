@@ -1,5 +1,3 @@
-import QRCode from "qrcode";
-import { jsPDF } from "jspdf";
 import type { SampleListing } from "@/data/sampleListings";
 import { formatPrice } from "@/data/sampleListings";
 
@@ -33,8 +31,10 @@ function triggerDownload(blob: Blob, filename: string): void {
 /**
  * Render the listing URL as a PNG data URL. High error correction (H) so a
  * printed QR remains scannable when the rider gets weather-beaten on a sign.
+ * Dynamic import keeps qrcode out of the initial listing-page bundle.
  */
 export async function generateQrDataUrl(url: string, sizePx = 1024): Promise<string> {
+  const QRCode = (await import("qrcode")).default;
   return QRCode.toDataURL(url, {
     errorCorrectionLevel: "H",
     margin: 1,
@@ -86,6 +86,7 @@ async function imageToDataUrl(src: string): Promise<{ dataUrl: string; w: number
  * + agent on the left. Auto-generated from MLS data, no agent input.
  */
 export async function generateSignRiderPdf(listing: ListingForPdf, url: string): Promise<void> {
+  const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ orientation: "landscape", unit: "in", format: [24, 6] });
   const W = 24;
   const H = 6;
@@ -186,6 +187,7 @@ export async function generateSignRiderPdf(listing: ListingForPdf, url: string):
  * + agent contact + QR + PropSite branding. Print-ready, no agent input.
  */
 export async function generateFlyerPdf(listing: ListingForPdf, url: string): Promise<void> {
+  const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ orientation: "portrait", unit: "in", format: "letter" });
   const W = 8.5;
   const H = 11;
