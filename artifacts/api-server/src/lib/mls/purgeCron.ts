@@ -2,6 +2,8 @@ import {
   db,
   listingsTable,
   listingPhotosTable,
+  listingStatusEventsTable,
+  sitesTable,
   emailOutboxTable,
   smsOutboxTable,
 } from "@workspace/db";
@@ -49,8 +51,10 @@ async function runOneTick(): Promise<{ purged: number }> {
     .from(listingsTable)
     .where(
       and(
+        // Mode must still be "preview" — once a listing has been
+        // upgraded to "live" or "disabled" it represents a paying or
+        // formerly-paying customer and is never auto-purged.
         eq(listingsTable.mode, "preview"),
-        eq(listingsTable.status, "active"),
         isNull(listingsTable.agentId),
         isNull(listingsTable.stripeSubscriptionId),
         isNull(listingsTable.purgedAt),
@@ -75,8 +79,21 @@ async function runOneTick(): Promise<{ purged: number }> {
         }
       }
 
-      // 2. Tombstone the listing. This cascade-deletes listing_photos,
-      //    sites, listing_status_events via their FKs.
+      // 2. Explicitly delete dependent rows. The FK cascades on
+      //    `sites.listingId`, `listing_photos.listingId`, and
+      //    `listing_status_events.listingId` only fire on a hard DELETE
+      //    of the listing row — but we keep the listing row alive as a
+      //    tombstone so MLS sync won't resurrect it. So we have to
+      //    remove the dependents ourselves.
+      await db.delete(sitesTable).where(eq(sitesTable.listingId, row.id));
+      await db
+        .delete(listingStatusEventsTable)
+        .where(eq(listingStatusEventsTable.listingId, row.id));
+      await db
+        .delete(listingPhotosTable)
+        .where(eq(listingPhotosTable.listingId, row.id));
+
+      // 3. Tombstone the listing itself.
       await db
         .update(listingsTable)
         .set({
@@ -88,11 +105,7 @@ async function runOneTick(): Promise<{ purged: number }> {
         })
         .where(eq(listingsTable.id, row.id));
 
-      await db
-        .delete(listingPhotosTable)
-        .where(eq(listingPhotosTable.listingId, row.id));
-
-      // 3. Cancel any still-pending outbox messages for this listing.
+      // 4. Cancel any still-pending outbox messages for this listing.
       //    The cold-outreach guard would also do this lazily, but
       //    cleaning up explicitly keeps the outbox tidy.
       await db.execute(sql`
