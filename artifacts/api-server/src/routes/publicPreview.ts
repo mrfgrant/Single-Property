@@ -33,7 +33,7 @@ router.get("/listings/preview/:id", async (req, res) => {
     .where(eq(listingsTable.id, id))
     .limit(1);
   const listing = rows[0];
-  if (!listing || listing.status === "archived" || listing.status === "closed") {
+  if (!listing || listing.purgedAt || listing.status === "archived" || listing.status === "closed") {
     res.status(404).json({ error: "Not found" });
     return;
   }

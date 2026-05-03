@@ -6,6 +6,8 @@ import { initColdOutreachBridge } from "./lib/outreach/coldOutreach";
 import { startEmailOutboxWorker } from "./lib/outbox/email";
 import { startSmsOutboxWorker } from "./lib/outbox/sms";
 import { startWeeklyReportCron } from "./lib/analytics/cron";
+import { startColdOutreachFollowupCron } from "./lib/outreach/followupCron";
+import { startPurgeUnclaimedCron } from "./lib/mls/purgeCron";
 
 const rawPort = process.env["PORT"];
 
@@ -33,5 +35,7 @@ app.listen(port, (err) => {
   startEmailOutboxWorker();
   startSmsOutboxWorker();
   startWeeklyReportCron();
+  startColdOutreachFollowupCron();
+  startPurgeUnclaimedCron();
   startMlsIngestion();
 });

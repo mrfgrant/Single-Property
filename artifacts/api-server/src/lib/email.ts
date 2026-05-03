@@ -293,6 +293,106 @@ export function coldOutreachEmail(params: {
 }
 
 /**
+ * Cold-outreach Digest — one email summarising 1+ new preview sites
+ * for the same agent (e.g. an agent who lists 3 properties the same
+ * night). Built so the single-listing case still reads naturally.
+ */
+export function coldOutreachDigestEmail(params: {
+  agentEmail: string;
+  agentFirstName: string;
+  listings: Array<{
+    address: string;
+    previewUrl: string;
+    activateUrl: string;
+    photoUrl: string | null;
+  }>;
+  unsubscribeUrl: string;
+}): EmailPayload {
+  const count = params.listings.length;
+  const subject =
+    count === 1
+      ? `Your site for ${params.listings[0]!.address} is ready`
+      : `We built ${count} websites for your new listings`;
+
+  const cardsHtml = params.listings
+    .map((l) => {
+      const photo = l.photoUrl
+        ? `<img src="${escapeAttr(l.photoUrl)}" alt="${escapeAttr(l.address)}" style="display:block;width:100%;max-width:480px;border-radius:8px;margin-bottom:12px;"/>`
+        : "";
+      return `
+        <div style="margin:24px 0;padding:16px;border:1px solid #e5e7eb;border-radius:10px;">
+          ${photo}
+          <p style="margin:0 0 8px;font:600 16px/1.3 system-ui;">${escape(l.address)}</p>
+          <p style="margin:0 0 14px;">
+            <a href="${escapeAttr(l.previewUrl)}" style="display:inline-block;padding:10px 18px;background:#c9a84c;color:#fff;font-weight:600;text-decoration:none;border-radius:9999px;">View preview →</a>
+            &nbsp;<a href="${escapeAttr(l.activateUrl)}" style="font-size:14px;color:#0d1b2a;">Activate this site →</a>
+          </p>
+        </div>`;
+    })
+    .join("");
+
+  const intro =
+    count === 1
+      ? `<p>I noticed your new listing at <strong>${escape(params.listings[0]!.address)}</strong> hit the MLS — so we built you a property website for it. No charge, no signup needed to view.</p>`
+      : `<p>I noticed <strong>${count} new listings</strong> from you hit the MLS — so we built a property website for each one. No charge, no signup needed to view.</p>`;
+
+  const html = `
+      <p>Hi ${escape(params.agentFirstName)},</p>
+      ${intro}
+      ${cardsHtml}
+      <p>Each site is mobile-optimized, includes MLS photos, mortgage calculator, walk/school scores, and an instant lead-capture form that emails you any inquiry.</p>
+      <p>If you'd like to keep ${count === 1 ? "it" : "them"} live on a custom domain (and have us auto-build one for every listing going forward), it's <strong>$49/mo per active listing</strong> — billing stops the day each listing closes.</p>
+      <p>Either way, the previews are yours. Reply with any questions.</p>
+      <p>— PropSite</p>
+    `;
+
+  // Plain-text fallback.
+  const text =
+    `Hi ${params.agentFirstName}, we built ${count === 1 ? "a property site" : count + " property sites"} for your new listing${count === 1 ? "" : "s"}:\n\n` +
+    params.listings
+      .map((l) => `• ${l.address} — preview: ${l.previewUrl}\n  activate ($49/mo): ${l.activateUrl}`)
+      .join("\n\n") +
+    `\n\nUnsubscribe: ${params.unsubscribeUrl}`;
+
+  return {
+    to: params.agentEmail,
+    subject,
+    html: withFooter(html, params.unsubscribeUrl),
+    text,
+  };
+}
+
+/**
+ * Cold-outreach Follow-up — sent ~5 days after the initial digest if
+ * the agent never signed up and never unsubscribed. One nudge only;
+ * never repeats for the same agent.
+ */
+export function coldOutreachFollowupEmail(params: {
+  agentEmail: string;
+  agentFirstName: string;
+  primaryAddress: string;
+  primaryPreviewUrl: string;
+  unsubscribeUrl: string;
+}): EmailPayload {
+  const html = `
+      <p>Hi ${escape(params.agentFirstName)},</p>
+      <p>Just circling back — your property site for <strong>${escape(params.primaryAddress)}</strong> is still ready when you are:</p>
+      <p style="margin:24px 0;">
+        <a href="${escapeAttr(params.primaryPreviewUrl)}" style="display:inline-block;padding:12px 24px;background:#c9a84c;color:#fff;font-weight:600;text-decoration:none;border-radius:9999px;">View it →</a>
+      </p>
+      <p>Activating takes about 60 seconds and runs $49/mo per active listing — billing stops automatically the day the listing closes.</p>
+      <p>If this isn't for you, no worries — I won't email about this listing again.</p>
+      <p>— PropSite</p>
+    `;
+  return {
+    to: params.agentEmail,
+    subject: `Still want a site for ${params.primaryAddress}?`,
+    html: withFooter(html, params.unsubscribeUrl),
+    text: `Hi ${params.agentFirstName}, your property site for ${params.primaryAddress} is still ready: ${params.primaryPreviewUrl}. Activate any time for $49/mo. Unsubscribe: ${params.unsubscribeUrl}`,
+  };
+}
+
+/**
  * Cold-outreach SMS body. Hard-capped near 160 chars (~1 segment) and
  * always includes "Reply STOP to opt out" per TCPA.
  */

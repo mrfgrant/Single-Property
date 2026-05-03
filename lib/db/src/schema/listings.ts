@@ -41,6 +41,13 @@ export const listingsTable = pgTable(
     domainName: text("domain_name"),
     closedReason: text("closed_reason"),
     mlsModificationTimestamp: timestamp("mls_modification_timestamp"),
+    // Set when the listing has been purged by the unclaimed-preview
+    // cleanup job. Acts as a tombstone: the row is preserved (so the
+    // MLS sync can recognize the mlsListingId and skip re-creating it),
+    // but the photos/site/status-events are deleted and we never act on
+    // it again.
+    purgedAt: timestamp("purged_at"),
+    purgedReason: text("purged_reason"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

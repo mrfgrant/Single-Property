@@ -120,6 +120,14 @@ async function upsertProperty(p: ResoProperty): Promise<string | null> {
     .from(listingsTable)
     .where(eq(listingsTable.mlsListingId, mapped.mlsListingId));
 
+  // Tombstoned listing: previously purged by the unclaimed-preview
+  // cleanup. Do NOT resurrect it on subsequent syncs even though it's
+  // still active in the MLS. The agent had their chance; we won't keep
+  // re-creating it forever.
+  if (existing?.purgedAt) {
+    return null;
+  }
+
   if (!existing) {
     const [inserted] = await db
       .insert(listingsTable)

@@ -1,5 +1,5 @@
 import { db, emailOutboxTable, emailSuppressionsTable, listingsTable } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { sendEmail } from "../email.js";
 import { logger } from "../logger.js";
 
@@ -15,23 +15,51 @@ import { logger } from "../logger.js";
 async function shouldCancelColdOutreach(
   metadata: Record<string, unknown> | null,
 ): Promise<{ cancel: boolean; reason?: string }> {
-  const listingId = metadata && typeof metadata.listingId === "string" ? metadata.listingId : null;
-  if (!listingId) return { cancel: false };
+  // Collect the set of listingIds attached to this outbox row. Modern
+  // (digest) rows carry `listingIds` (array). Legacy single-listing
+  // rows carry `listingId` (string). We accept either.
+  const listingIds: string[] = [];
+  if (metadata) {
+    const arr = metadata.listingIds;
+    if (Array.isArray(arr)) {
+      for (const id of arr) if (typeof id === "string") listingIds.push(id);
+    }
+    const single = metadata.listingId;
+    if (typeof single === "string") listingIds.push(single);
+  }
+  if (listingIds.length === 0) return { cancel: false };
+
   const rows = await db
     .select({
+      id: listingsTable.id,
       mode: listingsTable.mode,
       status: listingsTable.status,
       agentId: listingsTable.agentId,
+      purgedAt: listingsTable.purgedAt,
     })
     .from(listingsTable)
-    .where(eq(listingsTable.id, listingId))
-    .limit(1);
-  const listing = rows[0];
-  if (!listing) return { cancel: true, reason: "listing_deleted" };
-  if (listing.agentId) return { cancel: true, reason: "agent_activated" };
-  if (listing.mode !== "preview") return { cancel: true, reason: `mode_${listing.mode}` };
-  if (listing.status !== "active") return { cancel: true, reason: `status_${listing.status}` };
-  return { cancel: false };
+    .where(inArray(listingsTable.id, listingIds));
+
+  // For the digest case, send if AT LEAST ONE referenced listing is
+  // still a viable preview. Only cancel when every listing has been
+  // activated, gone off-market, been purged, or vanished.
+  const stillEligible = rows.filter(
+    (r) =>
+      !r.purgedAt &&
+      !r.agentId &&
+      r.mode === "preview" &&
+      r.status === "active",
+  );
+  if (stillEligible.length > 0) return { cancel: false };
+
+  if (rows.length === 0) return { cancel: true, reason: "listing_deleted" };
+  // Pick a representative reason from the first row for the log.
+  const r = rows[0]!;
+  if (r.purgedAt) return { cancel: true, reason: "purged" };
+  if (r.agentId) return { cancel: true, reason: "agent_activated" };
+  if (r.mode !== "preview") return { cancel: true, reason: `mode_${r.mode}` };
+  if (r.status !== "active") return { cancel: true, reason: `status_${r.status}` };
+  return { cancel: true, reason: "ineligible" };
 }
 
 const log = logger.child({ component: "email-outbox" });
@@ -113,6 +141,7 @@ export async function enqueueEmail(
 function isSuppressible(kind: string): boolean {
   return (
     kind === "cold_outreach" ||
+    kind === "cold_outreach_followup" ||
     kind === "weekly_seller_report" ||
     kind === "final_marketing_report"
   );
@@ -179,7 +208,7 @@ export async function drainEmailOutbox(limit = 25): Promise<{ processed: number 
         effectiveCc = null;
       }
     }
-    if (row.kind === "cold_outreach") {
+    if (row.kind === "cold_outreach" || row.kind === "cold_outreach_followup") {
       // Pre-send listing-state guard for cold outreach: if the listing
       // has since been activated, gone off-market, or been deleted, do
       // not blast the agent — they may have already paid us, or the
