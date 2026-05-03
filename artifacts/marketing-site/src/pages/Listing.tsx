@@ -32,7 +32,13 @@ type FullListing = SampleListing & {
   agentPhotoUrl?: string;
   brokerageLogoUrl?: string;
   domainName?: string;
+  mode?: "preview" | "live" | "disabled";
 };
+
+function getTokenFromUrl(): string | null {
+  if (typeof window === "undefined") return null;
+  return new URLSearchParams(window.location.search).get("token");
+}
 
 const NAV_SECTIONS = [
   { id: "home", label: "Home" },
@@ -346,6 +352,7 @@ export default function Listing() {
   const [apiListing, setApiListing] = useState<PublicListing | null>(null);
   const [apiLoading, setApiLoading] = useState(!staticListing);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [refetchTick, setRefetchTick] = useState(0);
   const heroRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -359,7 +366,7 @@ export default function Listing() {
     return () => {
       cancelled = true;
     };
-  }, [slug, staticListing]);
+  }, [slug, staticListing, refetchTick]);
 
   const listing: FullListing | null = staticListing ?? apiListing;
 
@@ -480,6 +487,12 @@ export default function Listing() {
   if (!listing) return <NotFound />;
 
   const showPreviewBanner = !isOnCustomDomain(listing.domainName);
+  const magicToken = getTokenFromUrl();
+  const canActivate =
+    showPreviewBanner &&
+    listing.mode === "preview" &&
+    Boolean(listing.id) &&
+    Boolean(magicToken);
   const fullAddress = `${listing.address}, ${listing.city}, ${listing.state} ${listing.zip}`;
   const photos = listing.photoUrls ?? [];
   const heroPhoto = photos[0];
@@ -684,7 +697,18 @@ export default function Listing() {
           fall back to the demo route for preview/example listings. */}
       {showPreviewBanner && (
         <Suspense fallback={null}>
-          <PreviewBanner address={listing.address} slug={listing.slug} />
+          {canActivate && listing.id && magicToken ? (
+            <PreviewBanner
+              variant="activate"
+              address={listing.address}
+              slug={listing.slug}
+              listingId={listing.id}
+              token={magicToken}
+              onActivated={() => setRefetchTick((n) => n + 1)}
+            />
+          ) : (
+            <PreviewBanner address={listing.address} slug={listing.slug} />
+          )}
         </Suspense>
       )}
 
