@@ -27,6 +27,7 @@
   --color-destructive-foreground: var(--destructive-foreground);
 
   --color-ink: var(--ink);
+  --color-navy-deep: var(--navy-deep);
   --color-cream: var(--cream);
   --color-warm-white: var(--warm-white);
   --color-gold: var(--gold);
@@ -43,13 +44,14 @@
 }
 
 :root {
-  --ink: #0e0e0e;
-  --cream: #f5f0e8;
-  --warm-white: #faf8f4;
+  --ink: #0a1e3a;
+  --navy-deep: #061528;
+  --cream: #f4ede0;
+  --warm-white: #faf6ee;
   --gold: #c9a84c;
   --gold-light: #e8c96b;
-  --muted: #6b6458;
-  --border: rgba(14,14,14,0.12);
+  --muted: #5d6577;
+  --border: rgba(10,30,58,0.14);
 
   --background: var(--warm-white);
   --foreground: var(--ink);
@@ -79,13 +81,14 @@
 
 .dark {
   /* No dark mode needed per spec, using light mode colors to prevent breakage if user system is dark */
-  --ink: #0e0e0e;
-  --cream: #f5f0e8;
-  --warm-white: #faf8f4;
+  --ink: #0a1e3a;
+  --navy-deep: #061528;
+  --cream: #f4ede0;
+  --warm-white: #faf6ee;
   --gold: #c9a84c;
   --gold-light: #e8c96b;
-  --muted: #6b6458;
-  --border: rgba(14,14,14,0.12);
+  --muted: #5d6577;
+  --border: rgba(10,30,58,0.14);
 
   --background: var(--warm-white);
   --foreground: var(--ink);

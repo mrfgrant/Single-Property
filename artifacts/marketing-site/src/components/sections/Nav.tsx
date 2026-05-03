@@ -45,9 +45,13 @@ export function Nav() {
         }`}
       >
         <div className="max-w-[1200px] mx-auto px-6 lg:px-12 h-20 flex items-center justify-between">
-          <Link href="/" className="text-2xl flex items-baseline">
-            <span className="font-serif font-normal text-ink">{WORDMARK_PREFIX}</span>
-            <span className="font-serif text-gold">{WORDMARK_SUFFIX}</span>
+          <Link href="/" className="flex flex-col leading-none">
+            <span className="font-sans font-bold text-ink uppercase tracking-[0.18em] text-base md:text-lg">
+              {WORDMARK_PREFIX}{WORDMARK_SUFFIX}
+            </span>
+            <span className="hidden sm:block font-mono text-[0.6rem] tracking-[0.12em] text-gold mt-1">
+              CSRA's Property Site Engine · Est. 2026
+            </span>
           </Link>
 
           <div className="hidden md:flex items-center gap-8">
@@ -75,9 +79,9 @@ export function Nav() {
             <a
               href={ONBOARDING_URL}
               onClick={handleGetStarted}
-              className="h-11 px-6 bg-ink text-warm-white font-medium text-sm rounded flex items-center hover:bg-ink/90 transition-colors"
+              className="h-11 px-6 bg-gold text-white font-semibold text-sm rounded-full flex items-center hover:bg-gold-light transition-colors shadow-sm"
             >
-              Get started — $49/mo
+              Get started →
             </a>
           </div>
 
@@ -120,7 +124,7 @@ export function Nav() {
             <a
               href={ONBOARDING_URL}
               onClick={handleGetStarted}
-              className="h-14 px-6 bg-ink text-warm-white font-medium text-base rounded flex items-center justify-center mt-4"
+              className="h-14 px-6 bg-gold text-white font-semibold text-base rounded-full flex items-center justify-center mt-4"
             >
               Get started — $49/mo
             </a>

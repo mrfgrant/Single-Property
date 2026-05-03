@@ -12,9 +12,13 @@ export function Footer() {
     <footer className="border-t border-border bg-warm-white py-12 px-6 lg:px-12">
       <div className="max-w-[1200px] mx-auto">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-6">
-          <div className="text-xl flex items-baseline">
-            <span className="font-serif font-normal text-ink">Prop</span>
-            <span className="font-serif text-gold">Site</span>
+          <div className="flex flex-col leading-none">
+            <span className="font-sans font-bold text-ink uppercase tracking-[0.18em] text-base">
+              PropSite
+            </span>
+            <span className="font-mono text-[0.6rem] tracking-[0.12em] text-gold mt-1">
+              CSRA's Property Site Engine · Est. 2026
+            </span>
           </div>
 
           <div className="text-sm text-muted font-light">

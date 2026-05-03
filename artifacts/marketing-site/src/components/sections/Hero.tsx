@@ -21,12 +21,11 @@ export function Hero() {
               </span>
             </div>
 
-            <h1 className="text-5xl md:text-[4rem] leading-[1.1] font-bold text-ink mb-6">
+            <h1 className="font-serif text-5xl md:text-[4.25rem] leading-[1.05] font-semibold text-ink mb-6 tracking-tight">
               {HERO.headline[0]}
               <br />
-              {HERO.headline[1]}
-              <br />
-              <em className="text-gold font-serif italic">{HERO.headline[2]}</em>
+              {HERO.headline[1]}{" "}
+              <em className="text-gold italic font-medium">{HERO.headline[2]}</em>
             </h1>
 
             <p className="text-lg md:text-xl font-light text-muted leading-relaxed max-w-[480px] mb-10">
@@ -37,7 +36,7 @@ export function Hero() {
               <a
                 href={ONBOARDING_URL}
                 onClick={() => track("cta_click", { label: "hero_get_started" })}
-                className="w-full sm:w-auto h-14 px-8 bg-ink text-warm-white font-medium text-base rounded flex items-center justify-center hover:bg-ink/90 transition-colors"
+                className="w-full sm:w-auto h-14 px-8 bg-gold text-white font-semibold text-base rounded-full flex items-center justify-center hover:bg-gold-light transition-colors shadow-md"
               >
                 {HERO.primaryCta}
               </a>

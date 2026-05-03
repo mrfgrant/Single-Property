@@ -557,8 +557,7 @@ export default function Listing() {
         <p className="text-xs text-muted mt-2">
           Site auto-built by{" "}
           <Link href="/" className="font-semibold hover:text-gold transition-colors">
-            <span className="text-ink">{WORDMARK_PREFIX}</span>
-            <span className="text-gold">{WORDMARK_SUFFIX}</span>
+            <span className="text-ink font-sans font-bold uppercase tracking-[0.18em] text-sm">{WORDMARK_PREFIX}{WORDMARK_SUFFIX}</span>
           </Link>
         </p>
       </footer>
