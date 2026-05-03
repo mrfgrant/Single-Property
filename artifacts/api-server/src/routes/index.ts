@@ -11,6 +11,7 @@ import exampleListingsRouter from "./exampleListings.js";
 import adminListingsRouter from "./adminListings.js";
 import adminDomainsRouter from "./adminDomains.js";
 import simulateMlsRouter from "./simulateMls.js";
+import mlsRouter from "./mls.js";
 import storageRouter from "./storage.js";
 
 const router: IRouter = Router();
@@ -27,6 +28,7 @@ router.use(exampleListingsRouter);
 router.use(adminListingsRouter);
 router.use(adminDomainsRouter);
 router.use(simulateMlsRouter);
+router.use(mlsRouter);
 router.use(storageRouter);
 
 export default router;
