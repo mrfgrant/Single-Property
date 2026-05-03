@@ -25,17 +25,20 @@ async function runOneTick(now: Date = new Date()): Promise<{ enqueued: number }>
 
   for (const listing of liveListings) {
     const tz = resolveTimezone(listing.zip ?? null);
-    const weekStart = getLocalWeekStart(now, tz);
-    // Send any time at-or-after Monday 8am local in the current local
-    // week. seller_reports_sent dedupe makes repeat ticks no-ops. This
-    // gives us automatic catch-up if Monday 8am was missed (downtime,
-    // restart, deploy window) without spamming previous weeks: we only
-    // ever target the CURRENT week.
-    const eightAmLocalMs = weekStart.getTime() + 8 * 60 * 60 * 1000;
+    // The "current" local week (the one we're inside right now) starts
+    // at Monday 00:00 local. The seller report summarises the *previous*
+    // full week (last Monday 00:00 → this Monday 00:00) and is sent at
+    // or after this Monday 8 AM local. seller_reports_sent dedupe keys
+    // off the report's weekStart, so repeat ticks within the same week
+    // are no-ops, and a missed 8 AM window (downtime, restart, deploy)
+    // automatically catches up on the next tick during the same week.
+    const currentWeekStart = getLocalWeekStart(now, tz);
+    const eightAmLocalMs = currentWeekStart.getTime() + 8 * 60 * 60 * 1000;
     if (now.getTime() < eightAmLocalMs) continue;
+    const reportWeekStart = new Date(currentWeekStart.getTime() - 7 * 24 * 60 * 60 * 1000);
 
     try {
-      const sent = await sendWeeklyReportFor(listing, weekStart);
+      const sent = await sendWeeklyReportFor(listing, reportWeekStart);
       if (sent) enqueued += 1;
     } catch (err) {
       log.error({ err, listingId: listing.id }, "Failed to send weekly report for listing");
@@ -160,7 +163,11 @@ export function startWeeklyReportCron(): void {
     log.info("Weekly report cron disabled via WEEKLY_REPORT_CRON_DISABLED=1");
     return;
   }
-  const intervalMs = Number(process.env.WEEKLY_REPORT_TICK_MS ?? 60 * 60 * 1000);
+  // Default 15-minute tick cadence so the actual send happens within
+  // ±15 min of Monday 8:00 AM local, regardless of when the process
+  // started. (Hourly ticks could drift the send time up to a full hour
+  // depending on process-start time.) Override with WEEKLY_REPORT_TICK_MS.
+  const intervalMs = Number(process.env.WEEKLY_REPORT_TICK_MS ?? 15 * 60 * 1000);
   const tick = () =>
     runOneTick().catch((err) => log.error({ err }, "Weekly report tick errored"));
   timer = setInterval(tick, intervalMs);
