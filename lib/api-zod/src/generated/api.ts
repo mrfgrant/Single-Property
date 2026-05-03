@@ -130,6 +130,48 @@ export const ActivateListingResponse = zod.object({
 });
 
 /**
+ * Records a buyer lead against a listing and queues two emails: a lead-alert to the listing agent (with click-to-call/email), and an auto-reply to the buyer confirming receipt. No SMS for buyer leads at $49/mo per listing economics.
+
+ * @summary Submit a buyer lead from a live property site
+ */
+export const createLeadBodyNameMax = 120;
+
+export const createLeadBodyEmailMax = 200;
+
+export const createLeadBodyPhoneMax = 40;
+
+export const createLeadBodyMessageMax = 2000;
+
+export const createLeadBodySourceMax = 40;
+
+export const CreateLeadBody = zod.object({
+  listingId: zod.string().uuid(),
+  name: zod.string().min(1).max(createLeadBodyNameMax),
+  email: zod.string().email().max(createLeadBodyEmailMax),
+  phone: zod.string().max(createLeadBodyPhoneMax).optional(),
+  message: zod.string().max(createLeadBodyMessageMax).optional(),
+  source: zod.string().max(createLeadBodySourceMax).optional(),
+});
+
+/**
+ * @summary One-click email unsubscribe (CAN-SPAM compliant)
+ */
+export const EmailUnsubscribeOneClickQueryParams = zod.object({
+  email: zod.coerce.string().email(),
+});
+
+/**
+ * @summary RFC 8058 List-Unsubscribe-Post target
+ */
+export const EmailUnsubscribePostBody = zod.object({
+  email: zod.string().email().optional(),
+});
+
+export const EmailUnsubscribePostResponse = zod.object({
+  ok: zod.boolean().optional(),
+});
+
+/**
  * @summary Request a presigned URL for file upload
  */
 

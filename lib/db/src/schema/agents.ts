@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -16,6 +16,15 @@ export const agentsTable = pgTable("agents", {
   stripeCustomerId: text("stripe_customer_id"),
   magicLinkToken: text("magic_link_token"),
   magicLinkExpiresAt: timestamp("magic_link_expires_at"),
+  /**
+   * Cached result of Telnyx Number Lookup against `phone`. NULL = never
+   * looked up; true = mobile/VoIP, OK to text; false = landline / unknown
+   * carrier, never text again. Used to avoid wasting $0.01 SMS sends on
+   * confirmed landlines and to avoid texting brokerage office lines.
+   */
+  smsEligible: boolean("sms_eligible"),
+  /** When the agent (or our STOP webhook) opted them out of cold email. */
+  unsubscribedAt: timestamp("unsubscribed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -25,6 +34,8 @@ export const insertAgentSchema = createInsertSchema(agentsTable).omit({
   stripeCustomerId: true,
   magicLinkToken: true,
   magicLinkExpiresAt: true,
+  smsEligible: true,
+  unsubscribedAt: true,
   createdAt: true,
   updatedAt: true,
 });

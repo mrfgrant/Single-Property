@@ -182,6 +182,78 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /leads:
+    post:
+      tags: [Leads]
+      operationId: createLead
+      summary: Submit a buyer lead from a live property site
+      description: >
+        Records a buyer lead against a listing and queues two emails:
+        a lead-alert to the listing agent (with click-to-call/email),
+        and an auto-reply to the buyer confirming receipt. No SMS for
+        buyer leads at $49/mo per listing economics.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLeadRequest'
+      responses:
+        '201':
+          description: Lead recorded and notification emails queued.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [leadId]
+                properties:
+                  leadId: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /email/unsubscribe:
+    get:
+      tags: [Email]
+      operationId: emailUnsubscribeOneClick
+      summary: One-click email unsubscribe (CAN-SPAM compliant)
+      parameters:
+        - name: email
+          in: query
+          required: true
+          schema: { type: string, format: email }
+      responses:
+        '200':
+          description: Unsubscribe confirmation HTML page.
+          content:
+            text/html:
+              schema: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+    post:
+      tags: [Email]
+      operationId: emailUnsubscribePost
+      summary: RFC 8058 List-Unsubscribe-Post target
+      requestBody:
+        required: false
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                email: { type: string, format: email }
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '200':
+          description: Suppression recorded.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+        '400': { $ref: '#/components/responses/BadRequest' }
   /storage/uploads/request-url:
     post:
       tags: [Storage]
@@ -350,6 +422,16 @@ components:
       required: [agent]
       properties:
         agent: { $ref: '#/components/schemas/AgentProfile' }
+    CreateLeadRequest:
+      type: object
+      required: [listingId, name, email]
+      properties:
+        listingId: { type: string, format: uuid }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        email: { type: string, format: email, maxLength: 200 }
+        phone: { type: string, maxLength: 40 }
+        message: { type: string, maxLength: 2000 }
+        source: { type: string, maxLength: 40 }
     AgentProfileUpdate:
       type: object
       description: All fields optional. Send `null` for `headshotUrl`/`logoUrl`/`personalWebsiteUrl` to clear that field.

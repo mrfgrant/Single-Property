@@ -160,8 +160,12 @@ Real estate agent SaaS that auto-builds a property marketing site for every MLS 
 - `STRIPE_WEBHOOK_SECRET` — generated after first deploy + webhook registration
 - `SITE_DEPLOYMENT_HOSTNAME` — production hostname for DNS CNAME records
 - `PLATFORM_HOMEPAGE_URL` — fallback redirect for closed listings
-- `TELNYX_API_KEY` — SMS outreach
-- `TELNYX_PHONE_NUMBER` — outbound SMS number
+- `TELNYX_API_KEY` — SMS outreach (Telnyx Messaging API v2 + Number Lookup)
+- `TELNYX_MESSAGING_PROFILE_ID` — Telnyx messaging profile (preferred — selects sending number automatically)
+- `TELNYX_FROM_NUMBER` — fallback E.164 number if no messaging profile
+- `TELNYX_PUBLIC_KEY` — base64 SPKI Ed25519 public key for webhook signature verification (required in production)
+- `COLD_OUTREACH_DELAY_MS` — optional, defaults to 15min delay between MLS event and outreach send
+- `MARKETING_SITE_URL` — base URL for preview/onboarding links in cold outreach (defaults to https://propsite.app)
 - `FRED_API_KEY` — mortgage rate data
 
 **Important workflow:**
@@ -175,7 +179,7 @@ After any `lib/db/src/schema/` change:
 - #2 MLS ingestion — blocked (awaiting MLS credentials from Augusta Board of REALTORS)
 - #3 Property site renderer — blocked on #2
 - #4 Agent onboarding & Stripe billing — in progress
-- #5 Leads, notifications & cold outreach — pending #2
+- #5 Leads, notifications & cold outreach — **BUILT** ✓ (in-process outbox workers; gated on Telnyx provisioning)
 - #6 Analytics & weekly seller report — pending #2, #3, #5
 - #7 Marketing site — **BUILT** ✓
 - #8 SEO metadata — **BUILT** ✓

@@ -22,6 +22,12 @@ import type {
   AgentProfileResponse,
   AgentProfileUpdate,
   BadRequestResponse,
+  CreateLead201,
+  CreateLeadRequest,
+  EmailUnsubscribeOneClickParams,
+  EmailUnsubscribePost200,
+  EmailUnsubscribePostBodyOne,
+  EmailUnsubscribePostBodyTwo,
   ErrorEnvelope,
   GetAgentBillingPortal200,
   GetAgentBillingPortalParams,
@@ -623,6 +629,291 @@ export const useActivateListing = <
   TContext
 > => {
   return useMutation(getActivateListingMutationOptions(options));
+};
+
+/**
+ * Records a buyer lead against a listing and queues two emails: a lead-alert to the listing agent (with click-to-call/email), and an auto-reply to the buyer confirming receipt. No SMS for buyer leads at $49/mo per listing economics.
+
+ * @summary Submit a buyer lead from a live property site
+ */
+export const getCreateLeadUrl = () => {
+  return `/api/leads`;
+};
+
+export const createLead = async (
+  createLeadRequest: CreateLeadRequest,
+  options?: RequestInit,
+): Promise<CreateLead201> => {
+  return customFetch<CreateLead201>(getCreateLeadUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createLeadRequest),
+  });
+};
+
+export const getCreateLeadMutationOptions = <
+  TError = ErrorType<BadRequestResponse | NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createLead>>,
+    TError,
+    { data: BodyType<CreateLeadRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createLead>>,
+  TError,
+  { data: BodyType<CreateLeadRequest> },
+  TContext
+> => {
+  const mutationKey = ["createLead"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createLead>>,
+    { data: BodyType<CreateLeadRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createLead(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateLeadMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createLead>>
+>;
+export type CreateLeadMutationBody = BodyType<CreateLeadRequest>;
+export type CreateLeadMutationError = ErrorType<
+  BadRequestResponse | NotFoundResponse
+>;
+
+/**
+ * @summary Submit a buyer lead from a live property site
+ */
+export const useCreateLead = <
+  TError = ErrorType<BadRequestResponse | NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createLead>>,
+    TError,
+    { data: BodyType<CreateLeadRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createLead>>,
+  TError,
+  { data: BodyType<CreateLeadRequest> },
+  TContext
+> => {
+  return useMutation(getCreateLeadMutationOptions(options));
+};
+
+/**
+ * @summary One-click email unsubscribe (CAN-SPAM compliant)
+ */
+export const getEmailUnsubscribeOneClickUrl = (
+  params: EmailUnsubscribeOneClickParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/email/unsubscribe?${stringifiedParams}`
+    : `/api/email/unsubscribe`;
+};
+
+export const emailUnsubscribeOneClick = async (
+  params: EmailUnsubscribeOneClickParams,
+  options?: RequestInit,
+): Promise<string> => {
+  return customFetch<string>(getEmailUnsubscribeOneClickUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getEmailUnsubscribeOneClickQueryKey = (
+  params?: EmailUnsubscribeOneClickParams,
+) => {
+  return [`/api/email/unsubscribe`, ...(params ? [params] : [])] as const;
+};
+
+export const getEmailUnsubscribeOneClickQueryOptions = <
+  TData = Awaited<ReturnType<typeof emailUnsubscribeOneClick>>,
+  TError = ErrorType<BadRequestResponse>,
+>(
+  params: EmailUnsubscribeOneClickParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof emailUnsubscribeOneClick>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getEmailUnsubscribeOneClickQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof emailUnsubscribeOneClick>>
+  > = ({ signal }) =>
+    emailUnsubscribeOneClick(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof emailUnsubscribeOneClick>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type EmailUnsubscribeOneClickQueryResult = NonNullable<
+  Awaited<ReturnType<typeof emailUnsubscribeOneClick>>
+>;
+export type EmailUnsubscribeOneClickQueryError = ErrorType<BadRequestResponse>;
+
+/**
+ * @summary One-click email unsubscribe (CAN-SPAM compliant)
+ */
+
+export function useEmailUnsubscribeOneClick<
+  TData = Awaited<ReturnType<typeof emailUnsubscribeOneClick>>,
+  TError = ErrorType<BadRequestResponse>,
+>(
+  params: EmailUnsubscribeOneClickParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof emailUnsubscribeOneClick>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getEmailUnsubscribeOneClickQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary RFC 8058 List-Unsubscribe-Post target
+ */
+export const getEmailUnsubscribePostUrl = () => {
+  return `/api/email/unsubscribe`;
+};
+
+export const emailUnsubscribePost = async (
+  emailUnsubscribePostBody?:
+    | EmailUnsubscribePostBodyOne
+    | EmailUnsubscribePostBodyTwo,
+  options?: RequestInit,
+): Promise<EmailUnsubscribePost200> => {
+  return customFetch<EmailUnsubscribePost200>(getEmailUnsubscribePostUrl(), {
+    ...options,
+    method: "POST",
+    body: JSON.stringify(emailUnsubscribePostBody),
+  });
+};
+
+export const getEmailUnsubscribePostMutationOptions = <
+  TError = ErrorType<BadRequestResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof emailUnsubscribePost>>,
+    TError,
+    {
+      data: BodyType<EmailUnsubscribePostBodyOne | EmailUnsubscribePostBodyTwo>;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof emailUnsubscribePost>>,
+  TError,
+  { data: BodyType<EmailUnsubscribePostBodyOne | EmailUnsubscribePostBodyTwo> },
+  TContext
+> => {
+  const mutationKey = ["emailUnsubscribePost"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof emailUnsubscribePost>>,
+    {
+      data: BodyType<EmailUnsubscribePostBodyOne | EmailUnsubscribePostBodyTwo>;
+    }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return emailUnsubscribePost(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type EmailUnsubscribePostMutationResult = NonNullable<
+  Awaited<ReturnType<typeof emailUnsubscribePost>>
+>;
+export type EmailUnsubscribePostMutationBody = BodyType<
+  EmailUnsubscribePostBodyOne | EmailUnsubscribePostBodyTwo
+>;
+export type EmailUnsubscribePostMutationError = ErrorType<BadRequestResponse>;
+
+/**
+ * @summary RFC 8058 List-Unsubscribe-Post target
+ */
+export const useEmailUnsubscribePost = <
+  TError = ErrorType<BadRequestResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof emailUnsubscribePost>>,
+    TError,
+    {
+      data: BodyType<EmailUnsubscribePostBodyOne | EmailUnsubscribePostBodyTwo>;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof emailUnsubscribePost>>,
+  TError,
+  { data: BodyType<EmailUnsubscribePostBodyOne | EmailUnsubscribePostBodyTwo> },
+  TContext
+> => {
+  return useMutation(getEmailUnsubscribePostMutationOptions(options));
 };
 
 /**

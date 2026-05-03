@@ -2,6 +2,9 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { startMlsIngestion } from "./lib/mls/cron";
 import { initBillingLifecycleBridge } from "./lib/billing/lifecycleBridge";
+import { initColdOutreachBridge } from "./lib/outreach/coldOutreach";
+import { startEmailOutboxWorker } from "./lib/outbox/email";
+import { startSmsOutboxWorker } from "./lib/outbox/sms";
 
 const rawPort = process.env["PORT"];
 
@@ -25,5 +28,8 @@ app.listen(port, (err) => {
 
   logger.info({ port }, "Server listening");
   initBillingLifecycleBridge();
+  initColdOutreachBridge();
+  startEmailOutboxWorker();
+  startSmsOutboxWorker();
   startMlsIngestion();
 });

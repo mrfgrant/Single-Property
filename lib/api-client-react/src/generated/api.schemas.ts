@@ -70,6 +70,23 @@ export interface AgentProfileResponse {
   agent: AgentProfile;
 }
 
+export interface CreateLeadRequest {
+  listingId: string;
+  /**
+   * @minLength 1
+   * @maxLength 120
+   */
+  name: string;
+  /** @maxLength 200 */
+  email: string;
+  /** @maxLength 40 */
+  phone?: string;
+  /** @maxLength 2000 */
+  message?: string;
+  /** @maxLength 40 */
+  source?: string;
+}
+
 /**
  * All fields optional. Send `null` for `headshotUrl`/`logoUrl`/`personalWebsiteUrl` to clear that field.
  */
@@ -131,4 +148,24 @@ export type ActivateListing200 = {
   domainName?: string | null;
   subscriptionId?: string | null;
   replitHandoffNote?: string | null;
+};
+
+export type CreateLead201 = {
+  leadId: string;
+};
+
+export type EmailUnsubscribeOneClickParams = {
+  email: string;
+};
+
+export type EmailUnsubscribePostBodyOne = {
+  email?: string;
+};
+
+export type EmailUnsubscribePostBodyTwo = {
+  email?: string;
+};
+
+export type EmailUnsubscribePost200 = {
+  ok?: boolean;
 };

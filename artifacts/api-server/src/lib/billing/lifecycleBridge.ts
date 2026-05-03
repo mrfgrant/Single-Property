@@ -4,6 +4,8 @@ import { mlsEventBus, type ListingStatusChangedEvent } from "../mls/eventBus.js"
 import { cancelListingSubscription } from "../stripe/index.js";
 import { handleListingClosed, type ListingCloseStatus } from "../cloudflare/lifecycle.js";
 import { logger } from "../logger.js";
+import { enqueueEmail } from "../outbox/email.js";
+import { listingArchivedEmail } from "../email.js";
 
 /**
  * Terminal MLS statuses that should end a listing's subscription and
@@ -79,7 +81,8 @@ async function onStatusChanged(event: ListingStatusChangedEvent): Promise<void> 
     })
     .where(eq(listingsTable.id, listing.id));
 
-  // Look up the agent's personal site (if any) for the redirect target.
+  // Look up the agent's personal site (if any) for the redirect target,
+  // and notify them that their site has been archived.
   let agentWebsiteUrl: string | undefined;
   if (listing.agentId) {
     const agents = await db
@@ -87,7 +90,25 @@ async function onStatusChanged(event: ListingStatusChangedEvent): Promise<void> 
       .from(agentsTable)
       .where(eq(agentsTable.id, listing.agentId))
       .limit(1);
-    agentWebsiteUrl = agents[0]?.personalWebsiteUrl ?? undefined;
+    const agent = agents[0];
+    agentWebsiteUrl = agent?.personalWebsiteUrl ?? undefined;
+    if (agent?.email) {
+      try {
+        await enqueueEmail({
+          toEmail: agent.email,
+          kind: "transactional",
+          dedupeKey: `listing_archived:${listing.id}`,
+          ...listingArchivedEmail({
+            agentEmail: agent.email,
+            agentFirstName: agent.firstName,
+            address: listing.address,
+            closeStatus,
+          }),
+        });
+      } catch (err) {
+        log.error({ err }, "Failed to enqueue listing-archived email");
+      }
+    }
   }
 
   try {

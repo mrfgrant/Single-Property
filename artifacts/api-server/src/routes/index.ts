@@ -13,6 +13,8 @@ import adminDomainsRouter from "./adminDomains.js";
 import simulateMlsRouter from "./simulateMls.js";
 import mlsRouter from "./mls.js";
 import storageRouter from "./storage.js";
+import leadsRouter from "./leads.js";
+import unsubscribeRouter from "./unsubscribe.js";
 
 const router: IRouter = Router();
 
@@ -30,5 +32,7 @@ router.use(adminDomainsRouter);
 router.use(simulateMlsRouter);
 router.use(mlsRouter);
 router.use(storageRouter);
+router.use(leadsRouter);
+router.use(unsubscribeRouter);
 
 export default router;

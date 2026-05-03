@@ -3,6 +3,7 @@ import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes/index.js";
 import webhookStripeRouter from "./routes/webhookStripe.js";
+import webhookTelnyxRouter from "./routes/webhookTelnyx.js";
 import { logger } from "./lib/logger.js";
 
 const app: Express = express();
@@ -29,8 +30,9 @@ app.use(
 
 app.use(cors());
 
-// Stripe webhooks need raw body BEFORE the JSON parser
+// Stripe + Telnyx webhooks need raw body BEFORE the JSON parser
 app.use("/api", webhookStripeRouter);
+app.use("/api", webhookTelnyxRouter);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
