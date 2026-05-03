@@ -5,6 +5,7 @@ import { fetchPublicListingBySlug, type PublicListing } from "@/lib/publicListin
 import { WORDMARK_PREFIX, WORDMARK_SUFFIX } from "@/lib/copy";
 import { ONBOARDING_URL } from "@/lib/config";
 import { Phone, Mail, MessageCircle, X, Menu as MenuIcon } from "lucide-react";
+import ShareSection from "@/components/ShareSection";
 
 type FullListing = SampleListing & {
   photoUrls?: string[];
@@ -21,6 +22,7 @@ const NAV_SECTIONS = [
   { id: "gallery", label: "Gallery" },
   { id: "details", label: "Details" },
   { id: "finance", label: "Finance" },
+  { id: "share", label: "Share" },
   { id: "contact", label: "Schedule" },
 ];
 
@@ -549,6 +551,16 @@ export default function Listing() {
           <MortgageCalculator price={listing.price} />
         </div>
       </section>
+
+      {/* SHARE — QR + sign rider + flyer, all auto-generated */}
+      <ShareSection
+        listing={listing}
+        shareUrl={
+          typeof window !== "undefined"
+            ? `${window.location.origin}/listing/${listing.slug}`
+            : `https://${displayDomain}`
+        }
+      />
 
       {/* SCHEDULE / CONTACT */}
       <section
