@@ -377,7 +377,7 @@ export default function Listing() {
       <header
         id="home"
         ref={heroRef}
-        className="relative h-screen min-h-[600px] w-full pl-12 md:pl-14"
+        className="relative h-screen min-h-[600px] w-full pl-20 md:pl-28"
         style={
           heroPhoto
             ? {
@@ -389,7 +389,7 @@ export default function Listing() {
         }
       >
         {/* Top bar */}
-        <div className="absolute top-0 inset-x-0 pl-12 md:pl-14 px-6 md:px-12 py-6 md:py-8 flex items-start justify-between gap-4 text-warm-white">
+        <div className="absolute top-0 inset-x-0 pl-20 md:pl-28 px-6 md:px-12 py-6 md:py-8 flex items-start justify-between gap-4 text-warm-white">
           <a
             href="#home"
             className="font-serif text-base md:text-xl tracking-tight drop-shadow-md hover:opacity-80 transition-opacity"
@@ -405,7 +405,7 @@ export default function Listing() {
         </div>
 
         {/* Bottom overlay */}
-        <div className="absolute bottom-0 inset-x-0 pl-12 md:pl-14 px-6 md:px-12 pb-8 md:pb-14 flex flex-col md:flex-row md:items-end justify-between gap-6 text-warm-white">
+        <div className="absolute bottom-0 inset-x-0 pl-20 md:pl-28 px-6 md:px-12 pb-8 md:pb-14 flex flex-col md:flex-row md:items-end justify-between gap-6 text-warm-white">
           <div>
             <p className="font-serif text-4xl md:text-6xl lg:text-7xl leading-none drop-shadow-lg">
               {formatPrice(listing.price)}
@@ -431,7 +431,7 @@ export default function Listing() {
       </header>
 
       {/* STORY / DESCRIPTION — editorial */}
-      <section id="story" className="pl-12 md:pl-14 px-6 md:px-12 py-24 md:py-32 bg-warm-white">
+      <section id="story" className="pl-20 md:pl-28 px-6 md:px-12 py-24 md:py-32 bg-warm-white">
         <div className="max-w-3xl mx-auto text-center">
           <p className="text-[10px] uppercase tracking-[0.4em] text-gold mb-6">The Home</p>
           <h2 className="font-serif text-4xl md:text-6xl text-ink leading-[1.05] mb-10">
@@ -445,7 +445,7 @@ export default function Listing() {
 
       {/* FEATURE PHOTO — full-bleed */}
       {featurePhoto && (
-        <section className="pl-12 md:pl-14">
+        <section className="pl-20 md:pl-28">
           <div
             className="w-full h-[60vh] md:h-[80vh] bg-ink"
             style={{
@@ -460,7 +460,7 @@ export default function Listing() {
       {/* SPECS BAR */}
       <section
         id="details"
-        className="pl-12 md:pl-14 px-6 md:px-12 py-20 md:py-28 bg-cream"
+        className="pl-20 md:pl-28 px-6 md:px-12 py-20 md:py-28 bg-cream"
       >
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-14">
@@ -508,7 +508,7 @@ export default function Listing() {
 
       {/* GALLERY */}
       {remainingGallery.length > 0 && (
-        <section id="gallery" className="pl-12 md:pl-14 px-0 md:px-0 py-20 md:py-28 bg-warm-white">
+        <section id="gallery" className="pl-20 md:pl-28 px-0 md:px-0 py-20 md:py-28 bg-warm-white">
           <div className="text-center mb-14 px-6">
             <p className="text-[10px] uppercase tracking-[0.4em] text-gold mb-4">Gallery</p>
             <h2 className="font-serif text-3xl md:text-5xl text-ink">Take a closer look</h2>
@@ -539,7 +539,7 @@ export default function Listing() {
       {/* FINANCE / MORTGAGE */}
       <section
         id="finance"
-        className="pl-12 md:pl-14 px-6 md:px-12 py-24 md:py-32 bg-cream"
+        className="pl-20 md:pl-28 px-6 md:px-12 py-24 md:py-32 bg-cream"
       >
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-16">
@@ -553,7 +553,7 @@ export default function Listing() {
       {/* SCHEDULE / CONTACT */}
       <section
         id="contact"
-        className="pl-12 md:pl-14 px-6 md:px-12 py-24 md:py-32 bg-ink text-warm-white"
+        className="pl-20 md:pl-28 px-6 md:px-12 py-24 md:py-32 bg-ink text-warm-white"
       >
         <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24 items-start">
           <div>
@@ -632,7 +632,7 @@ export default function Listing() {
       </section>
 
       {/* FOOTER */}
-      <footer className="pl-12 md:pl-14 px-6 md:px-12 py-12 bg-warm-white border-t border-ink/10 pb-24 md:pb-12">
+      <footer className="pl-20 md:pl-28 px-6 md:px-12 py-12 bg-warm-white border-t border-ink/10 pb-24 md:pb-12">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4 text-center md:text-left">
           <p className="text-xs text-muted uppercase tracking-[0.2em]">{fullAddress}</p>
           <Link

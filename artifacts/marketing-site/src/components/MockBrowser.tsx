@@ -82,7 +82,7 @@ export function MockBrowser({ listing }: Props) {
 
         {/* Photo */}
         <div
-          className="relative h-[280px] md:h-[360px] pl-7 md:pl-9"
+          className="relative h-[280px] md:h-[360px] pl-12 md:pl-16"
           style={
             heroPhoto
               ? {
@@ -94,7 +94,7 @@ export function MockBrowser({ listing }: Props) {
           }
         >
           {/* Top bar — domain + tour pill */}
-          <div className="absolute top-0 inset-x-0 pl-7 md:pl-9 px-4 md:px-6 py-3 md:py-4 flex items-start justify-between gap-3 text-warm-white">
+          <div className="absolute top-0 inset-x-0 pl-12 md:pl-16 px-4 md:px-6 py-3 md:py-4 flex items-start justify-between gap-3 text-warm-white">
             <span className="font-serif text-xs md:text-sm tracking-tight drop-shadow-md truncate max-w-[60%]">
               {deriveDomain(data as PublicListing)}
             </span>
@@ -104,7 +104,7 @@ export function MockBrowser({ listing }: Props) {
           </div>
 
           {/* Bottom overlay — price + address + open house */}
-          <div className="absolute bottom-0 inset-x-0 pl-7 md:pl-9 px-4 md:px-6 pb-4 md:pb-5 flex items-end justify-between gap-3 text-warm-white">
+          <div className="absolute bottom-0 inset-x-0 pl-12 md:pl-16 px-4 md:px-6 pb-4 md:pb-5 flex items-end justify-between gap-3 text-warm-white">
             <div className="min-w-0">
               <p className="font-serif text-3xl md:text-5xl leading-none drop-shadow-lg">
                 {fmtPrice(data.price)}
@@ -132,7 +132,7 @@ export function MockBrowser({ listing }: Props) {
       </div>
 
       {/* Editorial story strip + tiny lead bar (mirrors page below the fold) */}
-      <div className="bg-warm-white pl-7 md:pl-9">
+      <div className="bg-warm-white pl-12 md:pl-16">
         <div className="px-5 md:px-6 py-6 md:py-8 text-center border-b border-ink/10">
           <p className="text-[8px] md:text-[9px] uppercase tracking-[0.4em] text-gold mb-2">
             The Home
