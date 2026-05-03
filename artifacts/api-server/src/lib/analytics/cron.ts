@@ -122,6 +122,7 @@ async function sendWeeklyReportFor(
   // the admin backfill route bypasses the claim check entirely.)
   await enqueueEmail({
     toEmail: rendered.to,
+    ccEmail: rendered.cc,
     subject: rendered.subject,
     html: rendered.html,
     textBody: rendered.text,
@@ -130,7 +131,6 @@ async function sendWeeklyReportFor(
     metadata: {
       listingId: listing.id,
       weekStart: weekStart.toISOString(),
-      cc: rendered.cc,
     },
   });
 
@@ -161,11 +161,14 @@ export function startWeeklyReportCron(): void {
     return;
   }
   const intervalMs = Number(process.env.WEEKLY_REPORT_TICK_MS ?? 60 * 60 * 1000);
-  timer = setInterval(() => {
+  const tick = () =>
     runOneTick().catch((err) => log.error({ err }, "Weekly report tick errored"));
-  }, intervalMs);
+  timer = setInterval(tick, intervalMs);
   if (typeof timer.unref === "function") timer.unref();
   log.info({ intervalMs }, "Weekly seller report cron started");
+  // Fire once immediately so a Monday-morning restart doesn't miss the
+  // 8am window. seller_reports_sent dedupe makes this safe.
+  void tick();
 }
 
 export function stopWeeklyReportCron(): void {

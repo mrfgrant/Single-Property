@@ -13,6 +13,8 @@ export const emailOutboxTable = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     toEmail: text("to_email").notNull(),
+    /** Optional secondary recipient — agent CC on seller-facing reports, etc. */
+    ccEmail: text("cc_email"),
     subject: text("subject").notNull(),
     html: text("html").notNull(),
     textBody: text("text_body"),

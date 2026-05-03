@@ -38,10 +38,19 @@ const log = logger.child({ component: "email-outbox" });
 
 export interface EnqueueEmailParams {
   toEmail: string;
+  /** Optional CC — agent on seller-facing reports, etc. */
+  ccEmail?: string | null;
   subject: string;
   html: string;
   textBody?: string;
-  kind: "transactional" | "lead_alert" | "buyer_auto_reply" | "cold_outreach" | string;
+  kind:
+    | "transactional"
+    | "lead_alert"
+    | "buyer_auto_reply"
+    | "cold_outreach"
+    | "weekly_seller_report"
+    | "final_marketing_report"
+    | string;
   dedupeKey?: string;
   sendAfter?: Date;
   metadata?: Record<string, unknown>;
@@ -72,6 +81,7 @@ export async function enqueueEmail(
     .insert(emailOutboxTable)
     .values({
       toEmail: p.toEmail,
+      ccEmail: p.ccEmail ?? null,
       subject: p.subject,
       html: p.html,
       textBody: p.textBody,
@@ -84,9 +94,28 @@ export async function enqueueEmail(
   return row?.id ?? null;
 }
 
-/** Cold outreach is suppressible; transactional is not. */
+/**
+ * Email kinds that respect the unsubscribe / suppression list.
+ * Transactional + lead-alert + buyer auto-reply are critical and never
+ * suppressed (the user expects them — payment receipts, lead notices,
+ * inquiry confirmations). Marketing-style messages going to sellers or
+ * cold prospects MUST honor unsubscribe.
+ */
 function isSuppressible(kind: string): boolean {
-  return kind === "cold_outreach";
+  return (
+    kind === "cold_outreach" ||
+    kind === "weekly_seller_report" ||
+    kind === "final_marketing_report"
+  );
+}
+
+async function isAddressSuppressed(email: string): Promise<boolean> {
+  const sup = await db
+    .select({ email: emailSuppressionsTable.email })
+    .from(emailSuppressionsTable)
+    .where(eq(emailSuppressionsTable.email, email))
+    .limit(1);
+  return sup.length > 0;
 }
 
 /**
@@ -119,14 +148,13 @@ export async function drainEmailOutbox(limit = 25): Promise<{ processed: number 
   let processed = 0;
   for (const row of due) {
     processed++;
-    // Suppression check (cold_outreach only).
+    // Suppression check for marketing-style kinds. If the primary
+    // recipient unsubscribed we drop the row entirely; if only the CC
+    // unsubscribed we strip the CC and still send to the primary so the
+    // seller still gets their report even when the agent has opted out.
+    let effectiveCc: string | null = row.ccEmail ?? null;
     if (isSuppressible(row.kind)) {
-      const sup = await db
-        .select({ email: emailSuppressionsTable.email })
-        .from(emailSuppressionsTable)
-        .where(eq(emailSuppressionsTable.email, row.toEmail))
-        .limit(1);
-      if (sup[0]) {
+      if (await isAddressSuppressed(row.toEmail)) {
         await db
           .update(emailOutboxTable)
           .set({ status: "suppressed", updatedAt: new Date() })
@@ -134,6 +162,15 @@ export async function drainEmailOutbox(limit = 25): Promise<{ processed: number 
         log.info({ outboxId: row.id, kind: row.kind }, "Email suppressed");
         continue;
       }
+      if (effectiveCc && (await isAddressSuppressed(effectiveCc))) {
+        log.info(
+          { outboxId: row.id, kind: row.kind },
+          "CC recipient suppressed — sending to primary only",
+        );
+        effectiveCc = null;
+      }
+    }
+    if (row.kind === "cold_outreach") {
       // Pre-send listing-state guard for cold outreach: if the listing
       // has since been activated, gone off-market, or been deleted, do
       // not blast the agent — they may have already paid us, or the
@@ -156,6 +193,7 @@ export async function drainEmailOutbox(limit = 25): Promise<{ processed: number 
     try {
       const result = await sendEmail({
         to: row.toEmail,
+        cc: effectiveCc,
         subject: row.subject,
         html: row.html,
         text: row.textBody ?? undefined,

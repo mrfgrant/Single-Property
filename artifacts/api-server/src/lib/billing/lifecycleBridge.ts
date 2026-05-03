@@ -142,6 +142,7 @@ async function onStatusChanged(event: ListingStatusChangedEvent): Promise<void> 
           });
           await enqueueEmail({
             toEmail: rendered.to,
+            ccEmail: rendered.cc,
             subject: rendered.subject,
             html: rendered.html,
             textBody: rendered.text,
@@ -150,7 +151,6 @@ async function onStatusChanged(event: ListingStatusChangedEvent): Promise<void> 
             metadata: {
               listingId: listing.id,
               closeStatus,
-              cc: rendered.cc,
             },
           });
           log.info(

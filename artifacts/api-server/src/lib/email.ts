@@ -7,6 +7,7 @@ const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
 
 interface EmailPayload {
   to: string;
+  cc?: string | null;
   subject: string;
   html: string;
   text?: string;
@@ -26,6 +27,7 @@ async function sendViaResend(payload: EmailPayload): Promise<SendEmailResult> {
     body: JSON.stringify({
       from: `${FROM_NAME} <${FROM_EMAIL}>`,
       to: [payload.to],
+      ...(payload.cc ? { cc: [payload.cc] } : {}),
       subject: payload.subject,
       html: payload.html,
       text: payload.text,
@@ -47,7 +49,10 @@ async function sendViaSendGrid(payload: EmailPayload): Promise<SendEmailResult> 
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      personalizations: [{ to: [{ email: payload.to }] }],
+      personalizations: [{
+        to: [{ email: payload.to }],
+        ...(payload.cc ? { cc: [{ email: payload.cc }] } : {}),
+      }],
       from: { email: FROM_EMAIL, name: FROM_NAME },
       subject: payload.subject,
       content: [
