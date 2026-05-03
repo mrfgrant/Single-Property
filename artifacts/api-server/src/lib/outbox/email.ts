@@ -54,6 +54,15 @@ export interface EnqueueEmailParams {
   dedupeKey?: string;
   sendAfter?: Date;
   metadata?: Record<string, unknown>;
+  /**
+   * Skip the dedupeKey collapse check and always insert a fresh outbox
+   * row. Used by admin backfill endpoints that explicitly want to
+   * re-send a previously-sent message (e.g. /admin/listings/:id/
+   * weekly-report). The dedupeKey is still recorded on the new row for
+   * traceability — uniqueness is not enforced at the DB level so this
+   * is safe.
+   */
+  force?: boolean;
 }
 
 /**
@@ -67,7 +76,7 @@ export async function enqueueEmail(
   p: EnqueueEmailParams,
   tx: typeof db = db,
 ): Promise<string | null> {
-  if (p.dedupeKey) {
+  if (p.dedupeKey && !p.force) {
     const existing = await tx
       .select({ id: emailOutboxTable.id, status: emailOutboxTable.status })
       .from(emailOutboxTable)

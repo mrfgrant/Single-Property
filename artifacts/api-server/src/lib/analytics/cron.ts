@@ -126,9 +126,14 @@ async function sendWeeklyReportFor(
         textBody: rendered.text,
         kind: "weekly_seller_report",
         dedupeKey: `weekly_report:${listing.id}:${weekStart.toISOString().slice(0, 10)}`,
+        // Admin backfill (force=true) bypasses both the
+        // seller_reports_sent claim and the outbox dedupe collapse so
+        // operators can genuinely re-send a previously-sent week.
+        force: opts.force,
         metadata: {
           listingId: listing.id,
           weekStart: weekStart.toISOString(),
+          backfilled: opts.force === true,
         },
       },
       tx,
