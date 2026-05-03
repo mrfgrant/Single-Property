@@ -41,5 +41,5 @@ externalPort = 3002
 PLATFORM_HOMEPAGE_URL = "https://propsite.io"
 ADMIN_TOKEN = "Jamie1969!!"
 MLS_BOARD_ID = ""
-EMAIL_FROM = "noreply@soracle.dev"
+EMAIL_FROM = "noreply@mailer.soracle.dev"
 EMAIL_FROM_NAME = "PropSite"
