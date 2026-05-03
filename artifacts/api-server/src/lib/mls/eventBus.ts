@@ -12,8 +12,17 @@ import { EventEmitter } from "events";
 export type ListingStatusChangedEvent = {
   listingId: string;
   mlsListingId: string | null;
+  /** Normalized DB enum status the listing changed FROM. */
   fromStatus: string | null;
+  /** Normalized DB enum status the listing changed TO. */
   toStatus: string;
+  /**
+   * Raw vendor MLS status string (e.g. "Closed", "Pending Show", "ActiveUC").
+   * Preserved verbatim from the upstream feed so subscribers can disambiguate
+   * subtypes the normalized `toStatus` collapses (e.g. Closed vs Sold).
+   * Optional for backward compatibility with non-MLS sources.
+   */
+  mlsStatus?: string | null;
   source: "mls" | "manual" | "stripe";
   occurredAt: Date;
 };

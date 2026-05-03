@@ -18,6 +18,7 @@ export * from "./getAgentBillingPortalParams";
 export * from "./getAgentProfileParams";
 export * from "./healthStatus";
 export * from "./notFoundResponse";
+export * from "./onboardAgent200";
 export * from "./onboardingRequest";
 export * from "./onboardingResponse";
 export * from "./requestUploadUrlBody";

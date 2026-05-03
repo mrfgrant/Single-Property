@@ -28,6 +28,7 @@ import type {
   GetAgentProfileParams,
   HealthStatus,
   NotFoundResponse,
+  OnboardAgent200,
   OnboardingRequest,
   OnboardingResponse,
   RequestUploadUrlBody,
@@ -133,17 +134,20 @@ export const getOnboardAgentUrl = () => {
 export const onboardAgent = async (
   onboardingRequest: OnboardingRequest,
   options?: RequestInit,
-): Promise<OnboardingResponse> => {
-  return customFetch<OnboardingResponse>(getOnboardAgentUrl(), {
-    ...options,
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(onboardingRequest),
-  });
+): Promise<OnboardAgent200 | OnboardingResponse> => {
+  return customFetch<OnboardAgent200 | OnboardingResponse>(
+    getOnboardAgentUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(onboardingRequest),
+    },
+  );
 };
 
 export const getOnboardAgentMutationOptions = <
-  TError = ErrorType<ErrorEnvelope>,
+  TError = ErrorType<BadRequestResponse | ErrorEnvelope>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -184,13 +188,15 @@ export type OnboardAgentMutationResult = NonNullable<
   Awaited<ReturnType<typeof onboardAgent>>
 >;
 export type OnboardAgentMutationBody = BodyType<OnboardingRequest>;
-export type OnboardAgentMutationError = ErrorType<ErrorEnvelope>;
+export type OnboardAgentMutationError = ErrorType<
+  BadRequestResponse | ErrorEnvelope
+>;
 
 /**
  * @summary Create an agent account and start the Stripe Checkout setup flow
  */
 export const useOnboardAgent = <
-  TError = ErrorType<ErrorEnvelope>,
+  TError = ErrorType<BadRequestResponse | ErrorEnvelope>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<

@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
+/**
+ * All fields optional. Send `null` for `headshotUrl`/`logoUrl`/`personalWebsiteUrl` to clear that field.
+ */
 export interface AgentProfileUpdate {
   /** @minLength 1 */
   firstName?: string;
@@ -13,7 +16,7 @@ export interface AgentProfileUpdate {
   lastName?: string;
   phone?: string;
   brokerage?: string;
-  personalWebsiteUrl?: string;
-  headshotUrl?: string;
-  logoUrl?: string;
+  personalWebsiteUrl?: string | null;
+  headshotUrl?: string | null;
+  logoUrl?: string | null;
 }

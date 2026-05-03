@@ -7,13 +7,11 @@
  */
 
 export interface OnboardingResponse {
-  agentId?: string | null;
-  /** Magic link token (also embedded in checkoutUrl/success URL). */
-  token?: string | null;
-  /** Stripe Checkout setup-mode URL. Redirect the browser here. */
+  agentId: string;
+  /** Token-bearing URL for fetching/updating the agent's profile (e.g. `/api/agents/profile?token=…`). */
+  profileUrl: string;
+  /** Stripe Checkout setup-mode URL. Redirect the browser here when present. */
   checkoutUrl?: string | null;
   /** How many existing preview listings were linked to this new agent by `listAgentMlsId`. */
   backfilledCount?: number | null;
-  /** If true, the agent's MLS prefix is outside the served market and they should be added to the waitlist. */
-  outOfMarket?: boolean | null;
 }

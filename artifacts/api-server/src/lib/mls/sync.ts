@@ -167,6 +167,7 @@ async function upsertProperty(p: ResoProperty): Promise<string | null> {
         mlsListingId: inserted.mlsListingId,
         fromStatus: null,
         toStatus: inserted.status,
+        mlsStatus: inserted.mlsStatus ?? null,
         source: "mls",
         occurredAt: new Date(),
       });
@@ -196,6 +197,7 @@ async function upsertProperty(p: ResoProperty): Promise<string | null> {
       mlsListingId: updated.mlsListingId,
       fromStatus: existing.status,
       toStatus: updated.status,
+      mlsStatus: updated.mlsStatus ?? null,
       source: "mls",
       occurredAt: new Date(),
     });

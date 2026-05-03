@@ -43,13 +43,25 @@ paths:
               $ref: '#/components/schemas/OnboardingRequest'
       responses:
         '200':
-          description: Onboarding accepted.
+          description: Out-of-market agent — added to waitlist instead of created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [outOfMarket]
+                properties:
+                  outOfMarket:
+                    type: boolean
+                    description: True when the agent's MLS prefix is outside the served market.
+        '201':
+          description: Agent created and Stripe Checkout setup session ready.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/OnboardingResponse'
-        '400':
-          description: Invalid request.
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409':
+          description: An agent with this email or MLS Agent ID already exists.
           content:
             application/json:
               schema:
@@ -304,22 +316,21 @@ components:
         logoUrl: { type: string, format: uri }
     OnboardingResponse:
       type: object
+      required: [agentId, profileUrl]
       properties:
-        agentId: { type: string, nullable: true }
-        token: { type: string, nullable: true, description: "Magic link token (also embedded in checkoutUrl/success URL)." }
+        agentId: { type: string }
+        profileUrl:
+          type: string
+          description: Token-bearing URL for fetching/updating the agent's profile (e.g. `/api/agents/profile?token=…`).
         checkoutUrl:
           type: string
           format: uri
           nullable: true
-          description: Stripe Checkout setup-mode URL. Redirect the browser here.
+          description: Stripe Checkout setup-mode URL. Redirect the browser here when present.
         backfilledCount:
           type: integer
           nullable: true
           description: How many existing preview listings were linked to this new agent by `listAgentMlsId`.
-        outOfMarket:
-          type: boolean
-          nullable: true
-          description: If true, the agent's MLS prefix is outside the served market and they should be added to the waitlist.
     AgentProfile:
       type: object
       required: [id, firstName, lastName, email, mlsAgentId]
@@ -341,14 +352,15 @@ components:
         agent: { $ref: '#/components/schemas/AgentProfile' }
     AgentProfileUpdate:
       type: object
+      description: All fields optional. Send `null` for `headshotUrl`/`logoUrl`/`personalWebsiteUrl` to clear that field.
       properties:
         firstName: { type: string, minLength: 1 }
         lastName: { type: string, minLength: 1 }
         phone: { type: string }
         brokerage: { type: string }
-        personalWebsiteUrl: { type: string, format: uri }
-        headshotUrl: { type: string, format: uri }
-        logoUrl: { type: string, format: uri }
+        personalWebsiteUrl: { type: string, format: uri, nullable: true }
+        headshotUrl: { type: string, format: uri, nullable: true }
+        logoUrl: { type: string, format: uri, nullable: true }
   responses:
     Unauthorized:
       description: Missing or invalid agent token.

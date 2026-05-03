@@ -44,15 +44,13 @@ export interface OnboardingRequest {
 }
 
 export interface OnboardingResponse {
-  agentId?: string | null;
-  /** Magic link token (also embedded in checkoutUrl/success URL). */
-  token?: string | null;
-  /** Stripe Checkout setup-mode URL. Redirect the browser here. */
+  agentId: string;
+  /** Token-bearing URL for fetching/updating the agent's profile (e.g. `/api/agents/profile?token=…`). */
+  profileUrl: string;
+  /** Stripe Checkout setup-mode URL. Redirect the browser here when present. */
   checkoutUrl?: string | null;
   /** How many existing preview listings were linked to this new agent by `listAgentMlsId`. */
   backfilledCount?: number | null;
-  /** If true, the agent's MLS prefix is outside the served market and they should be added to the waitlist. */
-  outOfMarket?: boolean | null;
 }
 
 export interface AgentProfile {
@@ -72,6 +70,9 @@ export interface AgentProfileResponse {
   agent: AgentProfile;
 }
 
+/**
+ * All fields optional. Send `null` for `headshotUrl`/`logoUrl`/`personalWebsiteUrl` to clear that field.
+ */
 export interface AgentProfileUpdate {
   /** @minLength 1 */
   firstName?: string;
@@ -79,9 +80,9 @@ export interface AgentProfileUpdate {
   lastName?: string;
   phone?: string;
   brokerage?: string;
-  personalWebsiteUrl?: string;
-  headshotUrl?: string;
-  logoUrl?: string;
+  personalWebsiteUrl?: string | null;
+  headshotUrl?: string | null;
+  logoUrl?: string | null;
 }
 
 /**
@@ -98,6 +99,11 @@ export type NotFoundResponse = ErrorEnvelope;
  * Invalid request.
  */
 export type BadRequestResponse = ErrorEnvelope;
+
+export type OnboardAgent200 = {
+  /** True when the agent's MLS prefix is outside the served market. */
+  outOfMarket: boolean;
+};
 
 export type GetAgentProfileParams = {
   token: string;

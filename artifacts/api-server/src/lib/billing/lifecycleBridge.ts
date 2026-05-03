@@ -24,13 +24,19 @@ function normalizeStatus(s: string): ListingCloseStatus | null {
 }
 
 async function onStatusChanged(event: ListingStatusChangedEvent): Promise<void> {
-  const closeStatus = normalizeStatus(event.toStatus);
+  // Prefer the raw vendor MLS status to disambiguate subtypes the
+  // normalized DB enum collapses (e.g. "Closed" vs "Sold" both become
+  // `closed` in our enum but mean different things to the agent).
+  const rawSubtype = event.mlsStatus?.trim() || event.toStatus;
+  const closeStatus =
+    normalizeStatus(rawSubtype) ?? normalizeStatus(event.toStatus);
   if (!closeStatus) return;
 
   const log = logger.child({
     listingId: event.listingId,
     fromStatus: event.fromStatus,
     toStatus: event.toStatus,
+    mlsStatus: event.mlsStatus,
     closeStatus,
   });
 
@@ -61,11 +67,13 @@ async function onStatusChanged(event: ListingStatusChangedEvent): Promise<void> 
 
   // Always reflect MLS reality on the listing row even if Stripe was
   // never wired up (preview-only listings still need closedReason set).
+  // Preserve the raw vendor MLS status so we don't clobber subtype
+  // information with our normalized enum value.
   await db
     .update(listingsTable)
     .set({
       status: "closed",
-      mlsStatus: event.toStatus,
+      mlsStatus: event.mlsStatus ?? listing.mlsStatus ?? event.toStatus,
       closedReason: closeStatus,
       updatedAt: new Date(),
     })

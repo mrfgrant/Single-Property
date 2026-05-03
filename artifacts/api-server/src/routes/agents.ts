@@ -47,9 +47,10 @@ const updateProfileSchema = z.object({
   lastName: z.string().min(1).optional(),
   phone: z.string().optional(),
   brokerage: z.string().optional(),
-  personalWebsiteUrl: z.string().url().optional().or(z.literal("")),
-  headshotUrl: z.string().url().optional(),
-  logoUrl: z.string().url().optional(),
+  personalWebsiteUrl: z.string().url().nullable().optional().or(z.literal("")),
+  // Allow explicit null to clear the asset (e.g. agent removes their headshot).
+  headshotUrl: z.string().url().nullable().optional(),
+  logoUrl: z.string().url().nullable().optional(),
 });
 
 router.patch("/agents/profile", async (req, res) => {
@@ -71,9 +72,13 @@ router.patch("/agents/profile", async (req, res) => {
     return;
   }
 
+  // Coerce empty strings to null so the column clears cleanly.
   const updates = {
     ...parsed.data,
     personalWebsiteUrl: parsed.data.personalWebsiteUrl || null,
+    headshotUrl:
+      parsed.data.headshotUrl === undefined ? undefined : parsed.data.headshotUrl,
+    logoUrl: parsed.data.logoUrl === undefined ? undefined : parsed.data.logoUrl,
     updatedAt: new Date(),
   };
 

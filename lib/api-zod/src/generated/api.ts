@@ -34,28 +34,9 @@ export const OnboardAgentBody = zod.object({
 });
 
 export const OnboardAgentResponse = zod.object({
-  agentId: zod.string().nullish(),
-  token: zod
-    .string()
-    .nullish()
-    .describe("Magic link token (also embedded in checkoutUrl\/success URL)."),
-  checkoutUrl: zod
-    .string()
-    .url()
-    .nullish()
-    .describe("Stripe Checkout setup-mode URL. Redirect the browser here."),
-  backfilledCount: zod
-    .number()
-    .nullish()
-    .describe(
-      "How many existing preview listings were linked to this new agent by `listAgentMlsId`.",
-    ),
   outOfMarket: zod
     .boolean()
-    .nullish()
-    .describe(
-      "If true, the agent's MLS prefix is outside the served market and they should be added to the waitlist.",
-    ),
+    .describe("True when the agent's MLS prefix is outside the served market."),
 });
 
 /**
@@ -87,15 +68,19 @@ export const UpdateAgentProfileQueryParams = zod.object({
   token: zod.coerce.string(),
 });
 
-export const UpdateAgentProfileBody = zod.object({
-  firstName: zod.string().min(1).optional(),
-  lastName: zod.string().min(1).optional(),
-  phone: zod.string().optional(),
-  brokerage: zod.string().optional(),
-  personalWebsiteUrl: zod.string().url().optional(),
-  headshotUrl: zod.string().url().optional(),
-  logoUrl: zod.string().url().optional(),
-});
+export const UpdateAgentProfileBody = zod
+  .object({
+    firstName: zod.string().min(1).optional(),
+    lastName: zod.string().min(1).optional(),
+    phone: zod.string().optional(),
+    brokerage: zod.string().optional(),
+    personalWebsiteUrl: zod.string().url().nullish(),
+    headshotUrl: zod.string().url().nullish(),
+    logoUrl: zod.string().url().nullish(),
+  })
+  .describe(
+    "All fields optional. Send `null` for `headshotUrl`\/`logoUrl`\/`personalWebsiteUrl` to clear that field.",
+  );
 
 export const UpdateAgentProfileResponse = zod.object({
   agent: zod.object({

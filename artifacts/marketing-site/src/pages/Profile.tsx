@@ -18,6 +18,14 @@ interface AgentProfile {
   logoUrl?: string | null;
 }
 
+// Patch payload allows explicit null to clear an asset on the server.
+type AgentProfilePatch = Partial<
+  Omit<AgentProfile, "id" | "email" | "mlsAgentId" | "headshotUrl" | "logoUrl">
+> & {
+  headshotUrl?: string | null;
+  logoUrl?: string | null;
+};
+
 function getTokenFromUrl(): string | null {
   if (typeof window === "undefined") return null;
   return new URLSearchParams(window.location.search).get("token");
@@ -91,7 +99,7 @@ export default function Profile() {
       .finally(() => setLoading(false));
   }, [token]);
 
-  async function patch(partial: Partial<AgentProfile>) {
+  async function patch(partial: AgentProfilePatch) {
     if (!token) return;
     setSaving(true);
     setError(null);
@@ -215,7 +223,7 @@ export default function Profile() {
                     url={agent.headshotUrl}
                     busy={uploadingHeadshot}
                     onPick={() => headshotInput.current?.click()}
-                    onRemove={() => patch({ headshotUrl: undefined })}
+                    onRemove={() => patch({ headshotUrl: null })}
                     inputRef={headshotInput}
                     onChange={(e) => handleAssetChange(e, "headshot")}
                     testId="headshot"
@@ -225,7 +233,7 @@ export default function Profile() {
                     url={agent.logoUrl}
                     busy={uploadingLogo}
                     onPick={() => logoInput.current?.click()}
-                    onRemove={() => patch({ logoUrl: undefined })}
+                    onRemove={() => patch({ logoUrl: null })}
                     inputRef={logoInput}
                     onChange={(e) => handleAssetChange(e, "logo")}
                     testId="logo"
