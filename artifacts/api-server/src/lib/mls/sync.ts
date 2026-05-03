@@ -47,18 +47,36 @@ function mapResoToListing(p: ResoProperty): Partial<Listing> & { mlsListingId: s
 const TRACKED_FIELDS: (keyof Listing)[] = [
   "address", "city", "state", "zip",
   "priceUsd", "beds", "baths", "sqft", "lotAcres", "yearBuilt",
-  "description", "listAgentMlsId", "mlsStatus", "status",
+  "description",
+  "listAgentMlsId", "listAgentName", "listAgentEmail", "listAgentPhone",
+  "mlsStatus", "status",
+  "mlsModificationTimestamp",
 ];
+
+function valuesEqual(a: unknown, b: unknown): boolean {
+  if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime();
+  if (a instanceof Date || b instanceof Date) {
+    const at = a instanceof Date ? a.getTime() : a == null ? null : new Date(a as string).getTime();
+    const bt = b instanceof Date ? b.getTime() : b == null ? null : new Date(b as string).getTime();
+    return at === bt;
+  }
+  return a === b;
+}
 
 function diffFields(prev: Listing, next: Partial<Listing>): string[] {
   const changed: string[] = [];
   for (const f of TRACKED_FIELDS) {
-    if (next[f] !== undefined && next[f] !== prev[f]) changed.push(String(f));
+    if (next[f] !== undefined && !valuesEqual(next[f], prev[f])) changed.push(String(f));
   }
   return changed;
 }
 
-async function upsertProperty(p: ResoProperty): Promise<void> {
+/**
+ * Upsert a single MLS property and return its listingId if the row was
+ * touched (inserted or updated), otherwise null. Returning the id lets
+ * the caller drive selective photo sync without re-querying.
+ */
+async function upsertProperty(p: ResoProperty): Promise<string | null> {
   const mapped = mapResoToListing(p);
   const [existing] = await db
     .select()
@@ -116,11 +134,11 @@ async function upsertProperty(p: ResoProperty): Promise<void> {
         occurredAt: new Date(),
       });
     }
-    return;
+    return inserted.id;
   }
 
   const changed = diffFields(existing, mapped);
-  if (changed.length === 0) return;
+  if (changed.length === 0) return null;
 
   const [updated] = await db
     .update(listingsTable)
@@ -152,6 +170,7 @@ async function upsertProperty(p: ResoProperty): Promise<void> {
     isNew: false,
     changedFields: changed,
   });
+  return updated.id;
 }
 
 async function syncPhotos(listingId: string, listingKey: string): Promise<void> {
@@ -270,9 +289,14 @@ export async function runSync(kind: "full" | "delta"): Promise<SyncResult> {
       filter = `StandardStatus eq 'Active'`;
     }
 
+    // Track listings touched during this run so we photo-sync only what
+    // changed (delta) or everything (full).
+    const touched = new Map<string, string>(); // listingId -> mlsListingKey
+
     for await (const page of mlsClient.iterateProperties({ filter })) {
       for (const p of page) {
-        await upsertProperty(p);
+        const touchedId = await upsertProperty(p);
+        if (touchedId) touched.set(touchedId, p.ListingKey);
         processed += 1;
         if (p.ModificationTimestamp) {
           const ts = new Date(p.ModificationTimestamp);
@@ -282,8 +306,9 @@ export async function runSync(kind: "full" | "delta"): Promise<SyncResult> {
       logger.info({ runId, kind, processed }, "MLS sync progress");
     }
 
-    // Photo sync for newly-touched listings is handled lazily on a slow loop
-    // here — full sync grabs everything, delta only what changed.
+    // Photo sync: full sync covers every MLS listing in the DB; delta sync
+    // only refreshes media for listings touched in this run. Both use the
+    // same dedup path (unique on listing_id + mls_media_key).
     if (kind === "full") {
       const allWithKeys = await db
         .select({ id: listingsTable.id, mlsListingId: listingsTable.mlsListingId })
@@ -291,6 +316,10 @@ export async function runSync(kind: "full" | "delta"): Promise<SyncResult> {
         .where(sql`${listingsTable.mlsListingId} is not null`);
       for (const row of allWithKeys) {
         if (row.mlsListingId) await syncPhotos(row.id, row.mlsListingId);
+      }
+    } else {
+      for (const [listingId, listingKey] of touched) {
+        await syncPhotos(listingId, listingKey);
       }
     }
 

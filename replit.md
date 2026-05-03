@@ -50,6 +50,15 @@ Express 5 API server. Serves all backend routes. No frontend.
 - `src/routes/domainAdmin.ts` — operator-only CRUD: list runs, provision, close listing, list registered
 - `src/routes/adminDomains.ts` — domain search, standalone register, assign-to-listing, and DNS CRUD (A/TXT)
 
+**MLS ingestion & data foundation** (Task #2 — built; live calls credential-gated):
+- `src/lib/mls/config.ts` — env-driven config (`MLS_BASE_URL`, `MLS_ACCESS_TOKEN`, `MLS_BOARD_ID`, optional `MLS_DELTA_INTERVAL_MS`, `MLS_FULL_SYNC_ON_BOOT`, `MLS_PROPERTY_RESOURCE`, `MLS_MEDIA_RESOURCE`, `MLS_MAX_PHOTOS_PER_LISTING`). Includes `normalizeStatus()` and `isTerminalStatus()`.
+- `src/lib/mls/client.ts` — typed RESO Web API (OData 4.0) client. `MlsClient.iterateProperties()` follows `@odata.nextLink` pagination; `fetchMediaForListing()` pulls photos. Throws `MlsNotConfiguredError` when env vars are missing — no live calls without credentials.
+- `src/lib/mls/eventBus.ts` — typed in-process `EventEmitter` exporting `mlsEventBus`. Emits `listing.status_changed` and `listing.upserted`. Downstream tasks (#3 renderer, #4 billing) subscribe.
+- `src/lib/mls/sync.ts` — `runSync('full' | 'delta')`, status diffing, watermark tracking via `mls_sync_state`, photo upsert keyed by `(listing_id, mls_media_key)`, mirrors photo URLs onto `listings.photoUrls` for renderer convenience.
+- `src/lib/mls/cron.ts` — `startMlsIngestion()` boots the 15-min delta loop + optional boot-time full sync. No-op when MLS isn't configured (logs a clear warning).
+- `src/routes/mls.ts` — `GET /api/mls/status` (public; returns config + last sync state + total ingested) and `POST /api/mls/sync?kind=full|delta` (admin Bearer; manual trigger).
+- New schema files: `listingPhotos.ts`, `listingStatusEvents.ts`, `sites.ts`, `subscriptions.ts`, `mlsSyncState.ts`. Existing `listings` table gained `listAgentMlsId` (indexed), `listAgentName/Email/Phone`, `mlsStatus`, `mlsModificationTimestamp`, plus an index on `mlsListingId`. `agentId` is now nullable (MLS-ingested listings exist before an agent signs up — Task #4 backfills via MLS-ID match).
+
 **Object storage** (Task #12 — built):
 - `src/lib/objectStorage.ts` — `ObjectStorageService` class (GCS via Replit Object Storage)
 - `src/lib/objectAcl.ts` — ACL policy helpers

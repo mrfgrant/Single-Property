@@ -1,4 +1,5 @@
-import { pgTable, text, uuid, timestamp, integer, real, index } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, timestamp, integer, real, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { agentsTable } from "./agents";
@@ -37,7 +38,12 @@ export const listingsTable = pgTable(
   },
   (table) => ({
     listAgentMlsIdIdx: index("listings_list_agent_mls_id_idx").on(table.listAgentMlsId),
-    mlsListingIdIdx: index("listings_mls_listing_id_idx").on(table.mlsListingId),
+    // Partial unique index — enforces MLS identity at the DB level so
+    // concurrent sync runs cannot insert duplicates, while still allowing
+    // many manually-created listings with NULL mls_listing_id.
+    mlsListingIdUq: uniqueIndex("listings_mls_listing_id_uq")
+      .on(table.mlsListingId)
+      .where(sql`${table.mlsListingId} IS NOT NULL`),
   }),
 );
 
