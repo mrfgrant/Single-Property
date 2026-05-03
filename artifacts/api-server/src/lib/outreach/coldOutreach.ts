@@ -111,10 +111,17 @@ async function upsertDigestForAgent(recipient: string, listing: ListingRow): Pro
   const firstName = firstNameOf(listing.listAgentName);
   const unsubscribeUrl = buildUnsubscribeUrl(MARKETING_SITE_URL, recipient);
 
-  // Race-safe append: lock any pending row for this dedupe key inside a
-  // transaction so two concurrent listing.upserted events for the same
-  // agent serialize through here and one cleanly appends to the other.
+  // Race-safe append. Two correctness layers:
+  //   (1) A Postgres transaction-scoped advisory lock keyed by the
+  //       recipient email serializes ALL concurrent handlers for the
+  //       same agent — even when no pending row exists yet, which
+  //       row-level FOR UPDATE alone cannot guard against (the row
+  //       isn't there to lock until one of them inserts it).
+  //   (2) FOR UPDATE on the pending dedupe row guards the read-modify-
+  //       write of metadata.listingIds within the held lock.
   await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${dedupeKey}))`);
+
     const lockRows = await tx.execute<{ id: string; metadata: Record<string, unknown> | null }>(sql`
       SELECT id, metadata
         FROM ${emailOutboxTable}
