@@ -2,7 +2,7 @@ import { db, listingsTable, agentsTable, sellerReportsSentTable } from "@workspa
 import { and, eq, isNotNull } from "drizzle-orm";
 import { logger } from "../logger.js";
 import { enqueueEmail } from "../outbox/email.js";
-import { resolveTimezone, getLocalParts, getLocalWeekStart } from "./timezone.js";
+import { resolveTimezone, getLocalWeekStart } from "./timezone.js";
 import { getWeeklyStats, buildNarrative } from "./aggregate.js";
 import { renderWeeklySellerReport } from "./report.js";
 
@@ -25,18 +25,14 @@ async function runOneTick(now: Date = new Date()): Promise<{ enqueued: number }>
 
   for (const listing of liveListings) {
     const tz = resolveTimezone(listing.zip ?? null);
-    const local = getLocalParts(now, tz);
-    // Monday (dayOfWeek=1) at 8 AM local. We deliberately do NOT scope
-    // to a single tick — if the server was down at 8am the next tick
-    // (within the same local hour or even the next morning) will catch
-    // it because the dedupe is by week, not by minute.
-    const isReportWindow = local.dayOfWeek === 1 && local.hour === 8;
-    if (!isReportWindow) continue;
-
     const weekStart = getLocalWeekStart(now, tz);
-    // Bound the window to this week — if we missed Monday for whatever
-    // reason, we don't want to spam an old week's data.
-    if (weekStart.getTime() > now.getTime()) continue;
+    // Send any time at-or-after Monday 8am local in the current local
+    // week. seller_reports_sent dedupe makes repeat ticks no-ops. This
+    // gives us automatic catch-up if Monday 8am was missed (downtime,
+    // restart, deploy window) without spamming previous weeks: we only
+    // ever target the CURRENT week.
+    const eightAmLocalMs = weekStart.getTime() + 8 * 60 * 60 * 1000;
+    if (now.getTime() < eightAmLocalMs) continue;
 
     try {
       const sent = await sendWeeklyReportFor(listing, weekStart);
@@ -56,26 +52,8 @@ async function sendWeeklyReportFor(
   weekStart: Date,
   opts: { force?: boolean } = {},
 ): Promise<boolean> {
-  // Atomically claim the (listing, week) slot BEFORE doing any work.
-  // INSERT ... ON CONFLICT DO NOTHING RETURNING returns the inserted row
-  // only for the winner of a race; concurrent callers get an empty array
-  // and bail out without enqueuing duplicate email. The unique index on
-  // (listing_id, week_start) is what makes this race-safe.
-  if (!opts.force) {
-    const claimed = await db
-      .insert(sellerReportsSentTable)
-      .values({ listingId: listing.id, weekStart, sentAt: new Date() })
-      .onConflictDoNothing()
-      .returning({ id: sellerReportsSentTable.id });
-    if (claimed.length === 0) {
-      log.debug(
-        { listingId: listing.id, weekStart },
-        "Weekly report already claimed by another worker — skipping",
-      );
-      return false;
-    }
-  }
-
+  // Pre-flight: skip cleanly if we obviously can't render an email so
+  // we don't claim the (listing, week) slot for a row we'd never send.
   if (!listing.agentId) {
     log.warn({ listingId: listing.id }, "Live listing has no agent — cannot send weekly report");
     return false;
@@ -116,23 +94,45 @@ async function sendWeeklyReportFor(
     narrative,
   });
 
-  // We've already claimed the slot above — enqueue the email last so
-  // that if anything below the claim fails the operator can manually
-  // delete the seller_reports_sent row and retry. (`force: true` from
-  // the admin backfill route bypasses the claim check entirely.)
-  await enqueueEmail({
-    toEmail: rendered.to,
-    ccEmail: rendered.cc,
-    subject: rendered.subject,
-    html: rendered.html,
-    textBody: rendered.text,
-    kind: "weekly_seller_report",
-    dedupeKey: `weekly_report:${listing.id}:${weekStart.toISOString().slice(0, 10)}`,
-    metadata: {
-      listingId: listing.id,
-      weekStart: weekStart.toISOString(),
-    },
+  // Claim and enqueue in one transaction so that any failure (DB blip,
+  // outbox insert error, etc.) rolls back the claim and lets the next
+  // tick retry. The unique index on (listing_id, week_start) makes the
+  // claim race-safe; the transaction makes it retry-safe. `force: true`
+  // (admin backfill) bypasses the claim check entirely.
+  const enqueued = await db.transaction(async (tx) => {
+    if (!opts.force) {
+      const claimed = await tx
+        .insert(sellerReportsSentTable)
+        .values({ listingId: listing.id, weekStart, sentAt: new Date() })
+        .onConflictDoNothing()
+        .returning({ id: sellerReportsSentTable.id });
+      if (claimed.length === 0) {
+        log.debug(
+          { listingId: listing.id, weekStart },
+          "Weekly report already claimed by another worker — skipping",
+        );
+        return false;
+      }
+    }
+    await enqueueEmail(
+      {
+        toEmail: rendered.to,
+        ccEmail: rendered.cc,
+        subject: rendered.subject,
+        html: rendered.html,
+        textBody: rendered.text,
+        kind: "weekly_seller_report",
+        dedupeKey: `weekly_report:${listing.id}:${weekStart.toISOString().slice(0, 10)}`,
+        metadata: {
+          listingId: listing.id,
+          weekStart: weekStart.toISOString(),
+        },
+      },
+      tx,
+    );
+    return true;
   });
+  if (!enqueued) return false;
 
   log.info(
     {
