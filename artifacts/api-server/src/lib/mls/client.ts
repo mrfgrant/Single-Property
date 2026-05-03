@@ -155,7 +155,7 @@ export function logMlsStatus(): void {
     );
   } else {
     logger.warn(
-      "MLS_BASE_URL/MLS_ACCESS_TOKEN not set — MLS ingestion is disabled. Set both env vars to enable.",
+      "MLS ingestion is disabled — set MLS_BASE_URL, MLS_ACCESS_TOKEN, and MLS_BOARD_ID to enable.",
     );
   }
 }

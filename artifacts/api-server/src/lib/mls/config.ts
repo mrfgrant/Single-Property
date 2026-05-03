@@ -29,7 +29,13 @@ export type MlsConfig = {
 export function getMlsConfig(): MlsConfig {
   const baseUrl = process.env.MLS_BASE_URL?.trim() || null;
   const accessToken = process.env.MLS_ACCESS_TOKEN?.trim() || null;
-  const boardId = process.env.MLS_BOARD_ID?.trim() || "UNCONFIGURED";
+  const boardIdRaw = process.env.MLS_BOARD_ID?.trim() || "";
+  const boardId = boardIdRaw || "UNCONFIGURED";
+  // MLS_BOARD_ID is required for "configured" operation — it's the single
+  // source of truth for market identity used by Task #4 out-of-market
+  // detection. Without it, treat MLS as unconfigured even if URL+token
+  // are present, so downstream code never gets a UNCONFIGURED board id.
+  const fullyConfigured = Boolean(baseUrl && accessToken && boardIdRaw);
   const deltaIntervalMs = Number(process.env.MLS_DELTA_INTERVAL_MS ?? 15 * 60_000);
   const fullSyncOnBoot = (process.env.MLS_FULL_SYNC_ON_BOOT ?? "").toLowerCase() === "true";
   const maxPhotosPerListing = Number(process.env.MLS_MAX_PHOTOS_PER_LISTING ?? 25);
@@ -37,7 +43,7 @@ export function getMlsConfig(): MlsConfig {
   const mediaResource = process.env.MLS_MEDIA_RESOURCE?.trim() || "Media";
 
   return {
-    configured: Boolean(baseUrl && accessToken),
+    configured: fullyConfigured,
     baseUrl,
     accessToken,
     boardId,
