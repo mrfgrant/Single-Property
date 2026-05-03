@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "wouter";
 import { getListingBySlug, formatPrice, type SampleListing } from "@/data/sampleListings";
 import { fetchPublicListingBySlug, type PublicListing } from "@/lib/publicListings";
 import { WORDMARK_PREFIX, WORDMARK_SUFFIX } from "@/lib/copy";
 import { ONBOARDING_URL } from "@/lib/config";
-import { Bed, Bath, Car, Square, MapPin, Calendar, Phone, Mail, Calculator, MessageCircle } from "lucide-react";
+import { Phone, Mail, X, Menu as MenuIcon } from "lucide-react";
 
 type FullListing = SampleListing & {
   photoUrls?: string[];
@@ -15,18 +15,102 @@ type FullListing = SampleListing & {
   domainName?: string;
 };
 
-function ScoreChip({ label, score }: { label: string; score: number }) {
-  const color =
-    score >= 70
-      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-      : score >= 45
-      ? "bg-amber-50 text-amber-700 border-amber-200"
-      : "bg-red-50 text-red-700 border-red-200";
+const NAV_SECTIONS = [
+  { id: "home", label: "Home" },
+  { id: "story", label: "The Home" },
+  { id: "gallery", label: "Gallery" },
+  { id: "details", label: "Details" },
+  { id: "finance", label: "Finance" },
+  { id: "contact", label: "Schedule" },
+];
+
+function MenuRail({
+  open,
+  onToggle,
+  brand,
+  sections,
+}: {
+  open: boolean;
+  onToggle: (next: boolean) => void;
+  brand: string;
+  sections: { id: string; label: string }[];
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onToggle(false);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [open, onToggle]);
+
   return (
-    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border ${color}`}>
-      <span className="font-bold">{score}</span>
-      <span className="font-normal opacity-80">{label}</span>
-    </span>
+    <>
+      {/* Vertical rail (always visible, fixed left edge) */}
+      <button
+        type="button"
+        onClick={() => onToggle(!open)}
+        className="fixed top-0 left-0 z-50 h-screen w-12 md:w-14 bg-ink text-warm-white flex flex-col items-center justify-between py-6 hover:bg-ink/90 transition-colors"
+        aria-label={open ? "Close menu" : "Open menu"}
+        aria-expanded={open}
+        aria-controls="primary-nav-drawer"
+      >
+        <span className="block">
+          {open ? <X size={20} strokeWidth={1.5} /> : <MenuIcon size={20} strokeWidth={1.5} />}
+        </span>
+        <span
+          className="text-[10px] tracking-[0.5em] uppercase font-medium"
+          style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+        >
+          {open ? "Close" : "Menu"}
+        </span>
+        <span className="block w-1 h-1 rounded-full bg-gold" />
+      </button>
+
+      {/* Drawer */}
+      <div
+        className={`fixed inset-0 z-40 transition-opacity duration-300 ${
+          open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
+        onClick={() => onToggle(false)}
+      >
+        <div className="absolute inset-0 bg-ink/70 backdrop-blur-sm" />
+        <nav
+          id="primary-nav-drawer"
+          aria-label="Primary"
+          aria-hidden={!open}
+          className={`absolute top-0 left-12 md:left-14 h-screen w-[min(420px,calc(100vw-3rem))] bg-warm-white shadow-2xl px-8 md:px-12 py-10 flex flex-col transition-transform duration-300 ${
+            open ? "translate-x-0" : "-translate-x-full"
+          }`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="text-[10px] tracking-[0.4em] uppercase text-muted mb-8">{brand}</p>
+          <ul className="space-y-1">
+            {sections.map((s) => (
+              <li key={s.id}>
+                <a
+                  href={`#${s.id}`}
+                  onClick={() => onToggle(false)}
+                  className="block py-3 font-serif text-3xl md:text-4xl text-ink hover:text-gold transition-colors"
+                >
+                  {s.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-auto pt-8 border-t border-border">
+            <p className="text-[10px] tracking-[0.3em] uppercase text-muted mb-2">Auto-built by</p>
+            <Link
+              href="/"
+              className="font-sans text-base font-bold uppercase tracking-[0.18em] text-ink hover:text-gold transition-colors"
+            >
+              {WORDMARK_PREFIX}
+              {WORDMARK_SUFFIX}
+            </Link>
+          </div>
+        </nav>
+      </div>
+    </>
   );
 }
 
@@ -50,144 +134,107 @@ function MortgageCalculator({ price }: { price: number }) {
       : (principal * monthlyRate * Math.pow(1 + monthlyRate, n)) /
         (Math.pow(1 + monthlyRate, n) - 1);
   const monthlyRounded = isFinite(monthly) && monthly > 0 ? Math.round(monthly) : 0;
-  const totalInterest = Math.max(0, Math.round(monthlyRounded * n - principal));
 
-  const fmt = (n: number) =>
-    n.toLocaleString("en-US", { maximumFractionDigits: 0 });
+  const fmt = (v: number) => v.toLocaleString("en-US", { maximumFractionDigits: 0 });
 
   return (
-    <div className="bg-white border border-border rounded-md overflow-hidden">
-      <div className="flex items-center gap-2 bg-cream px-5 py-3 border-b border-border">
-        <Calculator size={15} className="text-gold" />
-        <h3 className="text-xs font-bold text-ink uppercase tracking-[0.2em]">
-          Mortgage Calculator
-        </h3>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-[1fr_280px]">
-        {/* Inputs */}
-        <div className="p-5 md:p-6 space-y-5 border-b md:border-b-0 md:border-r border-border">
-          {/* Home price */}
-          <div>
-            <label className="flex items-center justify-between text-xs font-semibold text-ink mb-1.5">
-              <span>Home price</span>
-              <span className="text-muted font-normal">${fmt(homePrice)}</span>
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">$</span>
-              <input
-                type="number"
-                value={homePrice}
-                onChange={(e) => setHomePrice(Math.max(0, Number(e.target.value) || 0))}
-                className="w-full h-10 pl-7 pr-3 rounded border border-border text-sm bg-warm-white focus:outline-none focus:border-ink"
-              />
-            </div>
-          </div>
-
-          {/* Down payment */}
-          <div>
-            <label className="flex items-center justify-between text-xs font-semibold text-ink mb-1.5">
-              <span>Down payment</span>
-              <span className="text-muted font-normal">
-                {downPct}% — ${fmt(downPayment)}
-              </span>
-            </label>
-            <input
-              type="range"
-              min={0}
-              max={50}
-              step={1}
-              value={downPct}
-              onChange={(e) => setDownPct(Number(e.target.value))}
-              className="w-full accent-gold cursor-pointer"
-            />
-          </div>
-
-          {/* Interest rate */}
-          <div>
-            <label className="flex items-center justify-between text-xs font-semibold text-ink mb-1.5">
-              <span>Interest rate</span>
-              <span className="text-muted font-normal">{ratePct.toFixed(2)}%</span>
-            </label>
-            <input
-              type="range"
-              min={2}
-              max={12}
-              step={0.125}
-              value={ratePct}
-              onChange={(e) => setRatePct(Number(e.target.value))}
-              className="w-full accent-gold cursor-pointer"
-            />
-          </div>
-
-          {/* Loan term */}
-          <div>
-            <label className="text-xs font-semibold text-ink mb-1.5 block">
-              Loan term
-            </label>
-            <div className="flex gap-2">
-              {[15, 30].map((y) => (
-                <button
-                  key={y}
-                  type="button"
-                  onClick={() => setYears(y as 15 | 30)}
-                  className={`flex-1 h-10 text-sm font-semibold rounded border transition-colors ${
-                    years === y
-                      ? "bg-ink text-white border-ink"
-                      : "bg-warm-white text-ink border-border hover:border-ink"
-                  }`}
-                >
-                  {y} years
-                </button>
-              ))}
-            </div>
-          </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-20 items-start">
+      {/* Inputs */}
+      <div className="space-y-7">
+        <div>
+          <label className="flex items-baseline justify-between text-[10px] tracking-[0.3em] uppercase text-muted mb-2">
+            <span>Home Price</span>
+            <span className="text-ink font-semibold tracking-normal text-sm">
+              ${fmt(homePrice)}
+            </span>
+          </label>
+          <input
+            type="number"
+            value={homePrice}
+            onChange={(e) => setHomePrice(Math.max(0, Number(e.target.value) || 0))}
+            className="w-full h-11 px-0 bg-transparent text-lg text-ink border-b border-ink/30 focus:outline-none focus:border-ink"
+          />
         </div>
 
-        {/* Result */}
-        <div className="bg-ink/95 text-white p-6 flex flex-col justify-center">
-          <p className="text-[10px] uppercase tracking-[0.2em] text-white/60 mb-2">
-            Estimated monthly payment
-          </p>
-          <p className="text-3xl md:text-4xl font-bold text-gold leading-none mb-1">
-            ${fmt(monthlyRounded)}
-            <span className="text-sm font-normal text-white/50">/mo</span>
-          </p>
-          <p className="text-xs text-white/60 mb-5">Principal &amp; interest</p>
+        <div>
+          <label className="flex items-baseline justify-between text-[10px] tracking-[0.3em] uppercase text-muted mb-2">
+            <span>Down Payment</span>
+            <span className="text-ink font-semibold tracking-normal text-sm">
+              {downPct}% — ${fmt(downPayment)}
+            </span>
+          </label>
+          <input
+            type="range"
+            min={0}
+            max={50}
+            step={1}
+            value={downPct}
+            onChange={(e) => setDownPct(Number(e.target.value))}
+            className="w-full accent-ink cursor-pointer"
+          />
+        </div>
 
-          <dl className="space-y-2 text-xs border-t border-white/10 pt-4">
-            <div className="flex items-center justify-between">
-              <dt className="text-white/60">Loan amount</dt>
-              <dd className="font-semibold text-white">${fmt(principal)}</dd>
-            </div>
-            <div className="flex items-center justify-between">
-              <dt className="text-white/60">Total interest</dt>
-              <dd className="font-semibold text-white">${fmt(totalInterest)}</dd>
-            </div>
-            <div className="flex items-center justify-between">
-              <dt className="text-white/60">Total of payments</dt>
-              <dd className="font-semibold text-white">
-                ${fmt(monthlyRounded * n)}
-              </dd>
-            </div>
-          </dl>
+        <div>
+          <label className="flex items-baseline justify-between text-[10px] tracking-[0.3em] uppercase text-muted mb-2">
+            <span>Interest Rate</span>
+            <span className="text-ink font-semibold tracking-normal text-sm">
+              {ratePct.toFixed(2)}%
+            </span>
+          </label>
+          <input
+            type="range"
+            min={2}
+            max={12}
+            step={0.125}
+            value={ratePct}
+            onChange={(e) => setRatePct(Number(e.target.value))}
+            className="w-full accent-ink cursor-pointer"
+          />
+        </div>
 
-          <p className="text-[10px] text-white/40 mt-4 leading-relaxed">
-            Estimate only. Excludes taxes, insurance, HOA, and PMI.
-          </p>
+        <div>
+          <p className="text-[10px] tracking-[0.3em] uppercase text-muted mb-3">Loan Term</p>
+          <div className="flex gap-3">
+            {[15, 30].map((y) => (
+              <button
+                key={y}
+                type="button"
+                onClick={() => setYears(y as 15 | 30)}
+                className={`flex-1 h-11 text-xs uppercase tracking-[0.2em] border transition-colors ${
+                  years === y
+                    ? "bg-ink text-warm-white border-ink"
+                    : "bg-transparent text-ink border-ink/30 hover:border-ink"
+                }`}
+              >
+                {y} Years
+              </button>
+            ))}
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
 
-function StatTile({ icon: Icon, value, label }: { icon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>; value: string | number; label: string }) {
-  return (
-    <div className="flex flex-col items-center text-center md:flex-row md:items-center md:text-left md:gap-3 gap-1 px-2 py-3 md:px-5 md:py-5">
-      <Icon size={20} strokeWidth={1.4} className="text-gold/90 shrink-0 md:w-7 md:h-7" />
-      <div className="min-w-0">
-        <p className="text-sm md:text-xl font-bold text-white leading-none">{value}</p>
-        <p className="text-[9px] md:text-[10px] uppercase tracking-[0.12em] md:tracking-[0.15em] text-white/60 mt-1 md:mt-1.5">{label}</p>
+      {/* Result */}
+      <div className="md:pt-2">
+        <p className="text-[10px] tracking-[0.4em] uppercase text-muted mb-4">
+          Estimated Monthly
+        </p>
+        <p className="font-serif text-6xl md:text-7xl lg:text-8xl text-ink leading-none mb-2">
+          ${fmt(monthlyRounded)}
+        </p>
+        <p className="text-sm text-muted mb-8">Principal &amp; interest, per month</p>
+        <dl className="space-y-3 text-sm border-t border-ink/10 pt-6">
+          <div className="flex items-center justify-between">
+            <dt className="text-muted">Loan amount</dt>
+            <dd className="text-ink font-medium">${fmt(principal)}</dd>
+          </div>
+          <div className="flex items-center justify-between">
+            <dt className="text-muted">Total of payments</dt>
+            <dd className="text-ink font-medium">${fmt(monthlyRounded * n)}</dd>
+          </div>
+        </dl>
+        <p className="text-[11px] text-muted/80 mt-6 italic">
+          Estimate only. Excludes taxes, insurance, HOA, and PMI.
+        </p>
       </div>
     </div>
   );
@@ -201,27 +248,53 @@ function LeadForm() {
   };
   if (submitted) {
     return (
-      <div className="text-center py-8">
-        <div className="text-4xl mb-3">✓</div>
-        <p className="font-semibold text-ink">Request received!</p>
-        <p className="text-sm text-muted mt-1">This is a demo — no data was saved.</p>
+      <div className="text-center py-12">
+        <div className="text-3xl text-gold mb-4 font-serif">Thank you</div>
+        <p className="text-ink font-medium">Your request has been received.</p>
+        <p className="text-sm text-muted mt-2">This is a demo — no data was saved.</p>
       </div>
     );
   }
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-      <div className="flex flex-col sm:flex-row gap-3">
-        <input required placeholder="First name" className="flex-1 h-11 px-3 rounded border border-border text-sm bg-warm-white focus:outline-none focus:border-ink" />
-        <input required placeholder="Last name" className="flex-1 h-11 px-3 rounded border border-border text-sm bg-warm-white focus:outline-none focus:border-ink" />
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <input
+          required
+          placeholder="First name"
+          className="h-11 px-0 bg-transparent text-ink border-b border-ink/30 focus:outline-none focus:border-ink placeholder:text-muted/70 text-sm"
+        />
+        <input
+          required
+          placeholder="Last name"
+          className="h-11 px-0 bg-transparent text-ink border-b border-ink/30 focus:outline-none focus:border-ink placeholder:text-muted/70 text-sm"
+        />
       </div>
-      <input required type="email" placeholder="Email address" className="h-11 px-3 rounded border border-border text-sm bg-warm-white focus:outline-none focus:border-ink" />
-      <input placeholder="Phone (optional)" className="h-11 px-3 rounded border border-border text-sm bg-warm-white focus:outline-none focus:border-ink" />
-      <button type="submit" className="h-12 bg-gold text-white font-semibold text-sm uppercase tracking-wider rounded hover:bg-gold/90 transition-colors">
+      <input
+        required
+        type="email"
+        placeholder="Email address"
+        className="w-full h-11 px-0 bg-transparent text-ink border-b border-ink/30 focus:outline-none focus:border-ink placeholder:text-muted/70 text-sm"
+      />
+      <input
+        placeholder="Phone (optional)"
+        className="w-full h-11 px-0 bg-transparent text-ink border-b border-ink/30 focus:outline-none focus:border-ink placeholder:text-muted/70 text-sm"
+      />
+      <textarea
+        placeholder="Message (optional)"
+        rows={3}
+        className="w-full px-0 py-3 bg-transparent text-ink border-b border-ink/30 focus:outline-none focus:border-ink placeholder:text-muted/70 text-sm resize-none"
+      />
+      <button
+        type="submit"
+        className="w-full h-14 bg-ink text-warm-white text-xs uppercase tracking-[0.3em] hover:bg-ink/90 transition-colors"
+      >
         Request a Showing
       </button>
-      <p className="text-center text-xs text-muted">
+      <p className="text-center text-[11px] text-muted">
         Demo mode — sign up to capture real leads.{" "}
-        <a href={ONBOARDING_URL} className="underline hover:text-ink">Get started →</a>
+        <a href={ONBOARDING_URL} className="underline hover:text-ink">
+          Get started →
+        </a>
       </p>
     </form>
   );
@@ -230,10 +303,15 @@ function LeadForm() {
 function NotFound() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-warm-white text-center px-6">
-      <h1 className="text-3xl font-serif font-bold text-ink mb-4">Listing not found</h1>
-      <p className="text-muted mb-8">This demo listing doesn't exist. Browse our examples instead.</p>
-      <Link href="/#demo" className="h-11 px-6 bg-ink text-warm-white rounded font-medium text-sm flex items-center hover:bg-ink/90 transition-colors">
-        ← Browse examples
+      <h1 className="text-3xl font-serif text-ink mb-4">Listing not found</h1>
+      <p className="text-muted mb-8">
+        This demo listing doesn't exist. Browse our examples instead.
+      </p>
+      <Link
+        href="/#demo"
+        className="h-11 px-6 bg-ink text-warm-white font-medium text-sm flex items-center hover:bg-ink/90 transition-colors uppercase tracking-[0.2em]"
+      >
+        Browse examples
       </Link>
     </div>
   );
@@ -246,6 +324,8 @@ export default function Listing() {
 
   const [apiListing, setApiListing] = useState<PublicListing | null>(null);
   const [apiLoading, setApiLoading] = useState(!staticListing);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const heroRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (staticListing) return;
@@ -275,332 +355,323 @@ export default function Listing() {
   const fullAddress = `${listing.address}, ${listing.city}, ${listing.state} ${listing.zip}`;
   const photos = listing.photoUrls ?? [];
   const heroPhoto = photos[0];
-  const stripPhotos = photos.slice(1, 6);
   const galleryPhotos = photos.slice(1);
+  const featurePhoto = galleryPhotos[0];
+  const remainingGallery = galleryPhotos.slice(1);
   const displayDomain = listing.domainName ?? `${listing.slug.toLowerCase()}.propsite.io`;
+  const cityState = `${listing.city}, ${listing.state}`.toUpperCase();
+  const addressLine = listing.address.toUpperCase();
 
   return (
-    <div className="font-sans bg-warm-white">
-      {/* Hero */}
+    <div className="font-sans bg-warm-white text-ink min-h-screen">
+      <MenuRail
+        open={menuOpen}
+        onToggle={setMenuOpen}
+        brand={displayDomain}
+        sections={NAV_SECTIONS.filter(
+          (s) => !(s.id === "gallery" && remainingGallery.length === 0),
+        )}
+      />
+
+      {/* HERO — full-bleed photo, editorial overlay */}
       <header
         id="home"
-        className="relative min-h-[560px] md:min-h-screen flex flex-col text-white"
+        ref={heroRef}
+        className="relative h-screen min-h-[600px] w-full pl-12 md:pl-14"
         style={
           heroPhoto
             ? {
-                backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.15) 25%, rgba(0,0,0,0.15) 60%, rgba(0,0,0,0.7) 100%), url(${heroPhoto})`,
+                backgroundImage: `linear-gradient(to bottom, rgba(10,30,58,0.25) 0%, rgba(10,30,58,0) 30%, rgba(10,30,58,0) 60%, rgba(10,30,58,0.55) 100%), url(${heroPhoto})`,
                 backgroundSize: "cover",
                 backgroundPosition: "center",
               }
-            : { background: "linear-gradient(135deg, #1a2e1a 0%, #2d4a2d 40%, #3a5c3a 100%)" }
+            : { background: "linear-gradient(135deg, #0a1e3a 0%, #1a3358 60%, #2d4a78 100%)" }
         }
       >
-        {/* Top nav */}
-        <nav className="relative z-10 flex items-center justify-between px-5 md:px-12 py-4 md:py-6">
+        {/* Top bar */}
+        <div className="absolute top-0 inset-x-0 pl-12 md:pl-14 px-6 md:px-12 py-6 md:py-8 flex items-start justify-between gap-4 text-warm-white">
           <a
             href="#home"
-            className="text-base md:text-2xl font-serif font-bold text-white drop-shadow-md hover:opacity-90 transition-opacity truncate max-w-[70%]"
+            className="font-serif text-base md:text-xl tracking-tight drop-shadow-md hover:opacity-80 transition-opacity"
           >
             {displayDomain}
           </a>
-          <div className="hidden md:flex items-center gap-7 text-xs font-semibold tracking-[0.2em] text-white">
-            <a href="#home" className="hover:text-gold transition-colors uppercase">Home</a>
-            <a href="#gallery" className="hover:text-gold transition-colors uppercase">Gallery</a>
-            <a href="#details" className="hover:text-gold transition-colors uppercase">Details</a>
-            <a href="#about" className="hover:text-gold transition-colors uppercase">About</a>
-            <a href="#contact" className="hover:text-gold transition-colors uppercase">Contact Agent</a>
-          </div>
-        </nav>
-
-        {/* Center floating card */}
-        <div className="flex-1 flex items-center justify-center px-4 md:px-6 py-6 md:py-10">
-          <div className="w-full max-w-4xl flex flex-col md:flex-row shadow-2xl rounded-sm overflow-hidden">
-            {/* Left — price + address + CTA */}
-            <div className="flex-1 bg-white/30 backdrop-blur-md px-5 md:px-8 py-6 md:py-10 flex flex-col justify-center">
-              <p className="text-3xl md:text-5xl font-bold text-gold mb-2 md:mb-3 leading-none tracking-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.45)]">
-                {formatPrice(listing.price)}
-              </p>
-              <p className="text-white font-semibold text-base md:text-lg mb-0.5 leading-tight drop-shadow-[0_1px_4px_rgba(0,0,0,0.7)]">{listing.address}</p>
-              <p className="text-white/90 text-xs md:text-sm mb-5 md:mb-7 drop-shadow-[0_1px_3px_rgba(0,0,0,0.7)]">
-                {listing.city}, {listing.state} {listing.zip}
-              </p>
-              <a
-                href="#contact"
-                className="block w-full text-center bg-gold hover:bg-gold/90 text-white font-bold uppercase tracking-[0.18em] text-xs py-3.5 md:py-4 transition-colors rounded-sm shadow-lg"
-              >
-                Schedule a Showing
-              </a>
-            </div>
-
-            {/* Right — stat panel */}
-            <div className="bg-ink/40 backdrop-blur-md grid grid-cols-4 md:grid-cols-2 md:w-[280px]">
-              <div className="border-r border-white/15 md:border-b">
-                <StatTile icon={Bed} value={listing.beds} label={listing.beds === 1 ? "Bed" : "Beds"} />
-              </div>
-              <div className="border-r border-white/15 md:border-b md:border-r-0">
-                <StatTile icon={Bath} value={listing.baths} label={listing.baths === 1 ? "Bath" : "Baths"} />
-              </div>
-              <div className="border-r border-white/15">
-                <StatTile icon={Car} value={listing.garage ? "Yes" : "—"} label="Garage" />
-              </div>
-              <div>
-                <StatTile icon={Square} value={listing.sqft.toLocaleString()} label="Sq Ft" />
-              </div>
-            </div>
-          </div>
+          <a
+            href="#contact"
+            className="border border-warm-white/80 text-warm-white text-[10px] md:text-xs uppercase tracking-[0.3em] px-4 md:px-6 py-2.5 md:py-3 hover:bg-warm-white hover:text-ink transition-colors backdrop-blur-sm"
+          >
+            Schedule a Tour
+          </a>
         </div>
 
-        {/* Bottom photo strip — desktop only (mobile gets a dedicated section below) */}
-        {stripPhotos.length > 0 && (
-          <div className="relative hidden md:grid grid-cols-3 md:grid-cols-5 bg-black/40">
-            {stripPhotos.map((url, i) => (
-              <a
-                key={i}
-                href="#gallery"
-                className="aspect-[4/3] overflow-hidden block group relative"
-              >
-                <img
-                  src={url}
-                  alt={`${listing.address} photo ${i + 2}`}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  loading="lazy"
-                />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
-              </a>
-            ))}
+        {/* Bottom overlay */}
+        <div className="absolute bottom-0 inset-x-0 pl-12 md:pl-14 px-6 md:px-12 pb-8 md:pb-14 flex flex-col md:flex-row md:items-end justify-between gap-6 text-warm-white">
+          <div>
+            <p className="font-serif text-4xl md:text-6xl lg:text-7xl leading-none drop-shadow-lg">
+              {formatPrice(listing.price)}
+            </p>
+            <p className="text-[10px] md:text-xs uppercase tracking-[0.3em] mt-2 md:mt-3 text-warm-white/80">
+              {listing.beds} Bed · {listing.baths} Bath · {listing.sqft.toLocaleString()} Sq Ft
+            </p>
+            <p className="font-serif text-lg md:text-2xl mt-4 md:mt-6 tracking-wide drop-shadow-md">
+              {addressLine}
+            </p>
+            <p className="text-[10px] md:text-xs uppercase tracking-[0.3em] mt-1 text-warm-white/80">
+              {cityState} {listing.zip}
+            </p>
           </div>
-        )}
+
+          <div className="text-left md:text-right">
+            <p className="font-serif text-xl md:text-2xl drop-shadow-md">Open House</p>
+            <p className="text-[10px] md:text-xs uppercase tracking-[0.3em] mt-1 text-warm-white/80">
+              By appointment · Schedule below
+            </p>
+          </div>
+        </div>
       </header>
 
-      {/* Mobile-only photo preview strip — horizontal scroll under the hero */}
-      {stripPhotos.length > 0 && (
-        <div className="md:hidden bg-ink py-3">
-          <div className="flex gap-2 overflow-x-auto px-4 snap-x snap-mandatory scrollbar-hide">
-            {stripPhotos.map((url, i) => (
+      {/* STORY / DESCRIPTION — editorial */}
+      <section id="story" className="pl-12 md:pl-14 px-6 md:px-12 py-24 md:py-32 bg-warm-white">
+        <div className="max-w-3xl mx-auto text-center">
+          <p className="text-[10px] uppercase tracking-[0.4em] text-gold mb-6">The Home</p>
+          <h2 className="font-serif text-4xl md:text-6xl text-ink leading-[1.05] mb-10">
+            {listing.address}
+          </h2>
+          <p className="text-ink/75 leading-[1.9] text-lg md:text-xl font-light">
+            {listing.description}
+          </p>
+        </div>
+      </section>
+
+      {/* FEATURE PHOTO — full-bleed */}
+      {featurePhoto && (
+        <section className="pl-12 md:pl-14">
+          <div
+            className="w-full h-[60vh] md:h-[80vh] bg-ink"
+            style={{
+              backgroundImage: `url(${featurePhoto})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }}
+          />
+        </section>
+      )}
+
+      {/* SPECS BAR */}
+      <section
+        id="details"
+        className="pl-12 md:pl-14 px-6 md:px-12 py-20 md:py-28 bg-cream"
+      >
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-14">
+            <p className="text-[10px] uppercase tracking-[0.4em] text-gold mb-4">Property</p>
+            <h2 className="font-serif text-3xl md:text-5xl text-ink">At a glance</h2>
+          </div>
+
+          <dl className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-y-12 gap-x-6 border-y border-ink/15 py-12">
+            {[
+              ["Bedrooms", listing.beds],
+              ["Bathrooms", listing.baths],
+              ["Living Area", `${listing.sqft.toLocaleString()} sf`],
+              ["Lot Size", `${listing.lotAcres} ac`],
+              ["Year Built", listing.yearBuilt],
+              ["Garage", listing.garage ? "Yes" : "—"],
+            ].map(([label, value], i) => (
+              <div key={i} className="text-center">
+                <dd className="font-serif text-3xl md:text-4xl text-ink leading-none">{value}</dd>
+                <dt className="text-[10px] uppercase tracking-[0.3em] text-muted mt-3">
+                  {label}
+                </dt>
+              </div>
+            ))}
+          </dl>
+
+          {(listing.walkScore || listing.bikeScore || listing.schoolRating || listing.transitScore) && (
+            <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto">
+              {[
+                ["Walk", listing.walkScore],
+                ["Bike", listing.bikeScore],
+                ["Schools", Math.round(listing.schoolRating * 10)],
+                ["Transit", listing.transitScore],
+              ].map(([label, score], i) => (
+                <div key={i} className="text-center">
+                  <p className="font-serif text-2xl text-ink">{score}</p>
+                  <p className="text-[10px] uppercase tracking-[0.3em] text-muted mt-2">
+                    {label} Score
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* GALLERY */}
+      {remainingGallery.length > 0 && (
+        <section id="gallery" className="pl-12 md:pl-14 px-0 md:px-0 py-20 md:py-28 bg-warm-white">
+          <div className="text-center mb-14 px-6">
+            <p className="text-[10px] uppercase tracking-[0.4em] text-gold mb-4">Gallery</p>
+            <h2 className="font-serif text-3xl md:text-5xl text-ink">Take a closer look</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-1 md:gap-2 px-1 md:px-2">
+            {remainingGallery.map((url, i) => (
               <a
                 key={i}
-                href="#gallery"
-                className="flex-shrink-0 w-40 aspect-[4/3] overflow-hidden rounded snap-start block"
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`block bg-cream overflow-hidden group ${
+                  i % 5 === 0 ? "md:col-span-2 aspect-[16/8]" : "aspect-[4/3]"
+                }`}
               >
                 <img
                   src={url}
                   alt={`${listing.address} photo ${i + 2}`}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
                   loading="lazy"
                 />
               </a>
             ))}
-          </div>
-        </div>
-      )}
-
-      {/* Gallery */}
-      {galleryPhotos.length > 0 && (
-        <section id="gallery" className="py-16 px-6 md:px-12 bg-cream">
-          <div className="max-w-6xl mx-auto">
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold mb-2">Gallery</p>
-            <h2 className="text-3xl md:text-4xl font-serif font-bold text-ink mb-10">
-              Take a closer look
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-              {galleryPhotos.map((url, i) => (
-                <a
-                  key={i}
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block aspect-[4/3] overflow-hidden rounded-md bg-warm-white border border-border group"
-                >
-                  <img
-                    src={url}
-                    alt={`${listing.address} photo ${i + 2}`}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    loading="lazy"
-                  />
-                </a>
-              ))}
-            </div>
           </div>
         </section>
       )}
 
-      {/* Details + About */}
-      <section id="details" className="py-16 px-6 md:px-12 bg-warm-white">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-12">
-          {/* Left column */}
+      {/* FINANCE / MORTGAGE */}
+      <section
+        id="finance"
+        className="pl-12 md:pl-14 px-6 md:px-12 py-24 md:py-32 bg-cream"
+      >
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-16">
+            <p className="text-[10px] uppercase tracking-[0.4em] text-gold mb-4">Finance</p>
+            <h2 className="font-serif text-3xl md:text-5xl text-ink">Estimate your payment</h2>
+          </div>
+          <MortgageCalculator price={listing.price} />
+        </div>
+      </section>
+
+      {/* SCHEDULE / CONTACT */}
+      <section
+        id="contact"
+        className="pl-12 md:pl-14 px-6 md:px-12 py-24 md:py-32 bg-ink text-warm-white"
+      >
+        <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24 items-start">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold mb-2">Property</p>
-            <h2 id="about" className="text-3xl md:text-4xl font-serif font-bold text-ink mb-6 leading-tight">
-              About this home
+            <p className="text-[10px] uppercase tracking-[0.4em] text-gold mb-4">Schedule</p>
+            <h2 className="font-serif text-4xl md:text-6xl leading-[1.05] mb-8">
+              Come see it in person.
             </h2>
-
-            {/* Quick info bar */}
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted mb-8 pb-6 border-b border-border">
-              <span className="flex items-center gap-1.5">
-                <MapPin size={15} className="text-gold" />
-                {listing.city}, {listing.state}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Calendar size={15} className="text-gold" />
-                Built {listing.yearBuilt}
-              </span>
-              <span>{listing.lotAcres} acres</span>
-            </div>
-
-            {/* Description */}
-            <p className="text-ink/80 leading-relaxed mb-10 text-[15px]">
-              {listing.description}
+            <p className="text-warm-white/75 text-lg leading-relaxed mb-12 font-light">
+              Tell us when works for you and the listing agent will reach out within 60 seconds
+              to confirm your private tour.
             </p>
 
-            {/* Property details grid */}
-            <div className="border border-border rounded-md overflow-hidden mb-10">
-              <div className="bg-cream px-5 py-3 border-b border-border">
-                <h3 className="text-xs font-bold text-ink uppercase tracking-[0.2em]">Property Details</h3>
-              </div>
-              <dl className="grid grid-cols-2 divide-x divide-border">
-                {[
-                  ["Bedrooms", listing.beds],
-                  ["Bathrooms", listing.baths],
-                  ["Living Area", `${listing.sqft.toLocaleString()} sqft`],
-                  ["Lot Size", `${listing.lotAcres} acres`],
-                  ["Year Built", listing.yearBuilt],
-                  ["Garage", listing.garage ? "Yes" : "No"],
-                ].map(([label, value], i) => (
-                  <div key={i} className="px-5 py-3 border-b border-border last:border-b-0">
-                    <dt className="text-[11px] uppercase tracking-wider text-muted mb-0.5">{label}</dt>
-                    <dd className="text-sm font-semibold text-ink">{value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-
-            {/* Mortgage calculator */}
-            <div id="mortgage" className="mb-10 scroll-mt-20">
-              <MortgageCalculator price={listing.price} />
-            </div>
-
-            {/* Neighborhood */}
-            <div>
-              <h3 className="text-xs font-bold text-ink uppercase tracking-[0.2em] mb-3">Neighborhood</h3>
-              <div className="flex flex-wrap gap-2">
-                <ScoreChip label="Walk" score={listing.walkScore} />
-                <ScoreChip label="Bike" score={listing.bikeScore} />
-                <ScoreChip label="Schools" score={listing.schoolRating * 10} />
-                <ScoreChip label="Transit" score={listing.transitScore} />
-              </div>
-            </div>
-          </div>
-
-          {/* Right column — sticky lead form + agent */}
-          <aside id="contact" className="lg:sticky lg:top-6 self-start space-y-4">
-            <div className="border border-border rounded-md p-6 bg-white shadow-sm">
-              <h3 className="font-serif font-bold text-ink text-xl mb-1">Request a Showing</h3>
-              <p className="text-xs text-muted mb-5">We'll connect you with the listing agent within 60 seconds.</p>
-              <LeadForm />
-            </div>
-
-            {/* Agent card */}
             {(listing.agentName || listing.agentBrokerage) && (
-              <div className="border border-border rounded-md p-5 bg-cream">
-                <p className="text-[11px] uppercase tracking-wider text-muted mb-3">Listed by</p>
-                <div className="flex items-start gap-4">
+              <div className="border-t border-warm-white/15 pt-8">
+                <p className="text-[10px] uppercase tracking-[0.4em] text-warm-white/60 mb-5">
+                  Listed by
+                </p>
+                <div className="flex items-start gap-5">
                   {listing.agentPhotoUrl && (
                     <img
                       src={listing.agentPhotoUrl}
                       alt={listing.agentName ?? "Listing agent"}
-                      className="w-16 h-16 rounded-full object-cover shrink-0 border border-border"
+                      className="w-16 h-16 rounded-full object-cover shrink-0 ring-1 ring-warm-white/20"
                     />
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-ink text-base leading-tight">{listing.agentName}</p>
+                    <p className="font-serif text-2xl leading-tight">{listing.agentName}</p>
                     {listing.agentBrokerage && (
-                      <p className="text-sm text-muted mt-1 leading-tight">{listing.agentBrokerage}</p>
+                      <p className="text-sm text-warm-white/60 mt-1">{listing.agentBrokerage}</p>
+                    )}
+                    {(listing.agentPhone || listing.agentEmail) && (
+                      <div className="mt-4 space-y-2">
+                        {listing.agentPhone && (
+                          <a
+                            href={`tel:${listing.agentPhone.replace(/[^0-9+]/g, "")}`}
+                            className="flex items-center gap-3 text-sm text-warm-white/85 hover:text-gold transition-colors"
+                          >
+                            <Phone size={14} className="text-gold shrink-0" />
+                            {listing.agentPhone}
+                          </a>
+                        )}
+                        {listing.agentEmail && (
+                          <a
+                            href={`mailto:${listing.agentEmail}`}
+                            className="flex items-center gap-3 text-sm text-warm-white/85 hover:text-gold transition-colors break-all"
+                          >
+                            <Mail size={14} className="text-gold shrink-0" />
+                            {listing.agentEmail}
+                          </a>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
                 {listing.brokerageLogoUrl && (
-                  <div className="mt-4 pt-4 border-t border-border flex items-center justify-center">
+                  <div className="mt-6 pt-6 border-t border-warm-white/10">
                     <img
                       src={listing.brokerageLogoUrl}
                       alt={`${listing.agentBrokerage ?? "Brokerage"} logo`}
-                      className="max-h-10 max-w-[140px] object-contain"
+                      className="max-h-10 max-w-[140px] object-contain opacity-90 brightness-0 invert"
                     />
-                  </div>
-                )}
-                {(listing.agentPhone || listing.agentEmail) && (
-                  <div className="mt-4 pt-4 border-t border-border space-y-1.5">
-                    {listing.agentPhone && (
-                      <a href={`tel:${listing.agentPhone}`} className="flex items-center gap-2 text-sm text-ink hover:text-gold transition-colors">
-                        <Phone size={13} className="text-gold" />
-                        {listing.agentPhone.trim()}
-                      </a>
-                    )}
-                    {listing.agentEmail && (
-                      <a href={`mailto:${listing.agentEmail}`} className="flex items-center gap-2 text-sm text-ink hover:text-gold transition-colors break-all">
-                        <Mail size={13} className="text-gold shrink-0" />
-                        {listing.agentEmail}
-                      </a>
-                    )}
                   </div>
                 )}
               </div>
             )}
-          </aside>
+          </div>
+
+          <div className="bg-warm-white text-ink p-8 md:p-12">
+            <h3 className="font-serif text-2xl text-ink mb-2">Request a private showing</h3>
+            <p className="text-xs text-muted mb-8">
+              We'll connect you with the agent in under a minute.
+            </p>
+            <LeadForm />
+          </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-border py-8 px-6 text-center bg-warm-white pb-24 md:pb-8">
-        <p className="text-xs text-muted">
-          {fullAddress}
-        </p>
-        <p className="text-xs text-muted mt-2">
-          Site auto-built by{" "}
-          <Link href="/" className="font-semibold hover:text-gold transition-colors">
-            <span className="text-ink font-sans font-bold uppercase tracking-[0.18em] text-sm">{WORDMARK_PREFIX}{WORDMARK_SUFFIX}</span>
+      {/* FOOTER */}
+      <footer className="pl-12 md:pl-14 px-6 md:px-12 py-12 bg-warm-white border-t border-ink/10 pb-24 md:pb-12">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4 text-center md:text-left">
+          <p className="text-xs text-muted uppercase tracking-[0.2em]">{fullAddress}</p>
+          <Link
+            href="/"
+            className="text-xs text-muted hover:text-ink transition-colors uppercase tracking-[0.2em]"
+          >
+            Auto-built by{" "}
+            <span className="text-ink font-bold">
+              {WORDMARK_PREFIX}
+              {WORDMARK_SUFFIX}
+            </span>
           </Link>
-        </p>
+        </div>
       </footer>
 
-      {/* Mobile sticky action bar — Call · Text · Mortgage */}
-      <div className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-border shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.1)] grid grid-cols-3 pb-[env(safe-area-inset-bottom)]">
+      {/* MOBILE STICKY CTA */}
+      <div className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-ink text-warm-white border-t border-warm-white/10 grid grid-cols-2 pb-[env(safe-area-inset-bottom)] pl-12">
         {listing.agentPhone ? (
           <a
             href={`tel:${listing.agentPhone.replace(/[^0-9+]/g, "")}`}
-            className="flex flex-col items-center justify-center gap-1 py-3 text-ink active:bg-cream transition-colors"
+            className="flex items-center justify-center py-4 text-[11px] uppercase tracking-[0.25em] border-r border-warm-white/15 active:bg-ink/80"
           >
-            <Phone size={18} className="text-gold" />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Call</span>
-          </a>
-        ) : (
-          <a href="#contact" className="flex flex-col items-center justify-center gap-1 py-3 text-ink active:bg-cream">
-            <Phone size={18} className="text-gold" />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Call</span>
-          </a>
-        )}
-        {listing.agentPhone ? (
-          <a
-            href={`sms:${listing.agentPhone.replace(/[^0-9+]/g, "")}`}
-            className="flex flex-col items-center justify-center gap-1 py-3 text-ink active:bg-cream transition-colors border-x border-border"
-          >
-            <MessageCircle size={18} className="text-gold" />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Text</span>
+            <Phone size={14} className="text-gold mr-2" />
+            Call Agent
           </a>
         ) : (
           <a
             href="#contact"
-            className="flex flex-col items-center justify-center gap-1 py-3 text-ink active:bg-cream border-x border-border"
+            className="flex items-center justify-center py-4 text-[11px] uppercase tracking-[0.25em] border-r border-warm-white/15 active:bg-ink/80"
           >
-            <MessageCircle size={18} className="text-gold" />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Text</span>
+            <Phone size={14} className="text-gold mr-2" />
+            Contact
           </a>
         )}
         <a
-          href="#mortgage"
-          className="flex flex-col items-center justify-center gap-1 py-3 text-ink active:bg-cream transition-colors"
+          href="#contact"
+          className="flex items-center justify-center py-4 text-[11px] uppercase tracking-[0.25em] bg-gold text-ink font-semibold active:bg-gold/90"
         >
-          <Calculator size={18} className="text-gold" />
-          <span className="text-[11px] font-semibold uppercase tracking-wider">Mortgage</span>
+          Schedule Tour
         </a>
       </div>
     </div>
