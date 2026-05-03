@@ -179,6 +179,36 @@ export const api = {
       ),
   },
 
+  simulator: {
+    run: (body: {
+      address: string;
+      city?: string;
+      state?: string;
+      zip?: string;
+      priceUsd?: number;
+      beds?: number;
+      baths?: number;
+      sqft?: number;
+      agentFirstName: string;
+      agentLastName?: string;
+      agentEmail: string;
+      agentPhone?: string;
+      agentBrokerage?: string;
+      sendEmail?: boolean;
+    }) =>
+      request<{
+        success: boolean;
+        listing: ExampleListing;
+        previewUrl: string;
+        activateUrl: string;
+        emailStatus: "sent" | "skipped" | "failed";
+        emailError?: string;
+      }>("/api/admin/simulate-mls", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+  },
+
   verifyPassword: (password: string) =>
     request<{ listings: ExampleListing[] }>("/api/admin/listings", {
       headers: { Authorization: `Bearer ${password}` },

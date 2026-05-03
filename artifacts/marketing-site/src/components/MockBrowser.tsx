@@ -12,7 +12,7 @@ export function MockBrowser() {
           <div className="w-3 h-3 rounded-full bg-[#27c93f]" />
         </div>
         <div className="absolute left-1/2 -translate-x-1/2 w-1/2 md:w-[240px] h-6 rounded bg-[rgba(255,255,255,0.1)] text-center text-[11px] leading-6 text-[rgba(255,255,255,0.5)] truncate px-4">
-          412magnoliadrive.com
+          2918arrowheaddrive.com
         </div>
         <div className="ml-auto flex items-center gap-2 text-[11px] font-medium text-[#28a865]">
           <motion.div
@@ -34,7 +34,7 @@ export function MockBrowser() {
         {/* Address */}
         <div className="mt-auto">
           <h2 className="text-white font-serif text-3xl md:text-4xl leading-tight font-bold mb-2">
-            412 Magnolia Drive,<br />
+            2918 Arrowhead Drive,<br />
             Augusta GA
           </h2>
           <div className="flex flex-wrap items-center gap-2 text-sm text-[rgba(255,255,255,0.8)] font-light">

@@ -10,6 +10,7 @@ import marketCheckRouter from "./marketCheck.js";
 import exampleListingsRouter from "./exampleListings.js";
 import adminListingsRouter from "./adminListings.js";
 import adminDomainsRouter from "./adminDomains.js";
+import simulateMlsRouter from "./simulateMls.js";
 import storageRouter from "./storage.js";
 
 const router: IRouter = Router();
@@ -25,6 +26,7 @@ router.use(marketCheckRouter);
 router.use(exampleListingsRouter);
 router.use(adminListingsRouter);
 router.use(adminDomainsRouter);
+router.use(simulateMlsRouter);
 router.use(storageRouter);
 
 export default router;

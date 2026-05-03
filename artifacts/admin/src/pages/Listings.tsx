@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { api, type ExampleListing } from "@/lib/api";
 import { clearToken } from "@/lib/auth";
-import { Plus, Pencil, Trash2, Star, Eye, EyeOff, Link2, XCircle, ExternalLink } from "lucide-react";
+import { Plus, Pencil, Trash2, Star, Eye, EyeOff, Link2, XCircle, ExternalLink, Sparkles } from "lucide-react";
+import SimulatorModal from "@/components/SimulatorModal";
 
 interface Props {
   onEdit: (listing: ExampleListing | null) => void;
@@ -20,6 +21,7 @@ export default function Listings({ onEdit, onAssignDomain, onListingsLoaded }: P
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState<string | null>(null);
   const [unassigning, setUnassigning] = useState<string | null>(null);
+  const [simulatorOpen, setSimulatorOpen] = useState(false);
 
   const handleLogout = () => {
     clearToken();
@@ -93,14 +95,30 @@ export default function Listings({ onEdit, onAssignDomain, onListingsLoaded }: P
           <h2 className="text-xl font-semibold text-gray-900">Example Listings</h2>
           <p className="text-sm text-gray-500 mt-0.5">Active listings appear on the marketing site demo section.</p>
         </div>
-        <button
-          onClick={() => onEdit(null)}
-          className="flex items-center gap-2 h-9 px-4 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
-        >
-          <Plus size={16} />
-          Add listing
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSimulatorOpen(true)}
+            className="flex items-center gap-2 h-9 px-4 bg-amber-500 text-white text-sm font-medium rounded-lg hover:bg-amber-600 transition-colors"
+            title="Simulate an MLS event — auto-build a site and email the agent"
+          >
+            <Sparkles size={16} />
+            Simulate MLS event
+          </button>
+          <button
+            onClick={() => onEdit(null)}
+            className="flex items-center gap-2 h-9 px-4 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
+          >
+            <Plus size={16} />
+            Add listing
+          </button>
+        </div>
       </div>
+
+      <SimulatorModal
+        open={simulatorOpen}
+        onClose={() => setSimulatorOpen(false)}
+        onCreated={() => load()}
+      />
 
       {loading && (
         <div className="text-center py-20 text-gray-400 text-sm">Loading listings…</div>

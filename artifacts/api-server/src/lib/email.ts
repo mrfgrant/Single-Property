@@ -68,6 +68,30 @@ export async function sendEmail(payload: EmailPayload): Promise<void> {
   logger.warn({ to: payload.to, subject: payload.subject }, "No email provider configured — skipping send (set RESEND_API_KEY or SENDGRID_API_KEY)");
 }
 
+export function previewReadyEmail(params: {
+  agentEmail: string;
+  agentFirstName: string;
+  address: string;
+  previewUrl: string;
+  activateUrl: string;
+}): EmailPayload {
+  return {
+    to: params.agentEmail,
+    subject: `We built you a website for ${params.address}`,
+    html: `
+      <p>Hi ${params.agentFirstName},</p>
+      <p>We noticed your new listing at <strong>${params.address}</strong> hit the MLS — so we went ahead and built you a full property website for it. No charge for the preview.</p>
+      <p><a href="${params.previewUrl}" style="display:inline-block;padding:12px 24px;background:#c9a84c;color:#fff;font-weight:600;text-decoration:none;border-radius:9999px;">View your free preview →</a></p>
+      <p>Includes MLS photos, mortgage calculator, walk/school scores, and instant lead capture. Mobile-optimized, ready to share.</p>
+      <p>If you'd like to keep it live (and have us do this automatically every time you list), it's <strong>$49/mo per active listing</strong> — billing stops the day the listing closes.</p>
+      <p><a href="${params.activateUrl}">Activate this site →</a></p>
+      <p>Either way, the preview is yours to share. Reply if you have any questions.</p>
+      <p>— The PropSite Team<br/><em style="color:#5d6577;font-size:12px;">CSRA's Property Site Engine</em></p>
+    `,
+    text: `Hi ${params.agentFirstName}, we built you a free property website for ${params.address}: ${params.previewUrl}. Activate it permanently for $49/mo: ${params.activateUrl}`,
+  };
+}
+
 export function welcomeEmail(agent: { firstName: string; email: string }): EmailPayload {
   return {
     to: agent.email,
