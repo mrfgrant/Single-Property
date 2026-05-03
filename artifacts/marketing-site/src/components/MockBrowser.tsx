@@ -28,7 +28,7 @@ export function MockBrowser() {
       <div className="relative h-[240px] md:h-[300px] bg-gradient-to-b from-[#1b3b36] to-[#0f2420] p-6 flex flex-col justify-end">
         {/* Price Tag */}
         <div className="absolute top-6 left-6 px-4 py-1.5 rounded-full bg-gold text-white font-serif font-bold text-lg">
-          $485,000
+          $185,000
         </div>
 
         {/* Address */}
@@ -38,13 +38,13 @@ export function MockBrowser() {
             Augusta GA
           </h2>
           <div className="flex flex-wrap items-center gap-2 text-sm text-[rgba(255,255,255,0.8)] font-light">
-            <span>4 bed</span>
+            <span>3 bed</span>
             <span>&middot;</span>
             <span>3 bath</span>
             <span>&middot;</span>
-            <span>2,340 sqft</span>
+            <span>1,836 sqft</span>
             <span>&middot;</span>
-            <span>0.38 acre lot</span>
+            <span>0.11 acre lot</span>
           </div>
         </div>
       </div>
@@ -53,10 +53,10 @@ export function MockBrowser() {
       <div className="p-6 bg-white">
         {/* Neighborhood Scores */}
         <div className="flex flex-wrap gap-2 mb-8">
-          <span className="px-3 py-1 bg-cream text-ink text-xs font-medium rounded-full border border-border">Walk 68</span>
-          <span className="px-3 py-1 bg-cream text-ink text-xs font-medium rounded-full border border-border">Bike 55</span>
-          <span className="px-3 py-1 bg-cream text-ink text-xs font-medium rounded-full border border-border">Schools 8/10</span>
-          <span className="px-3 py-1 bg-cream text-ink text-xs font-medium rounded-full border border-border">Transit 42</span>
+          <span className="px-3 py-1 bg-cream text-ink text-xs font-medium rounded-full border border-border">Walk 80</span>
+          <span className="px-3 py-1 bg-cream text-ink text-xs font-medium rounded-full border border-border">Bike 60</span>
+          <span className="px-3 py-1 bg-cream text-ink text-xs font-medium rounded-full border border-border">Schools 10/10</span>
+          <span className="px-3 py-1 bg-cream text-ink text-xs font-medium rounded-full border border-border">Transit 35</span>
         </div>
 
         {/* Lead Capture Form Mockup */}
