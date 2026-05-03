@@ -85,12 +85,16 @@ async function onListingUpserted(event: ListingUpsertedEvent): Promise<void> {
   }
 
   // SMS channel — pick best mobile-confidence number.
+  // Priority: explicit ListAgentMobilePhone → ListAgentDirectPhone →
+  // listAgentPhone (legacy single-field fallback). The office number is
+  // intentionally NEVER passed in — pickAgentMobile guarantees we don't
+  // text brokerage front-desk lines.
   const phones = pickAgentMobile({
-    mobilePhone: null, // populated by MLS sync if MLS feed exposes it; for now we only have one phone field on listings
-    directPhone: listing.listAgentPhone,
-    officePhone: null,
+    mobilePhone: listing.listAgentMobilePhone,
+    directPhone: listing.listAgentDirectPhone ?? listing.listAgentPhone,
+    officePhone: listing.listAgentOfficePhone,
   });
-  const phone = phones?.phone ?? normalize(listing.listAgentPhone);
+  const phone = phones?.phone ?? null;
   if (phone) {
     const sms = coldOutreachSms({
       agentFirstName: firstNameOf(listing.listAgentName),

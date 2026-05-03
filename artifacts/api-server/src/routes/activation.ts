@@ -119,12 +119,18 @@ router.post("/listings/:id/activate", requireMagicToken, async (req, res) => {
 
   if (provisionResult.domainName) {
     try {
+      const marketingBase =
+        process.env.MARKETING_SITE_URL ?? process.env.PLATFORM_HOMEPAGE_URL ?? "https://propsite.app";
       await sendEmail(
         siteLiveEmail({
           agentEmail: agent.email,
           agentFirstName: agent.firstName,
           address: listing.address,
           domainName: provisionResult.domainName,
+          // Deep-link to the seller-email collection form on the
+          // marketing site, pre-authenticated with the agent's magic
+          // token. The form POSTs to /api/listings/:id/seller-email.
+          sellerEmailCollectionUrl: `${marketingBase}/listing/${listing.id}/seller-email?token=${encodeURIComponent(token)}`,
         }),
       );
     } catch (err) {
@@ -182,6 +188,43 @@ router.post("/listings", requireMagicToken, async (req, res) => {
     .returning();
 
   res.status(201).json({ listing });
+});
+
+/**
+ * Persist the seller's email for a listing. Called from the post-activation
+ * collection form linked in the site-live email. Token-authenticated via
+ * the agent's magic link; the lookup also enforces ownership of the listing.
+ */
+const sellerEmailSchema = z.object({ sellerEmail: z.string().email().max(200) });
+
+router.post("/listings/:id/seller-email", requireMagicToken, async (req, res) => {
+  const listingId = String(req.params.id);
+  const token = (req as typeof req & { agentToken: string }).agentToken;
+  const parsed = sellerEmailSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid email", issues: parsed.error.issues });
+    return;
+  }
+  const agents = await db
+    .select()
+    .from(agentsTable)
+    .where(eq(agentsTable.magicLinkToken, token))
+    .limit(1);
+  const agent = agents[0];
+  if (!agent) {
+    res.status(401).json({ error: "Invalid or expired token" });
+    return;
+  }
+  const result = await db
+    .update(listingsTable)
+    .set({ sellerEmail: parsed.data.sellerEmail, updatedAt: new Date() })
+    .where(and(eq(listingsTable.id, listingId), eq(listingsTable.agentId, agent.id)))
+    .returning({ id: listingsTable.id });
+  if (!result[0]) {
+    res.status(404).json({ error: "Listing not found" });
+    return;
+  }
+  res.json({ ok: true });
 });
 
 router.get("/listings", requireMagicToken, async (req, res) => {

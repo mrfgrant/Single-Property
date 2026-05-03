@@ -8,13 +8,27 @@ import crypto from "crypto";
  * transactional mail). The `sig` parameter binds the email to a secret
  * only our server knows.
  */
+/**
+ * Returns the HMAC secret used to sign unsubscribe tokens.
+ *
+ * Fails CLOSED in production: if no secret env var is set, throws so
+ * that token generation/verification cannot silently succeed with a
+ * known fallback (which would let attackers forge unsubscribe URLs and
+ * suppress arbitrary recipients). In development we fall back to a
+ * documented placeholder so local boots don't require operator setup.
+ */
 function secret(): string {
-  return (
+  const explicit =
     process.env.UNSUBSCRIBE_SECRET ||
     process.env.STRIPE_WEBHOOK_SECRET ||
-    process.env.SESSION_SECRET ||
-    "dev-only-unsubscribe-secret-change-me"
-  );
+    process.env.SESSION_SECRET;
+  if (explicit) return explicit;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "UNSUBSCRIBE_SECRET (or STRIPE_WEBHOOK_SECRET / SESSION_SECRET) must be set in production",
+    );
+  }
+  return "dev-only-unsubscribe-secret-change-me";
 }
 
 export function signUnsubscribeToken(email: string): string {

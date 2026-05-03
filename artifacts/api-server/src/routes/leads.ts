@@ -36,6 +36,17 @@ router.post("/leads", async (req, res) => {
     return;
   }
 
+  // Buyer leads only come from LIVE property sites — preview/disabled
+  // listings are not publicly advertised, so a /leads POST against one
+  // is either spam, scraper noise, or a UI bug. Reject with 403 so
+  // operators can spot client-side mistakes quickly.
+  if (listing.mode !== "live" || listing.status !== "active") {
+    res
+      .status(403)
+      .json({ error: "Lead capture is only available on live, active listings" });
+    return;
+  }
+
   // Resolve the recipient agent. May be null for preview/cold-outreach
   // listings — in that case we still capture the lead for posterity but
   // we don't have anyone to email yet.

@@ -125,6 +125,7 @@ export function siteLiveEmail(params: {
   agentFirstName: string;
   address: string;
   domainName: string;
+  sellerEmailCollectionUrl: string;
 }): EmailPayload {
   return {
     to: params.agentEmail,
@@ -134,9 +135,13 @@ export function siteLiveEmail(params: {
       <p>Your property site for <strong>${params.address}</strong> is now live at:</p>
       <p><a href="https://${params.domainName}">https://${params.domainName}</a></p>
       <p>Share this link with your sellers and on social media. Lead inquiries will go straight to your email.</p>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;" />
+      <p><strong>One more step — add your seller's email.</strong></p>
+      <p>We'll send them a friendly weekly traffic + activity report so they can see what's happening with their listing. (You'll be CC'd.)</p>
+      <p><a href="${params.sellerEmailCollectionUrl}" style="display:inline-block;padding:10px 16px;background:#0d1b2a;color:#fff;text-decoration:none;border-radius:6px;">Add seller's email →</a></p>
       <p>— The PropSite Team</p>
     `,
-    text: `Your PropSite for ${params.address} is live at https://${params.domainName}`,
+    text: `Your PropSite for ${params.address} is live at https://${params.domainName}\n\nAdd your seller's email so we can send them a weekly report: ${params.sellerEmailCollectionUrl}`,
   };
 }
 

@@ -158,11 +158,18 @@ export async function drainSmsOutbox(limit = 25): Promise<{ processed: number }>
             .where(eq(agentsTable.id, agent.id));
         }
       } catch (err) {
-        log.warn({ err, phone: row.toPhone }, "Telnyx lookup failed — skipping SMS this tick");
-        // Don't burn an attempt on infra error; defer 5 min and retry.
+        log.warn({ err, phone: row.toPhone }, "Telnyx lookup failed — deferring SMS 5 minutes");
+        // Infrastructure failure (not a hard send error). Don't burn an
+        // attempt; release the row back to 'pending' with a 5-min delay
+        // so the next worker tick (rather than the 10-min stuck-row
+        // recovery) can re-claim it.
         await db
           .update(smsOutboxTable)
-          .set({ sendAfter: new Date(Date.now() + 5 * 60_000), updatedAt: new Date() })
+          .set({
+            status: "pending",
+            sendAfter: new Date(Date.now() + 5 * 60_000),
+            updatedAt: new Date(),
+          })
           .where(eq(smsOutboxTable.id, row.id));
         continue;
       }

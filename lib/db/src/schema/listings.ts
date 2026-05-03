@@ -14,6 +14,14 @@ export const listingsTable = pgTable(
     listAgentName: text("list_agent_name"),
     listAgentEmail: text("list_agent_email"),
     listAgentPhone: text("list_agent_phone"),
+    // MLS-sourced phone breakdown for cold-outreach SMS targeting.
+    // We only text mobile/direct lines, never office. See lib/outreach/phone.ts.
+    listAgentMobilePhone: text("list_agent_mobile_phone"),
+    listAgentDirectPhone: text("list_agent_direct_phone"),
+    listAgentOfficePhone: text("list_agent_office_phone"),
+    // Seller's preferred email for analytics + the weekly seller report.
+    // Collected post-activation via /listings/:id/seller-email.
+    sellerEmail: text("seller_email"),
     address: text("address").notNull(),
     city: text("city").notNull(),
     state: text("state").notNull().default("GA"),
