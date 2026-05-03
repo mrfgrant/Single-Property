@@ -1,7 +1,32 @@
-import { db, smsOutboxTable, smsSuppressionsTable, agentsTable } from "@workspace/db";
+import { db, smsOutboxTable, smsSuppressionsTable, agentsTable, listingsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { sendSms, lookupNumber } from "../telnyx/client.js";
 import { logger } from "../logger.js";
+
+/**
+ * Mirror of the email outbox cold-outreach guard. See email.ts for why.
+ */
+async function shouldCancelColdOutreach(
+  metadata: Record<string, unknown> | null,
+): Promise<{ cancel: boolean; reason?: string }> {
+  const listingId = metadata && typeof metadata.listingId === "string" ? metadata.listingId : null;
+  if (!listingId) return { cancel: false };
+  const rows = await db
+    .select({
+      mode: listingsTable.mode,
+      status: listingsTable.status,
+      agentId: listingsTable.agentId,
+    })
+    .from(listingsTable)
+    .where(eq(listingsTable.id, listingId))
+    .limit(1);
+  const listing = rows[0];
+  if (!listing) return { cancel: true, reason: "listing_deleted" };
+  if (listing.agentId) return { cancel: true, reason: "agent_activated" };
+  if (listing.mode !== "preview") return { cancel: true, reason: `mode_${listing.mode}` };
+  if (listing.status !== "active") return { cancel: true, reason: `status_${listing.status}` };
+  return { cancel: false };
+}
 
 const log = logger.child({ component: "sms-outbox" });
 
@@ -81,6 +106,25 @@ export async function drainSmsOutbox(limit = 25): Promise<{ processed: number }>
         .where(eq(smsOutboxTable.id, row.id));
       log.info({ outboxId: row.id }, "SMS suppressed (STOP on file)");
       continue;
+    }
+
+    // 1b. Cold outreach pre-send guard: cancel if the underlying listing
+    // is no longer eligible (agent activated, off-market, or deleted).
+    if (row.kind === "cold_outreach") {
+      const guard = await shouldCancelColdOutreach(
+        row.metadata as Record<string, unknown> | null,
+      );
+      if (guard.cancel) {
+        await db
+          .update(smsOutboxTable)
+          .set({ status: "cancelled", lastError: guard.reason ?? null, updatedAt: new Date() })
+          .where(eq(smsOutboxTable.id, row.id));
+        log.info(
+          { outboxId: row.id, reason: guard.reason },
+          "Cold outreach SMS cancelled — listing no longer eligible",
+        );
+        continue;
+      }
     }
 
     // 2. Mobile/landline check via Telnyx Number Lookup, cached on agent.

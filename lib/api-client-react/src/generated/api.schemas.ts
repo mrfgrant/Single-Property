@@ -156,14 +156,20 @@ export type CreateLead201 = {
 
 export type EmailUnsubscribeOneClickParams = {
   email: string;
+  /**
+   * HMAC-signed token bound to this email address.
+   */
+  token: string;
 };
 
 export type EmailUnsubscribePostBodyOne = {
-  email?: string;
+  email: string;
+  token: string;
 };
 
 export type EmailUnsubscribePostBodyTwo = {
-  email?: string;
+  email: string;
+  token: string;
 };
 
 export type EmailUnsubscribePost200 = {

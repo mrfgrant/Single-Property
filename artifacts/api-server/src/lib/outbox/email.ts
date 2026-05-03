@@ -1,7 +1,38 @@
-import { db, emailOutboxTable, emailSuppressionsTable } from "@workspace/db";
+import { db, emailOutboxTable, emailSuppressionsTable, listingsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { sendEmail } from "../email.js";
 import { logger } from "../logger.js";
+
+/**
+ * Cold outreach is queued with a 15-minute delay; before actually
+ * sending we re-check that the listing is still a viable cold-outreach
+ * target. If it has since been activated by an agent (mode flips out of
+ * preview, or agentId becomes set) or has gone off-market (status no
+ * longer "active"), we cancel the queued message instead of sending it.
+ *
+ * Returns true if the row should be SUPPRESSED (do not send).
+ */
+async function shouldCancelColdOutreach(
+  metadata: Record<string, unknown> | null,
+): Promise<{ cancel: boolean; reason?: string }> {
+  const listingId = metadata && typeof metadata.listingId === "string" ? metadata.listingId : null;
+  if (!listingId) return { cancel: false };
+  const rows = await db
+    .select({
+      mode: listingsTable.mode,
+      status: listingsTable.status,
+      agentId: listingsTable.agentId,
+    })
+    .from(listingsTable)
+    .where(eq(listingsTable.id, listingId))
+    .limit(1);
+  const listing = rows[0];
+  if (!listing) return { cancel: true, reason: "listing_deleted" };
+  if (listing.agentId) return { cancel: true, reason: "agent_activated" };
+  if (listing.mode !== "preview") return { cancel: true, reason: `mode_${listing.mode}` };
+  if (listing.status !== "active") return { cancel: true, reason: `status_${listing.status}` };
+  return { cancel: false };
+}
 
 const log = logger.child({ component: "email-outbox" });
 
@@ -101,6 +132,24 @@ export async function drainEmailOutbox(limit = 25): Promise<{ processed: number 
           .set({ status: "suppressed", updatedAt: new Date() })
           .where(eq(emailOutboxTable.id, row.id));
         log.info({ outboxId: row.id, kind: row.kind }, "Email suppressed");
+        continue;
+      }
+      // Pre-send listing-state guard for cold outreach: if the listing
+      // has since been activated, gone off-market, or been deleted, do
+      // not blast the agent — they may have already paid us, or the
+      // property is no longer relevant.
+      const guard = await shouldCancelColdOutreach(
+        row.metadata as Record<string, unknown> | null,
+      );
+      if (guard.cancel) {
+        await db
+          .update(emailOutboxTable)
+          .set({ status: "cancelled", lastError: guard.reason ?? null, updatedAt: new Date() })
+          .where(eq(emailOutboxTable.id, row.id));
+        log.info(
+          { outboxId: row.id, reason: guard.reason },
+          "Cold outreach email cancelled — listing no longer eligible",
+        );
         continue;
       }
     }

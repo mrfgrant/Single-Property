@@ -1,7 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import express from "express";
 import { db, smsSuppressionsTable } from "@workspace/db";
-import { sql } from "drizzle-orm";
 import { verifyWebhookSignature } from "../lib/telnyx/client.js";
 import { normalize } from "../lib/outreach/phone.js";
 import { logger } from "../lib/logger.js";
@@ -80,7 +79,6 @@ router.post(
     }
 
     res.status(200).json({ ok: true });
-    void sql; // keep import for future use
   },
 );
 

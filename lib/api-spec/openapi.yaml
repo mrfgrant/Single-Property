@@ -215,11 +215,22 @@ paths:
       tags: [Email]
       operationId: emailUnsubscribeOneClick
       summary: One-click email unsubscribe (CAN-SPAM compliant)
+      description: |
+        Both `email` and `token` are required. The `token` is an HMAC-SHA256
+        signature of the lowercased email (truncated to 24 hex chars) generated
+        server-side and embedded in outgoing unsubscribe links. Requests
+        without a valid token are rejected with 400 to prevent denial-of-mail
+        attacks against arbitrary recipients.
       parameters:
         - name: email
           in: query
           required: true
           schema: { type: string, format: email }
+        - name: token
+          in: query
+          required: true
+          description: HMAC-signed token bound to this email address.
+          schema: { type: string }
       responses:
         '200':
           description: Unsubscribe confirmation HTML page.
@@ -231,19 +242,27 @@ paths:
       tags: [Email]
       operationId: emailUnsubscribePost
       summary: RFC 8058 List-Unsubscribe-Post target
+      description: |
+        Both `email` and `token` are required (see GET docs). Mail providers
+        such as Gmail invoke this endpoint via the `List-Unsubscribe-Post`
+        header to honor one-click unsubscribe.
       requestBody:
-        required: false
+        required: true
         content:
           application/x-www-form-urlencoded:
             schema:
               type: object
+              required: [email, token]
               properties:
                 email: { type: string, format: email }
+                token: { type: string }
           application/json:
             schema:
               type: object
+              required: [email, token]
               properties:
                 email: { type: string, format: email }
+                token: { type: string }
       responses:
         '200':
           description: Suppression recorded.

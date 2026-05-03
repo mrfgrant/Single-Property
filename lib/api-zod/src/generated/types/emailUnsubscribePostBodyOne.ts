@@ -7,5 +7,6 @@
  */
 
 export type EmailUnsubscribePostBodyOne = {
-  email?: string;
+  email: string;
+  token: string;
 };

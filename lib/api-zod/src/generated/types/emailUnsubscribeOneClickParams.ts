@@ -8,4 +8,8 @@
 
 export type EmailUnsubscribeOneClickParams = {
   email: string;
+  /**
+   * HMAC-signed token bound to this email address.
+   */
+  token: string;
 };

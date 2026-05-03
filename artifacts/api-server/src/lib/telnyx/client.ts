@@ -86,8 +86,11 @@ export async function lookupNumber(phone: string): Promise<LookupCarrierType> {
  * Verify a Telnyx webhook payload using its Ed25519 signature.
  * Telnyx sends `telnyx-signature-ed25519` and `telnyx-timestamp` headers.
  *
- * If `TELNYX_PUBLIC_KEY` is unset (e.g. local dev), returns true with a
- * warning so we don't block local testing — production MUST set the key.
+ * Fails CLOSED: if `TELNYX_PUBLIC_KEY` is unset, we reject the webhook
+ * unless explicitly running in development. This prevents an attacker
+ * from posting forged STOP messages to suppress legitimate phone numbers
+ * (or vice versa) when a misconfigured production deploy is missing the
+ * key. Local dev bypass requires NODE_ENV !== "production".
  */
 export function verifyWebhookSignature(params: {
   rawBody: string;
@@ -97,7 +100,15 @@ export function verifyWebhookSignature(params: {
 }): boolean {
   const publicKey = process.env.TELNYX_PUBLIC_KEY;
   if (!publicKey) {
-    logger.warn("TELNYX_PUBLIC_KEY not set — accepting webhook without signature verification");
+    if (process.env.NODE_ENV === "production") {
+      logger.error(
+        "TELNYX_PUBLIC_KEY not set in production — rejecting webhook (fail-closed)",
+      );
+      return false;
+    }
+    logger.warn(
+      "TELNYX_PUBLIC_KEY not set — accepting webhook in development only (fail-open dev mode)",
+    );
     return true;
   }
   const { rawBody, signature, timestamp } = params;

@@ -154,17 +154,31 @@ export const CreateLeadBody = zod.object({
 });
 
 /**
+ * Both `email` and `token` are required. The `token` is an HMAC-SHA256
+signature of the lowercased email (truncated to 24 hex chars) generated
+server-side and embedded in outgoing unsubscribe links. Requests
+without a valid token are rejected with 400 to prevent denial-of-mail
+attacks against arbitrary recipients.
+
  * @summary One-click email unsubscribe (CAN-SPAM compliant)
  */
 export const EmailUnsubscribeOneClickQueryParams = zod.object({
   email: zod.coerce.string().email(),
+  token: zod.coerce
+    .string()
+    .describe("HMAC-signed token bound to this email address."),
 });
 
 /**
+ * Both `email` and `token` are required (see GET docs). Mail providers
+such as Gmail invoke this endpoint via the `List-Unsubscribe-Post`
+header to honor one-click unsubscribe.
+
  * @summary RFC 8058 List-Unsubscribe-Post target
  */
 export const EmailUnsubscribePostBody = zod.object({
-  email: zod.string().email().optional(),
+  email: zod.string().email(),
+  token: zod.string(),
 });
 
 export const EmailUnsubscribePostResponse = zod.object({

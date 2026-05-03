@@ -7,5 +7,6 @@
  */
 
 export type EmailUnsubscribePostBodyTwo = {
-  email?: string;
+  email: string;
+  token: string;
 };
