@@ -404,7 +404,7 @@ export default function Listing() {
         image: listing.photoUrls ?? [],
         url: listing.domainName
           ? `https://${listing.domainName}`
-          : `https://propsite.app/listing/${listing.slug}`,
+          : `https://app.propsite.io/listing/${listing.slug}`,
         address: {
           "@type": "PostalAddress",
           streetAddress: listing.address,
@@ -422,7 +422,7 @@ export default function Listing() {
                 availability: "https://schema.org/InStock",
                 url: listing.domainName
                   ? `https://${listing.domainName}`
-                  : `https://propsite.app/listing/${listing.slug}`,
+                  : `https://app.propsite.io/listing/${listing.slug}`,
               },
             }
           : {}),
@@ -450,13 +450,13 @@ export default function Listing() {
             "@type": "ListItem",
             position: 1,
             name: "PropSite",
-            item: "https://propsite.app/",
+            item: "https://app.propsite.io/",
           },
           {
             "@type": "ListItem",
             position: 2,
             name: listing.address,
-            item: `https://propsite.app/listing/${listing.slug}`,
+            item: `https://app.propsite.io/listing/${listing.slug}`,
           },
         ],
       }),

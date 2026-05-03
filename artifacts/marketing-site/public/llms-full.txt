@@ -157,8 +157,8 @@ A: The design is opinionated and consistent — that's part of the value (every 
 
 - **Product name**: PropSite
 - **Wordmark**: PropSite (capital P, lowercase r-o-p, capital S, lowercase i-t-e)
-- **Primary URL**: https://propsite.app
-- **Onboarding URL**: https://propsite.app/onboarding
-- **Demo listing**: https://propsite.app/listing/2918-Arrowhead-Drive
+- **Primary URL**: https://app.propsite.io
+- **Onboarding URL**: https://app.propsite.io/onboarding
+- **Demo listing**: https://app.propsite.io/listing/2918-Arrowhead-Drive
 - **Region**: Augusta, GA / CSRA, United States
 - **Coordinates**: 33.4735° N, -82.0105° W

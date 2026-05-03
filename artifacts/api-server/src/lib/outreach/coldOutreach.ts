@@ -11,7 +11,7 @@ import { logger } from "../logger.js";
 const log = logger.child({ component: "cold-outreach" });
 
 const MARKETING_SITE_URL =
-  process.env.MARKETING_SITE_URL ?? process.env.PLATFORM_HOMEPAGE_URL ?? "https://propsite.app";
+  process.env.MARKETING_SITE_URL ?? process.env.PLATFORM_HOMEPAGE_URL ?? "https://app.propsite.io";
 
 const OUTREACH_DELAY_MS = Number(process.env.COLD_OUTREACH_DELAY_MS ?? 15 * 60 * 1000);
 

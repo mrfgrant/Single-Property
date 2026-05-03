@@ -1,5 +1,5 @@
 # PropSite — robots.txt
-# https://propsite.app
+# https://app.propsite.io
 
 User-agent: *
 Allow: /
@@ -74,5 +74,5 @@ Allow: /
 User-agent: Timpibot
 Allow: /
 
-Sitemap: https://propsite.app/sitemap.xml
-Host: https://propsite.app
+Sitemap: https://app.propsite.io/sitemap.xml
+Host: https://app.propsite.io

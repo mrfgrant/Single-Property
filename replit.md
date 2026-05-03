@@ -165,7 +165,7 @@ Real estate agent SaaS that auto-builds a property marketing site for every MLS 
 - `TELNYX_FROM_NUMBER` — fallback E.164 number if no messaging profile
 - `TELNYX_PUBLIC_KEY` — base64 SPKI Ed25519 public key for webhook signature verification (required in production)
 - `COLD_OUTREACH_DELAY_MS` — optional, defaults to 15min delay between MLS event and outreach send
-- `MARKETING_SITE_URL` — base URL for preview/onboarding links in cold outreach (defaults to https://propsite.app)
+- `MARKETING_SITE_URL` — base URL for preview/onboarding links in cold outreach (defaults to https://app.propsite.io)
 - `FRED_API_KEY` — mortgage rate data
 
 **Important workflow:**

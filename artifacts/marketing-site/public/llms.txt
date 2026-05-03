@@ -25,9 +25,9 @@
 
 ## Pages
 
-- [Home](https://propsite.app/): product overview, how-it-works, pricing, comparison vs competitors, social proof, demo listings.
-- [Onboarding](https://propsite.app/onboarding): the 90-second signup form (name, email, MLS Agent ID, etc.) — handles in-market signup or out-of-market waitlist pivot.
-- [Demo listing](https://propsite.app/listing/2918-Arrowhead-Drive): a live example of what an auto-built property site looks like.
+- [Home](https://app.propsite.io/): product overview, how-it-works, pricing, comparison vs competitors, social proof, demo listings.
+- [Onboarding](https://app.propsite.io/onboarding): the 90-second signup form (name, email, MLS Agent ID, etc.) — handles in-market signup or out-of-market waitlist pivot.
+- [Demo listing](https://app.propsite.io/listing/2918-Arrowhead-Drive): a live example of what an auto-built property site looks like.
 
 ## FAQ
 
@@ -40,5 +40,5 @@
 
 ## Contact
 
-- Website: https://propsite.app
-- Onboarding: https://propsite.app/onboarding
+- Website: https://app.propsite.io
+- Onboarding: https://app.propsite.io/onboarding

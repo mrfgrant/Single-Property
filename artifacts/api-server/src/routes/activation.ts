@@ -120,7 +120,7 @@ router.post("/listings/:id/activate", requireMagicToken, async (req, res) => {
   if (provisionResult.domainName) {
     try {
       const marketingBase =
-        process.env.MARKETING_SITE_URL ?? process.env.PLATFORM_HOMEPAGE_URL ?? "https://propsite.app";
+        process.env.MARKETING_SITE_URL ?? process.env.PLATFORM_HOMEPAGE_URL ?? "https://app.propsite.io";
       await sendEmail(
         siteLiveEmail({
           agentEmail: agent.email,

@@ -8,7 +8,7 @@ import type Stripe from "stripe";
 
 const router = Router();
 
-const PLATFORM_HOMEPAGE = process.env.PLATFORM_HOMEPAGE_URL ?? "https://propsite.app";
+const PLATFORM_HOMEPAGE = process.env.PLATFORM_HOMEPAGE_URL ?? "https://app.propsite.io";
 
 async function getAgentAndListingBySubscription(subscriptionId: string) {
   const listings = await db

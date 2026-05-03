@@ -12,7 +12,7 @@ const router = Router();
 const ONBOARDING_URL =
   process.env.ONBOARDING_URL ?? "https://app.propsite.io/onboarding";
 const MARKETING_BASE_URL =
-  process.env.MARKETING_BASE_URL ?? "https://propsite.io";
+  process.env.MARKETING_BASE_URL ?? "https://app.propsite.io";
 
 function slugify(input: string): string {
   return input

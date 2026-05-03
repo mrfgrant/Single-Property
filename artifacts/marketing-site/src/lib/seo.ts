@@ -1,6 +1,6 @@
 import { PAGE_TITLE, PAGE_DESCRIPTION } from "./copy";
 
-const CANONICAL_ORIGIN = "https://propsite.app";
+const CANONICAL_ORIGIN = "https://app.propsite.io";
 const DEFAULT_OG_IMAGE = `${CANONICAL_ORIGIN}/og-image.png`;
 
 function setMeta(selector: string, value: string) {

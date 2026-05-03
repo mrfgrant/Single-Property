@@ -10,7 +10,7 @@ const router = Router();
 const MARKETING_SITE_URL =
   process.env.MARKETING_SITE_URL ??
   process.env.PLATFORM_HOMEPAGE_URL ??
-  "https://propsite.app";
+  "https://app.propsite.io";
 
 function resolveToken(req: import("express").Request): string | null {
   return (req.query.token as string) || (req.headers["x-agent-token"] as string) || null;

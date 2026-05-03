@@ -19,7 +19,7 @@ const MLS_BOARD_ID = process.env.MLS_BOARD_ID ?? "AUG";
 const MARKETING_SITE_URL =
   process.env.MARKETING_SITE_URL ??
   process.env.PLATFORM_HOMEPAGE_URL ??
-  "https://propsite.app";
+  "https://app.propsite.io";
 
 const onboardingSchema = z.object({
   firstName: z.string().min(1),
