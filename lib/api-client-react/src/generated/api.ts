@@ -21,6 +21,9 @@ import type {
   ActivateListingParams,
   AgentProfileResponse,
   AgentProfileUpdate,
+  BackfillWeeklyReport200,
+  BackfillWeeklyReport409,
+  BackfillWeeklyReportBody,
   BadRequestResponse,
   CreateLead201,
   CreateLeadRequest,
@@ -33,6 +36,7 @@ import type {
   GetAgentBillingPortalParams,
   GetAgentProfileParams,
   HealthStatus,
+  IngestAnalyticsEventsRequest,
   NotFoundResponse,
   OnboardAgent200,
   OnboardingRequest,
@@ -924,6 +928,199 @@ export const useEmailUnsubscribePost = <
   TContext
 > => {
   return useMutation(getEmailUnsubscribePostMutationOptions(options));
+};
+
+/**
+ * Accepts up to 50 events per call from the lightweight tracker
+embedded on every property site. Source / device / city geo are
+derived server-side from request headers; the tracker sends only
+the listing id, session id, event type, and minimal context.
+
+Events targeting unknown listing ids are silently dropped (the
+tracker also runs on demo / example pages with no real listing
+row). Returns 204 on success and 400 on malformed payloads.
+
+ * @summary Batched ingest of property-site visitor events
+ */
+export const getIngestAnalyticsEventsUrl = () => {
+  return `/api/analytics/events`;
+};
+
+export const ingestAnalyticsEvents = async (
+  ingestAnalyticsEventsRequest: IngestAnalyticsEventsRequest,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getIngestAnalyticsEventsUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(ingestAnalyticsEventsRequest),
+  });
+};
+
+export const getIngestAnalyticsEventsMutationOptions = <
+  TError = ErrorType<BadRequestResponse | ErrorEnvelope>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof ingestAnalyticsEvents>>,
+    TError,
+    { data: BodyType<IngestAnalyticsEventsRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof ingestAnalyticsEvents>>,
+  TError,
+  { data: BodyType<IngestAnalyticsEventsRequest> },
+  TContext
+> => {
+  const mutationKey = ["ingestAnalyticsEvents"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof ingestAnalyticsEvents>>,
+    { data: BodyType<IngestAnalyticsEventsRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return ingestAnalyticsEvents(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type IngestAnalyticsEventsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof ingestAnalyticsEvents>>
+>;
+export type IngestAnalyticsEventsMutationBody =
+  BodyType<IngestAnalyticsEventsRequest>;
+export type IngestAnalyticsEventsMutationError = ErrorType<
+  BadRequestResponse | ErrorEnvelope
+>;
+
+/**
+ * @summary Batched ingest of property-site visitor events
+ */
+export const useIngestAnalyticsEvents = <
+  TError = ErrorType<BadRequestResponse | ErrorEnvelope>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof ingestAnalyticsEvents>>,
+    TError,
+    { data: BodyType<IngestAnalyticsEventsRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof ingestAnalyticsEvents>>,
+  TError,
+  { data: BodyType<IngestAnalyticsEventsRequest> },
+  TContext
+> => {
+  return useMutation(getIngestAnalyticsEventsMutationOptions(options));
+};
+
+/**
+ * Admin-only. Re-enqueues the weekly seller report for a listing,
+either for the previous full local week (default) or for a
+specific week start. Useful for ad-hoc seller requests and for
+debugging the cron path.
+
+ * @summary Operator backfill of the weekly seller report
+ */
+export const getBackfillWeeklyReportUrl = (id: string) => {
+  return `/api/admin/listings/${id}/weekly-report`;
+};
+
+export const backfillWeeklyReport = async (
+  id: string,
+  backfillWeeklyReportBody?: BackfillWeeklyReportBody,
+  options?: RequestInit,
+): Promise<BackfillWeeklyReport200> => {
+  return customFetch<BackfillWeeklyReport200>(getBackfillWeeklyReportUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(backfillWeeklyReportBody),
+  });
+};
+
+export const getBackfillWeeklyReportMutationOptions = <
+  TError = ErrorType<UnauthorizedResponse | BackfillWeeklyReport409>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof backfillWeeklyReport>>,
+    TError,
+    { id: string; data: BodyType<BackfillWeeklyReportBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof backfillWeeklyReport>>,
+  TError,
+  { id: string; data: BodyType<BackfillWeeklyReportBody> },
+  TContext
+> => {
+  const mutationKey = ["backfillWeeklyReport"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof backfillWeeklyReport>>,
+    { id: string; data: BodyType<BackfillWeeklyReportBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return backfillWeeklyReport(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type BackfillWeeklyReportMutationResult = NonNullable<
+  Awaited<ReturnType<typeof backfillWeeklyReport>>
+>;
+export type BackfillWeeklyReportMutationBody =
+  BodyType<BackfillWeeklyReportBody>;
+export type BackfillWeeklyReportMutationError = ErrorType<
+  UnauthorizedResponse | BackfillWeeklyReport409
+>;
+
+/**
+ * @summary Operator backfill of the weekly seller report
+ */
+export const useBackfillWeeklyReport = <
+  TError = ErrorType<UnauthorizedResponse | BackfillWeeklyReport409>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof backfillWeeklyReport>>,
+    TError,
+    { id: string; data: BodyType<BackfillWeeklyReportBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof backfillWeeklyReport>>,
+  TError,
+  { id: string; data: BodyType<BackfillWeeklyReportBody> },
+  TContext
+> => {
+  return useMutation(getBackfillWeeklyReportMutationOptions(options));
 };
 
 /**

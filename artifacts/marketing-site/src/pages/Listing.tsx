@@ -5,6 +5,7 @@ import { fetchPublicListingBySlug, type PublicListing } from "@/lib/publicListin
 import { setPageSeo, injectJsonLd } from "@/lib/seo";
 import { WORDMARK_PREFIX, WORDMARK_SUFFIX } from "@/lib/copy";
 import { ONBOARDING_URL } from "@/lib/config";
+import { initListingAnalytics, trackPhotoView, trackLeadSubmitted } from "@/lib/analytics";
 import { Phone, Mail, MessageCircle, X, Menu as MenuIcon } from "lucide-react";
 
 // Lazy: keeps qrcode + jspdf out of the initial listing-page bundle.
@@ -24,6 +25,7 @@ function isOnCustomDomain(domainName?: string): boolean {
 }
 
 type FullListing = SampleListing & {
+  id?: string;
   photoUrls?: string[];
   agentPhone?: string;
   agentEmail?: string;
@@ -258,10 +260,11 @@ function MortgageCalculator({ price }: { price: number }) {
   );
 }
 
-function LeadForm() {
+function LeadForm({ listingId }: { listingId?: string }) {
   const [submitted, setSubmitted] = useState(false);
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    trackLeadSubmitted(listingId);
     setSubmitted(true);
   };
   if (submitted) {
@@ -459,6 +462,8 @@ export default function Listing() {
       }),
     );
 
+    cleanups.push(initListingAnalytics(listing.id));
+
     return () => {
       for (const fn of cleanups) fn();
     };
@@ -643,6 +648,7 @@ export default function Listing() {
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => trackPhotoView(listing.id, i + 2)}
                 className={`block bg-cream overflow-hidden group ${
                   i % 5 === 0 ? "md:col-span-2 aspect-[16/8]" : "aspect-[4/3]"
                 }`}
@@ -771,7 +777,7 @@ export default function Listing() {
             <p className="text-xs text-muted mb-8">
               We'll connect you with the agent in under a minute.
             </p>
-            <LeadForm />
+            <LeadForm listingId={listing.id} />
           </div>
         </div>
       </section>

@@ -273,6 +273,85 @@ paths:
                 properties:
                   ok: { type: boolean }
         '400': { $ref: '#/components/responses/BadRequest' }
+  /analytics/events:
+    post:
+      tags: [Analytics]
+      operationId: ingestAnalyticsEvents
+      summary: Batched ingest of property-site visitor events
+      description: |
+        Accepts up to 50 events per call from the lightweight tracker
+        embedded on every property site. Source / device / city geo are
+        derived server-side from request headers; the tracker sends only
+        the listing id, session id, event type, and minimal context.
+
+        Events targeting unknown listing ids are silently dropped (the
+        tracker also runs on demo / example pages with no real listing
+        row). Returns 204 on success and 400 on malformed payloads.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngestAnalyticsEventsRequest'
+      responses:
+        '204':
+          description: Events recorded (or silently dropped).
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '500':
+          description: Internal error persisting events.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /admin/listings/{id}/weekly-report:
+    post:
+      tags: [Admin]
+      operationId: backfillWeeklyReport
+      summary: Operator backfill of the weekly seller report
+      description: |
+        Admin-only. Re-enqueues the weekly seller report for a listing,
+        either for the previous full local week (default) or for a
+        specific week start. Useful for ad-hoc seller requests and for
+        debugging the cron path.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                weekStart:
+                  type: string
+                  format: date-time
+                  description: UTC instant corresponding to local Monday 00:00 of the target week.
+      responses:
+        '200':
+          description: Report enqueued.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, weekStart]
+                properties:
+                  ok: { type: boolean }
+                  sent: { type: boolean }
+                  weekStart: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409':
+          description: Could not enqueue (e.g. listing not found).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  weekStart: { type: string }
+                  reason: { type: string }
   /storage/uploads/request-url:
     post:
       tags: [Storage]
@@ -441,6 +520,29 @@ components:
       required: [agent]
       properties:
         agent: { $ref: '#/components/schemas/AgentProfile' }
+    AnalyticsEventInput:
+      type: object
+      required: [listingId, sessionId, eventType]
+      properties:
+        listingId: { type: string, format: uuid }
+        sessionId: { type: string, minLength: 8, maxLength: 64 }
+        eventType:
+          type: string
+          enum: [pageview, session_start, session_end, gallery_photo_view, lead_submitted]
+        occurredAt: { type: string, format: date-time }
+        referrer: { type: string, nullable: true, maxLength: 2000 }
+        utmSource: { type: string, nullable: true, maxLength: 100 }
+        photoIndex: { type: integer, nullable: true, minimum: 0, maximum: 500 }
+        path: { type: string, nullable: true, maxLength: 500 }
+    IngestAnalyticsEventsRequest:
+      type: object
+      required: [events]
+      properties:
+        events:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: { $ref: '#/components/schemas/AnalyticsEventInput' }
     CreateLeadRequest:
       type: object
       required: [listingId, name, email]

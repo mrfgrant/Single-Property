@@ -5,6 +5,7 @@ import { initBillingLifecycleBridge } from "./lib/billing/lifecycleBridge";
 import { initColdOutreachBridge } from "./lib/outreach/coldOutreach";
 import { startEmailOutboxWorker } from "./lib/outbox/email";
 import { startSmsOutboxWorker } from "./lib/outbox/sms";
+import { startWeeklyReportCron } from "./lib/analytics/cron";
 
 const rawPort = process.env["PORT"];
 
@@ -31,5 +32,6 @@ app.listen(port, (err) => {
   initColdOutreachBridge();
   startEmailOutboxWorker();
   startSmsOutboxWorker();
+  startWeeklyReportCron();
   startMlsIngestion();
 });

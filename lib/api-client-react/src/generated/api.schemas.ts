@@ -70,6 +70,47 @@ export interface AgentProfileResponse {
   agent: AgentProfile;
 }
 
+export type AnalyticsEventInputEventType =
+  (typeof AnalyticsEventInputEventType)[keyof typeof AnalyticsEventInputEventType];
+
+export const AnalyticsEventInputEventType = {
+  pageview: "pageview",
+  session_start: "session_start",
+  session_end: "session_end",
+  gallery_photo_view: "gallery_photo_view",
+  lead_submitted: "lead_submitted",
+} as const;
+
+export interface AnalyticsEventInput {
+  listingId: string;
+  /**
+   * @minLength 8
+   * @maxLength 64
+   */
+  sessionId: string;
+  eventType: AnalyticsEventInputEventType;
+  occurredAt?: string;
+  /** @maxLength 2000 */
+  referrer?: string | null;
+  /** @maxLength 100 */
+  utmSource?: string | null;
+  /**
+   * @minimum 0
+   * @maximum 500
+   */
+  photoIndex?: number | null;
+  /** @maxLength 500 */
+  path?: string | null;
+}
+
+export interface IngestAnalyticsEventsRequest {
+  /**
+   * @minItems 1
+   * @maxItems 50
+   */
+  events: AnalyticsEventInput[];
+}
+
 export interface CreateLeadRequest {
   listingId: string;
   /**
@@ -174,4 +215,21 @@ export type EmailUnsubscribePostBodyTwo = {
 
 export type EmailUnsubscribePost200 = {
   ok?: boolean;
+};
+
+export type BackfillWeeklyReportBody = {
+  /** UTC instant corresponding to local Monday 00:00 of the target week. */
+  weekStart?: string;
+};
+
+export type BackfillWeeklyReport200 = {
+  ok: boolean;
+  sent?: boolean;
+  weekStart: string;
+};
+
+export type BackfillWeeklyReport409 = {
+  ok?: boolean;
+  weekStart?: string;
+  reason?: string;
 };

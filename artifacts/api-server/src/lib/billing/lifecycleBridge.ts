@@ -6,6 +6,8 @@ import { handleListingClosed, type ListingCloseStatus } from "../cloudflare/life
 import { logger } from "../logger.js";
 import { enqueueEmail } from "../outbox/email.js";
 import { listingArchivedEmail } from "../email.js";
+import { getFinalMarketingStats } from "../analytics/aggregate.js";
+import { renderFinalMarketingReport } from "../analytics/report.js";
 
 /**
  * Terminal MLS statuses that should end a listing's subscription and
@@ -107,6 +109,57 @@ async function onStatusChanged(event: ListingStatusChangedEvent): Promise<void> 
         });
       } catch (err) {
         log.error({ err }, "Failed to enqueue listing-archived email");
+      }
+
+      // Final marketing summary — only meaningful for listings that
+      // were actually live (we have analytics for them) and only sent
+      // for the three terminal statuses we model.
+      const isFinalReportable =
+        closeStatus === "Sold" || closeStatus === "Withdrawn" || closeStatus === "Expired";
+      if (isFinalReportable && listing.mode === "live") {
+        try {
+          const stats = await getFinalMarketingStats(
+            listing.id,
+            listing.createdAt,
+            new Date(),
+          );
+          const sellerEmail = listing.sellerEmail?.trim() || null;
+          const isAgentOnly = !sellerEmail;
+          const rendered = renderFinalMarketingReport({
+            toEmail: sellerEmail ?? agent.email,
+            ccEmail: sellerEmail ? agent.email : null,
+            recipientName: sellerEmail ? "there" : agent.firstName,
+            isAgentOnly,
+            address: listing.address,
+            closeStatus,
+            agentFirstName: agent.firstName,
+            agentLastName: agent.lastName,
+            agentEmail: agent.email,
+            agentPhone: agent.phone ?? null,
+            agentHeadshotUrl: agent.headshotUrl ?? null,
+            brokerage: agent.brokerage ?? null,
+            stats,
+          });
+          await enqueueEmail({
+            toEmail: rendered.to,
+            subject: rendered.subject,
+            html: rendered.html,
+            textBody: rendered.text,
+            kind: "final_marketing_report",
+            dedupeKey: `final_report:${listing.id}`,
+            metadata: {
+              listingId: listing.id,
+              closeStatus,
+              cc: rendered.cc,
+            },
+          });
+          log.info(
+            { listingId: listing.id, closeStatus, totalViews: stats.totalViews, totalLeads: stats.totalLeads },
+            "Final marketing report enqueued",
+          );
+        } catch (err) {
+          log.error({ err }, "Failed to enqueue final marketing report");
+        }
       }
     }
   }

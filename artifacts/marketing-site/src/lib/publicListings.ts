@@ -34,6 +34,8 @@ interface ApiListing {
 }
 
 export interface PublicListing extends SampleListing {
+  /** Real listings.id UUID — present for live/preview rows, absent for purely sample data. */
+  id?: string;
   isLive: boolean;
   photoUrls?: string[];
   agentPhone?: string;
@@ -60,6 +62,7 @@ function resolvePhotoUrl(stored: string): string {
 
 export function apiToPublicListing(row: ApiListing): PublicListing {
   return {
+    id: row.id,
     slug: row.slug,
     address: row.address,
     city: row.city,

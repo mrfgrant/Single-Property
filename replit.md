@@ -180,7 +180,11 @@ After any `lib/db/src/schema/` change:
 - #3 Property site renderer — blocked on #2
 - #4 Agent onboarding & Stripe billing — in progress
 - #5 Leads, notifications & cold outreach — **BUILT** ✓ (in-process outbox workers; gated on Telnyx provisioning)
-- #6 Analytics & weekly seller report — pending #2, #3, #5
+- #6 Analytics & weekly seller report — **BUILT** ✓ (custom in-DB tracker, no third-party SDKs; hourly cron emits Mon 8am local-TZ seller report via outbox; final marketing summary on Sold/Withdrawn/Expired; admin backfill route)
+  - Schema: `analytics_events` (FK CASCADE on listings), `seller_reports_sent` (uniqueIndex on listing_id+week_start for idempotent dedupe).
+  - Tracker: `<2 KB`, sessionStorage UUID, batched + sendBeacon flush, idle 5min session_end.
+  - Server derives source/device/geo from request headers (Cloudflare cf-ipcity / x-vercel-* / x-forwarded-for); IP hashed via daily-rotating HMAC. ZIP→IANA TZ for week boundaries (default America/New_York).
+  - Env vars: `ANALYTICS_HASH_SECRET` (falls back to SESSION_SECRET / STRIPE_WEBHOOK_SECRET; fail-closed in prod). Optional: `WEEKLY_REPORT_TICK_MS` (default 1h), `WEEKLY_REPORT_CRON_DISABLED=1` to opt out.
 - #7 Marketing site — **BUILT** ✓
 - #8 SEO metadata — **BUILT** ✓
 - #9 Wire up CTAs — pending #4

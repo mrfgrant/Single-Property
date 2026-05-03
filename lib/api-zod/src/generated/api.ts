@@ -186,6 +186,99 @@ export const EmailUnsubscribePostResponse = zod.object({
 });
 
 /**
+ * Accepts up to 50 events per call from the lightweight tracker
+embedded on every property site. Source / device / city geo are
+derived server-side from request headers; the tracker sends only
+the listing id, session id, event type, and minimal context.
+
+Events targeting unknown listing ids are silently dropped (the
+tracker also runs on demo / example pages with no real listing
+row). Returns 204 on success and 400 on malformed payloads.
+
+ * @summary Batched ingest of property-site visitor events
+ */
+export const ingestAnalyticsEventsBodyEventsItemSessionIdMin = 8;
+export const ingestAnalyticsEventsBodyEventsItemSessionIdMax = 64;
+
+export const ingestAnalyticsEventsBodyEventsItemReferrerMax = 2000;
+
+export const ingestAnalyticsEventsBodyEventsItemUtmSourceMax = 100;
+
+export const ingestAnalyticsEventsBodyEventsItemPhotoIndexMin = 0;
+export const ingestAnalyticsEventsBodyEventsItemPhotoIndexMax = 500;
+
+export const ingestAnalyticsEventsBodyEventsItemPathMax = 500;
+
+export const ingestAnalyticsEventsBodyEventsMax = 50;
+
+export const IngestAnalyticsEventsBody = zod.object({
+  events: zod
+    .array(
+      zod.object({
+        listingId: zod.string().uuid(),
+        sessionId: zod
+          .string()
+          .min(ingestAnalyticsEventsBodyEventsItemSessionIdMin)
+          .max(ingestAnalyticsEventsBodyEventsItemSessionIdMax),
+        eventType: zod.enum([
+          "pageview",
+          "session_start",
+          "session_end",
+          "gallery_photo_view",
+          "lead_submitted",
+        ]),
+        occurredAt: zod.coerce.date().optional(),
+        referrer: zod
+          .string()
+          .max(ingestAnalyticsEventsBodyEventsItemReferrerMax)
+          .nullish(),
+        utmSource: zod
+          .string()
+          .max(ingestAnalyticsEventsBodyEventsItemUtmSourceMax)
+          .nullish(),
+        photoIndex: zod
+          .number()
+          .min(ingestAnalyticsEventsBodyEventsItemPhotoIndexMin)
+          .max(ingestAnalyticsEventsBodyEventsItemPhotoIndexMax)
+          .nullish(),
+        path: zod
+          .string()
+          .max(ingestAnalyticsEventsBodyEventsItemPathMax)
+          .nullish(),
+      }),
+    )
+    .min(1)
+    .max(ingestAnalyticsEventsBodyEventsMax),
+});
+
+/**
+ * Admin-only. Re-enqueues the weekly seller report for a listing,
+either for the previous full local week (default) or for a
+specific week start. Useful for ad-hoc seller requests and for
+debugging the cron path.
+
+ * @summary Operator backfill of the weekly seller report
+ */
+export const BackfillWeeklyReportParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const BackfillWeeklyReportBody = zod.object({
+  weekStart: zod.coerce
+    .date()
+    .optional()
+    .describe(
+      "UTC instant corresponding to local Monday 00:00 of the target week.",
+    ),
+});
+
+export const BackfillWeeklyReportResponse = zod.object({
+  ok: zod.boolean(),
+  sent: zod.boolean().optional(),
+  weekStart: zod.string(),
+});
+
+/**
  * @summary Request a presigned URL for file upload
  */
 

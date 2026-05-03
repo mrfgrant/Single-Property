@@ -14,3 +14,4 @@ export * from "./emailSuppressions";
 export * from "./leads";
 export * from "./emailOutbox";
 export * from "./smsOutbox";
+export * from "./analyticsEvents";
