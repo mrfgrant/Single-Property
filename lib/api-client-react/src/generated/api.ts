@@ -17,10 +17,23 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  ActivateListing200,
+  ActivateListingParams,
+  AgentProfileResponse,
+  AgentProfileUpdate,
+  BadRequestResponse,
   ErrorEnvelope,
+  GetAgentBillingPortal200,
+  GetAgentBillingPortalParams,
+  GetAgentProfileParams,
   HealthStatus,
+  NotFoundResponse,
+  OnboardingRequest,
+  OnboardingResponse,
   RequestUploadUrlBody,
   RequestUploadUrlResponse,
+  UnauthorizedResponse,
+  UpdateAgentProfileParams,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -107,6 +120,504 @@ export function useHealthCheck<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * Creates the agent record, optionally backfills any preview listings whose `listAgentMlsId` matches `mlsAgentId`, and returns either a Stripe Checkout setup-mode URL or `outOfMarket: true` if the agent's MLS prefix is outside the served market.
+
+ * @summary Create an agent account and start the Stripe Checkout setup flow
+ */
+export const getOnboardAgentUrl = () => {
+  return `/api/onboarding`;
+};
+
+export const onboardAgent = async (
+  onboardingRequest: OnboardingRequest,
+  options?: RequestInit,
+): Promise<OnboardingResponse> => {
+  return customFetch<OnboardingResponse>(getOnboardAgentUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(onboardingRequest),
+  });
+};
+
+export const getOnboardAgentMutationOptions = <
+  TError = ErrorType<ErrorEnvelope>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof onboardAgent>>,
+    TError,
+    { data: BodyType<OnboardingRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof onboardAgent>>,
+  TError,
+  { data: BodyType<OnboardingRequest> },
+  TContext
+> => {
+  const mutationKey = ["onboardAgent"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof onboardAgent>>,
+    { data: BodyType<OnboardingRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return onboardAgent(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type OnboardAgentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof onboardAgent>>
+>;
+export type OnboardAgentMutationBody = BodyType<OnboardingRequest>;
+export type OnboardAgentMutationError = ErrorType<ErrorEnvelope>;
+
+/**
+ * @summary Create an agent account and start the Stripe Checkout setup flow
+ */
+export const useOnboardAgent = <
+  TError = ErrorType<ErrorEnvelope>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof onboardAgent>>,
+    TError,
+    { data: BodyType<OnboardingRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof onboardAgent>>,
+  TError,
+  { data: BodyType<OnboardingRequest> },
+  TContext
+> => {
+  return useMutation(getOnboardAgentMutationOptions(options));
+};
+
+/**
+ * @summary Fetch the authenticated agent's profile (token auth)
+ */
+export const getGetAgentProfileUrl = (params: GetAgentProfileParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/agents/profile?${stringifiedParams}`
+    : `/api/agents/profile`;
+};
+
+export const getAgentProfile = async (
+  params: GetAgentProfileParams,
+  options?: RequestInit,
+): Promise<AgentProfileResponse> => {
+  return customFetch<AgentProfileResponse>(getGetAgentProfileUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAgentProfileQueryKey = (params?: GetAgentProfileParams) => {
+  return [`/api/agents/profile`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetAgentProfileQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAgentProfile>>,
+  TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+>(
+  params: GetAgentProfileParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAgentProfile>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetAgentProfileQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAgentProfile>>> = ({
+    signal,
+  }) => getAgentProfile(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAgentProfile>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAgentProfileQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAgentProfile>>
+>;
+export type GetAgentProfileQueryError = ErrorType<
+  UnauthorizedResponse | NotFoundResponse
+>;
+
+/**
+ * @summary Fetch the authenticated agent's profile (token auth)
+ */
+
+export function useGetAgentProfile<
+  TData = Awaited<ReturnType<typeof getAgentProfile>>,
+  TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+>(
+  params: GetAgentProfileParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAgentProfile>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAgentProfileQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update the authenticated agent's profile (token auth)
+ */
+export const getUpdateAgentProfileUrl = (params: UpdateAgentProfileParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/agents/profile?${stringifiedParams}`
+    : `/api/agents/profile`;
+};
+
+export const updateAgentProfile = async (
+  agentProfileUpdate: AgentProfileUpdate,
+  params: UpdateAgentProfileParams,
+  options?: RequestInit,
+): Promise<AgentProfileResponse> => {
+  return customFetch<AgentProfileResponse>(getUpdateAgentProfileUrl(params), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(agentProfileUpdate),
+  });
+};
+
+export const getUpdateAgentProfileMutationOptions = <
+  TError = ErrorType<
+    BadRequestResponse | UnauthorizedResponse | NotFoundResponse
+  >,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAgentProfile>>,
+    TError,
+    { data: BodyType<AgentProfileUpdate>; params: UpdateAgentProfileParams },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateAgentProfile>>,
+  TError,
+  { data: BodyType<AgentProfileUpdate>; params: UpdateAgentProfileParams },
+  TContext
+> => {
+  const mutationKey = ["updateAgentProfile"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateAgentProfile>>,
+    { data: BodyType<AgentProfileUpdate>; params: UpdateAgentProfileParams }
+  > = (props) => {
+    const { data, params } = props ?? {};
+
+    return updateAgentProfile(data, params, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateAgentProfileMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateAgentProfile>>
+>;
+export type UpdateAgentProfileMutationBody = BodyType<AgentProfileUpdate>;
+export type UpdateAgentProfileMutationError = ErrorType<
+  BadRequestResponse | UnauthorizedResponse | NotFoundResponse
+>;
+
+/**
+ * @summary Update the authenticated agent's profile (token auth)
+ */
+export const useUpdateAgentProfile = <
+  TError = ErrorType<
+    BadRequestResponse | UnauthorizedResponse | NotFoundResponse
+  >,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAgentProfile>>,
+    TError,
+    { data: BodyType<AgentProfileUpdate>; params: UpdateAgentProfileParams },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateAgentProfile>>,
+  TError,
+  { data: BodyType<AgentProfileUpdate>; params: UpdateAgentProfileParams },
+  TContext
+> => {
+  return useMutation(getUpdateAgentProfileMutationOptions(options));
+};
+
+/**
+ * @summary Create a Stripe Customer Portal session for the agent
+ */
+export const getGetAgentBillingPortalUrl = (
+  params: GetAgentBillingPortalParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/agents/billing-portal?${stringifiedParams}`
+    : `/api/agents/billing-portal`;
+};
+
+export const getAgentBillingPortal = async (
+  params: GetAgentBillingPortalParams,
+  options?: RequestInit,
+): Promise<GetAgentBillingPortal200> => {
+  return customFetch<GetAgentBillingPortal200>(
+    getGetAgentBillingPortalUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetAgentBillingPortalQueryKey = (
+  params?: GetAgentBillingPortalParams,
+) => {
+  return [`/api/agents/billing-portal`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetAgentBillingPortalQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAgentBillingPortal>>,
+  TError = ErrorType<UnauthorizedResponse | ErrorEnvelope>,
+>(
+  params: GetAgentBillingPortalParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAgentBillingPortal>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAgentBillingPortalQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAgentBillingPortal>>
+  > = ({ signal }) =>
+    getAgentBillingPortal(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAgentBillingPortal>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAgentBillingPortalQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAgentBillingPortal>>
+>;
+export type GetAgentBillingPortalQueryError = ErrorType<
+  UnauthorizedResponse | ErrorEnvelope
+>;
+
+/**
+ * @summary Create a Stripe Customer Portal session for the agent
+ */
+
+export function useGetAgentBillingPortal<
+  TData = Awaited<ReturnType<typeof getAgentBillingPortal>>,
+  TError = ErrorType<UnauthorizedResponse | ErrorEnvelope>,
+>(
+  params: GetAgentBillingPortalParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAgentBillingPortal>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAgentBillingPortalQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Verifies the agent has a default payment method on file with Stripe, creates the per-listing $49/mo subscription, provisions the domain, and flips the listing to `mode: live`.
+
+ * @summary Activate a preview listing (provision domain + paid subscription)
+ */
+export const getActivateListingUrl = (
+  id: string,
+  params: ActivateListingParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/listings/${id}/activate?${stringifiedParams}`
+    : `/api/listings/${id}/activate`;
+};
+
+export const activateListing = async (
+  id: string,
+  params: ActivateListingParams,
+  options?: RequestInit,
+): Promise<ActivateListing200> => {
+  return customFetch<ActivateListing200>(getActivateListingUrl(id, params), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getActivateListingMutationOptions = <
+  TError = ErrorType<UnauthorizedResponse | ErrorEnvelope | NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof activateListing>>,
+    TError,
+    { id: string; params: ActivateListingParams },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof activateListing>>,
+  TError,
+  { id: string; params: ActivateListingParams },
+  TContext
+> => {
+  const mutationKey = ["activateListing"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof activateListing>>,
+    { id: string; params: ActivateListingParams }
+  > = (props) => {
+    const { id, params } = props ?? {};
+
+    return activateListing(id, params, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ActivateListingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof activateListing>>
+>;
+
+export type ActivateListingMutationError = ErrorType<
+  UnauthorizedResponse | ErrorEnvelope | NotFoundResponse
+>;
+
+/**
+ * @summary Activate a preview listing (provision domain + paid subscription)
+ */
+export const useActivateListing = <
+  TError = ErrorType<UnauthorizedResponse | ErrorEnvelope | NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof activateListing>>,
+    TError,
+    { id: string; params: ActivateListingParams },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof activateListing>>,
+  TError,
+  { id: string; params: ActivateListingParams },
+  TContext
+> => {
+  return useMutation(getActivateListingMutationOptions(options));
+};
 
 /**
  * @summary Request a presigned URL for file upload

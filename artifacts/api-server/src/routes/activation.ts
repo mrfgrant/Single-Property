@@ -2,7 +2,10 @@ import { Router } from "express";
 import { db, agentsTable, listingsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod/v4";
-import { createListingSubscription } from "../lib/stripe/index.js";
+import {
+  createListingSubscription,
+  customerHasDefaultPaymentMethod,
+} from "../lib/stripe/index.js";
 import { provisionDomainForListing } from "../lib/cloudflare/index.js";
 import { sendEmail, siteLiveEmail } from "../lib/email.js";
 import { logger } from "../lib/logger.js";
@@ -54,6 +57,25 @@ router.post("/listings/:id/activate", requireMagicToken, async (req, res) => {
 
   if (!agent.stripeCustomerId) {
     res.status(402).json({ error: "Payment method not set up — complete onboarding first" });
+    return;
+  }
+
+  // Hard gate: confirm the customer actually has a default payment method
+  // attached (i.e. setup_intent.succeeded webhook fired). Otherwise the
+  // first invoice would fail and we'd flip the listing live with no
+  // collectable revenue.
+  try {
+    const ok = await customerHasDefaultPaymentMethod(agent.stripeCustomerId);
+    if (!ok) {
+      res.status(402).json({
+        error:
+          "No payment method on file. Open your billing portal from /profile to add a card, then try again.",
+      });
+      return;
+    }
+  } catch (err) {
+    logger.error({ err, listingId, customerId: agent.stripeCustomerId }, "Failed to verify Stripe payment method");
+    res.status(502).json({ error: "Could not verify payment method with Stripe" });
     return;
   }
 

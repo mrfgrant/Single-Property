@@ -27,3 +27,102 @@ export interface RequestUploadUrlResponse {
 export interface ErrorEnvelope {
   error: string;
 }
+
+export interface OnboardingRequest {
+  /** @minLength 1 */
+  firstName: string;
+  /** @minLength 1 */
+  lastName: string;
+  email: string;
+  phone?: string;
+  brokerage?: string;
+  /** @minLength 1 */
+  mlsAgentId: string;
+  personalWebsiteUrl?: string;
+  headshotUrl?: string;
+  logoUrl?: string;
+}
+
+export interface OnboardingResponse {
+  agentId?: string | null;
+  /** Magic link token (also embedded in checkoutUrl/success URL). */
+  token?: string | null;
+  /** Stripe Checkout setup-mode URL. Redirect the browser here. */
+  checkoutUrl?: string | null;
+  /** How many existing preview listings were linked to this new agent by `listAgentMlsId`. */
+  backfilledCount?: number | null;
+  /** If true, the agent's MLS prefix is outside the served market and they should be added to the waitlist. */
+  outOfMarket?: boolean | null;
+}
+
+export interface AgentProfile {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string | null;
+  brokerage?: string | null;
+  mlsAgentId: string;
+  personalWebsiteUrl?: string | null;
+  headshotUrl?: string | null;
+  logoUrl?: string | null;
+}
+
+export interface AgentProfileResponse {
+  agent: AgentProfile;
+}
+
+export interface AgentProfileUpdate {
+  /** @minLength 1 */
+  firstName?: string;
+  /** @minLength 1 */
+  lastName?: string;
+  phone?: string;
+  brokerage?: string;
+  personalWebsiteUrl?: string;
+  headshotUrl?: string;
+  logoUrl?: string;
+}
+
+/**
+ * Missing or invalid agent token.
+ */
+export type UnauthorizedResponse = ErrorEnvelope;
+
+/**
+ * Resource not found.
+ */
+export type NotFoundResponse = ErrorEnvelope;
+
+/**
+ * Invalid request.
+ */
+export type BadRequestResponse = ErrorEnvelope;
+
+export type GetAgentProfileParams = {
+  token: string;
+};
+
+export type UpdateAgentProfileParams = {
+  token: string;
+};
+
+export type GetAgentBillingPortalParams = {
+  token: string;
+};
+
+export type GetAgentBillingPortal200 = {
+  url: string;
+};
+
+export type ActivateListingParams = {
+  token: string;
+};
+
+export type ActivateListing200 = {
+  success?: boolean;
+  already?: boolean;
+  domainName?: string | null;
+  subscriptionId?: string | null;
+  replitHandoffNote?: string | null;
+};

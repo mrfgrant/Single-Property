@@ -16,6 +16,135 @@ export const HealthCheckResponse = zod.object({
 });
 
 /**
+ * Creates the agent record, optionally backfills any preview listings whose `listAgentMlsId` matches `mlsAgentId`, and returns either a Stripe Checkout setup-mode URL or `outOfMarket: true` if the agent's MLS prefix is outside the served market.
+
+ * @summary Create an agent account and start the Stripe Checkout setup flow
+ */
+
+export const OnboardAgentBody = zod.object({
+  firstName: zod.string().min(1),
+  lastName: zod.string().min(1),
+  email: zod.string().email(),
+  phone: zod.string().optional(),
+  brokerage: zod.string().optional(),
+  mlsAgentId: zod.string().min(1),
+  personalWebsiteUrl: zod.string().url().optional(),
+  headshotUrl: zod.string().url().optional(),
+  logoUrl: zod.string().url().optional(),
+});
+
+export const OnboardAgentResponse = zod.object({
+  agentId: zod.string().nullish(),
+  token: zod
+    .string()
+    .nullish()
+    .describe("Magic link token (also embedded in checkoutUrl\/success URL)."),
+  checkoutUrl: zod
+    .string()
+    .url()
+    .nullish()
+    .describe("Stripe Checkout setup-mode URL. Redirect the browser here."),
+  backfilledCount: zod
+    .number()
+    .nullish()
+    .describe(
+      "How many existing preview listings were linked to this new agent by `listAgentMlsId`.",
+    ),
+  outOfMarket: zod
+    .boolean()
+    .nullish()
+    .describe(
+      "If true, the agent's MLS prefix is outside the served market and they should be added to the waitlist.",
+    ),
+});
+
+/**
+ * @summary Fetch the authenticated agent's profile (token auth)
+ */
+export const GetAgentProfileQueryParams = zod.object({
+  token: zod.coerce.string(),
+});
+
+export const GetAgentProfileResponse = zod.object({
+  agent: zod.object({
+    id: zod.string(),
+    firstName: zod.string(),
+    lastName: zod.string(),
+    email: zod.string().email(),
+    phone: zod.string().nullish(),
+    brokerage: zod.string().nullish(),
+    mlsAgentId: zod.string(),
+    personalWebsiteUrl: zod.string().url().nullish(),
+    headshotUrl: zod.string().url().nullish(),
+    logoUrl: zod.string().url().nullish(),
+  }),
+});
+
+/**
+ * @summary Update the authenticated agent's profile (token auth)
+ */
+export const UpdateAgentProfileQueryParams = zod.object({
+  token: zod.coerce.string(),
+});
+
+export const UpdateAgentProfileBody = zod.object({
+  firstName: zod.string().min(1).optional(),
+  lastName: zod.string().min(1).optional(),
+  phone: zod.string().optional(),
+  brokerage: zod.string().optional(),
+  personalWebsiteUrl: zod.string().url().optional(),
+  headshotUrl: zod.string().url().optional(),
+  logoUrl: zod.string().url().optional(),
+});
+
+export const UpdateAgentProfileResponse = zod.object({
+  agent: zod.object({
+    id: zod.string(),
+    firstName: zod.string(),
+    lastName: zod.string(),
+    email: zod.string().email(),
+    phone: zod.string().nullish(),
+    brokerage: zod.string().nullish(),
+    mlsAgentId: zod.string(),
+    personalWebsiteUrl: zod.string().url().nullish(),
+    headshotUrl: zod.string().url().nullish(),
+    logoUrl: zod.string().url().nullish(),
+  }),
+});
+
+/**
+ * @summary Create a Stripe Customer Portal session for the agent
+ */
+export const GetAgentBillingPortalQueryParams = zod.object({
+  token: zod.coerce.string(),
+});
+
+export const GetAgentBillingPortalResponse = zod.object({
+  url: zod.string().url(),
+});
+
+/**
+ * Verifies the agent has a default payment method on file with Stripe, creates the per-listing $49/mo subscription, provisions the domain, and flips the listing to `mode: live`.
+
+ * @summary Activate a preview listing (provision domain + paid subscription)
+ */
+export const ActivateListingParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const ActivateListingQueryParams = zod.object({
+  token: zod.coerce.string(),
+});
+
+export const ActivateListingResponse = zod.object({
+  success: zod.boolean().optional(),
+  already: zod.boolean().optional(),
+  domainName: zod.string().nullish(),
+  subscriptionId: zod.string().nullish(),
+  replitHandoffNote: zod.string().nullish(),
+});
+
+/**
  * @summary Request a presigned URL for file upload
  */
 

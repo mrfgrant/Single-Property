@@ -6,5 +6,6 @@ export {
   createCustomerPortalSession,
   createOnboardingCheckoutSession,
   setDefaultPaymentMethod,
+  customerHasDefaultPaymentMethod,
   constructWebhookEvent,
 } from "./client.js";

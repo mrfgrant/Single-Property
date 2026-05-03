@@ -25,6 +25,151 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /onboarding:
+    post:
+      tags: [Onboarding]
+      operationId: onboardAgent
+      summary: Create an agent account and start the Stripe Checkout setup flow
+      description: >
+        Creates the agent record, optionally backfills any preview listings
+        whose `listAgentMlsId` matches `mlsAgentId`, and returns either a
+        Stripe Checkout setup-mode URL or `outOfMarket: true` if the agent's
+        MLS prefix is outside the served market.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnboardingRequest'
+      responses:
+        '200':
+          description: Onboarding accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingResponse'
+        '400':
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /agents/profile:
+    get:
+      tags: [Agents]
+      operationId: getAgentProfile
+      summary: Fetch the authenticated agent's profile (token auth)
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Agent profile.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentProfileResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Agents]
+      operationId: updateAgentProfile
+      summary: Update the authenticated agent's profile (token auth)
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentProfileUpdate'
+      responses:
+        '200':
+          description: Updated agent profile.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentProfileResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /agents/billing-portal:
+    get:
+      tags: [Agents]
+      operationId: getAgentBillingPortal
+      summary: Create a Stripe Customer Portal session for the agent
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Portal session URL.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url]
+                properties:
+                  url: { type: string, format: uri }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409':
+          description: Agent has no Stripe customer.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /listings/{id}/activate:
+    post:
+      tags: [Listings]
+      operationId: activateListing
+      summary: Activate a preview listing (provision domain + paid subscription)
+      description: >
+        Verifies the agent has a default payment method on file with Stripe,
+        creates the per-listing $49/mo subscription, provisions the domain,
+        and flips the listing to `mode: live`.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: token
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Listing activated (or already live).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  already: { type: boolean }
+                  domainName: { type: string, nullable: true }
+                  subscriptionId: { type: string, nullable: true }
+                  replitHandoffNote: { type: string, nullable: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '402':
+          description: Payment method missing — agent must add a card first.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500':
+          description: Domain provisioning failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /storage/uploads/request-url:
     post:
       tags: [Storage]
@@ -144,3 +289,79 @@ components:
       properties:
         error:
           type: string
+    OnboardingRequest:
+      type: object
+      required: [firstName, lastName, email, mlsAgentId]
+      properties:
+        firstName: { type: string, minLength: 1 }
+        lastName: { type: string, minLength: 1 }
+        email: { type: string, format: email }
+        phone: { type: string }
+        brokerage: { type: string }
+        mlsAgentId: { type: string, minLength: 1 }
+        personalWebsiteUrl: { type: string, format: uri }
+        headshotUrl: { type: string, format: uri }
+        logoUrl: { type: string, format: uri }
+    OnboardingResponse:
+      type: object
+      properties:
+        agentId: { type: string, nullable: true }
+        token: { type: string, nullable: true, description: "Magic link token (also embedded in checkoutUrl/success URL)." }
+        checkoutUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: Stripe Checkout setup-mode URL. Redirect the browser here.
+        backfilledCount:
+          type: integer
+          nullable: true
+          description: How many existing preview listings were linked to this new agent by `listAgentMlsId`.
+        outOfMarket:
+          type: boolean
+          nullable: true
+          description: If true, the agent's MLS prefix is outside the served market and they should be added to the waitlist.
+    AgentProfile:
+      type: object
+      required: [id, firstName, lastName, email, mlsAgentId]
+      properties:
+        id: { type: string }
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: string, format: email }
+        phone: { type: string, nullable: true }
+        brokerage: { type: string, nullable: true }
+        mlsAgentId: { type: string }
+        personalWebsiteUrl: { type: string, format: uri, nullable: true }
+        headshotUrl: { type: string, format: uri, nullable: true }
+        logoUrl: { type: string, format: uri, nullable: true }
+    AgentProfileResponse:
+      type: object
+      required: [agent]
+      properties:
+        agent: { $ref: '#/components/schemas/AgentProfile' }
+    AgentProfileUpdate:
+      type: object
+      properties:
+        firstName: { type: string, minLength: 1 }
+        lastName: { type: string, minLength: 1 }
+        phone: { type: string }
+        brokerage: { type: string }
+        personalWebsiteUrl: { type: string, format: uri }
+        headshotUrl: { type: string, format: uri }
+        logoUrl: { type: string, format: uri }
+  responses:
+    Unauthorized:
+      description: Missing or invalid agent token.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    BadRequest:
+      description: Invalid request.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }

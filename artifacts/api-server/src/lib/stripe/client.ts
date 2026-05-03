@@ -97,6 +97,20 @@ export async function createOnboardingCheckoutSession(params: {
  * After a setup_intent succeeds, attach the resulting payment method as
  * the customer's default for future invoices/subscriptions.
  */
+/**
+ * Returns true if the customer has a default payment method on file —
+ * the strict precondition for activating a paid subscription.
+ */
+export async function customerHasDefaultPaymentMethod(
+  customerId: string,
+): Promise<boolean> {
+  const stripe = getStripe();
+  const customer = await stripe.customers.retrieve(customerId);
+  if (customer.deleted) return false;
+  const dpm = customer.invoice_settings?.default_payment_method;
+  return Boolean(dpm);
+}
+
 export async function setDefaultPaymentMethod(
   customerId: string,
   paymentMethodId: string,
