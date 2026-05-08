@@ -33,6 +33,8 @@ interface ApiListing {
   createdAt: string;
   /** Real listings.mode — `"preview" | "live" | "disabled"`. Absent on example rows. */
   mode?: string | null;
+  /** ISO timestamp — when the api-server last refreshed this row from the MLS feed. Drives the IDX "Last updated" line. */
+  mlsLastSyncedAt?: string | null;
 }
 
 export interface PublicListing extends SampleListing {
@@ -49,6 +51,8 @@ export interface PublicListing extends SampleListing {
   mode?: "preview" | "live" | "disabled";
   /** MLS listing number when sourced from the MLS — drives the IDX disclaimer. */
   mlsId?: string;
+  /** ISO timestamp of our last MLS refresh — rendered as "Last updated …" near the IDX disclaimer. */
+  mlsLastSyncedAt?: string;
 }
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
@@ -102,6 +106,7 @@ export function apiToPublicListing(row: ApiListing): PublicListing {
         ? row.mode
         : undefined,
     mlsId: row.mlsId ?? undefined,
+    mlsLastSyncedAt: row.mlsLastSyncedAt ?? undefined,
   };
 }
 

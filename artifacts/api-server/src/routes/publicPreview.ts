@@ -98,8 +98,14 @@ router.get("/listings/preview/:id", async (req, res) => {
       agentPhone,
       agentEmail,
       agentPhotoUrl,
-      agentBrokerage,
+      // For MLS-sourced rows the IDX courtesy attribution must come
+      // from the MLS feed's ListOfficeName, not the on-platform agent's
+      // brokerage. Prefer the MLS value when present.
+      agentBrokerage: listing.mlsBrokerageName ?? agentBrokerage,
       brokerageLogoUrl,
+      mlsLastSyncedAt: listing.mlsLastSyncedAt
+        ? listing.mlsLastSyncedAt.toISOString()
+        : null,
     },
   });
 });

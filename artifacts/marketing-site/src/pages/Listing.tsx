@@ -973,6 +973,15 @@ export default function Listing() {
                 ? ` · Listing courtesy of ${listing.agentBrokerage}`
                 : ""}
             </p>
+            {listing.mlsLastSyncedAt && (
+              <p className="mt-0.5">
+                Last updated{" "}
+                {new Date(listing.mlsLastSyncedAt).toLocaleString(undefined, {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                })}
+              </p>
+            )}
             <p className="mt-1">
               Listing data is provided by participating MLS members and is
               deemed reliable but not guaranteed. Information is provided

@@ -26,6 +26,8 @@ export type ResoProperty = {
   ListAgentFullName?: string;
   ListAgentEmail?: string;
   ListAgentPreferredPhone?: string;
+  ListOfficeName?: string;
+  ListOfficeMlsId?: string;
   StandardStatus?: string;
   MlsStatus?: string;
   UnparsedAddress?: string;

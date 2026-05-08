@@ -197,138 +197,149 @@ router.delete("/admin/listings/:id/photos/:index", adminAuth, async (req, res) =
   res.json({ listing: updated });
 });
 
-/* GET /admin/mls-lookup/:mlsId
- *
- * Single-property MLS lookup. Returns a partial ListingInput populated
- * from MLS data so the admin "Add new listing" form can pre-fill from
- * an MLS#.
+/**
+ * Cache-then-live single-property MLS resolver. Shared by the GET lookup
+ * route and the POST import-from-mls alias so both endpoints have one
+ * source of truth for the resolution logic.
  *
  * Resolution order:
- *   1. Local cache: if the cron has already ingested this listing into
- *      `listings.mls_listing_id`, return it immediately (no network).
- *   2. Live RESO query against the configured MLS feed (SourceRE or
- *      generic RESO) — fetches the single property by ListingId.
- *
- * Returns `{ available: false, reason }` when MLS is unconfigured or
- * the property cannot be found, so the admin form degrades to manual
- * entry without surfacing an error to the operator.
+ *   1. Local cache (`listings.mls_listing_id`) — best-effort fast path.
+ *      Note: sync stores RESO `ListingKey` (opaque hex) here while
+ *      operators usually paste the human `ListingId`/MLS#. The cache
+ *      hits when they happen to match (some boards do, or when the
+ *      operator pastes a ListingKey directly); otherwise we fall
+ *      through to the live query, which is authoritative.
+ *   2. Live RESO query filtered by `ListingId` against the configured
+ *      MLS feed (SourceRE or generic RESO).
  */
-router.get("/admin/mls-lookup/:mlsId", adminAuth, async (req, res) => {
-  const mlsId = String(req.params.mlsId || "").trim();
-  if (!mlsId) {
-    res.json({ available: false, reason: "Missing MLS id" });
-    return;
+type LookupResult =
+  | { available: true; source: "cache" | "live"; data: Record<string, unknown> }
+  | { available: false; reason: string };
+
+async function resolveMlsListing(rawMlsId: string): Promise<LookupResult> {
+  const mlsId = rawMlsId.trim();
+  if (!mlsId) return { available: false, reason: "Missing MLS id" };
+
+  const [cached] = await db
+    .select()
+    .from(listingsTable)
+    .where(eq(listingsTable.mlsListingId, mlsId))
+    .limit(1);
+  if (cached) {
+    return {
+      available: true,
+      source: "cache",
+      data: {
+        mlsId: cached.mlsListingId ?? mlsId,
+        address: cached.address,
+        city: cached.city,
+        state: cached.state,
+        zip: cached.zip ?? "",
+        priceUsd: cached.priceUsd ?? undefined,
+        beds: cached.beds ?? undefined,
+        baths: cached.baths ?? undefined,
+        sqft: cached.sqft ?? undefined,
+        lotAcres: cached.lotAcres ?? undefined,
+        yearBuilt: cached.yearBuilt ?? undefined,
+        description: cached.description ?? "",
+        agentName: cached.listAgentName ?? "",
+        agentEmail: cached.listAgentEmail ?? "",
+        agentPhone: cached.listAgentPhone ?? "",
+        agentBrokerage: cached.mlsBrokerageName ?? "",
+        photoUrls: cached.photoUrls ?? [],
+      },
+    };
   }
 
+  const cfg = getMlsConfig();
+  if (!cfg.configured) {
+    return { available: false, reason: "MLS integration not yet configured" };
+  }
+
+  const safe = mlsId.replace(/'/g, "''");
+  let found: ResoProperty | null = null;
+  for await (const page of mlsClient.iterateProperties({
+    filter: `ListingId eq '${safe}'`,
+    top: 1,
+  })) {
+    if (page.length > 0) {
+      found = page[0];
+      break;
+    }
+  }
+  if (!found) {
+    return { available: false, reason: `MLS #${mlsId} not found in feed` };
+  }
+
+  const p = found;
+  const address =
+    p.UnparsedAddress?.trim() ||
+    [p.StreetNumber, p.StreetName, p.StreetSuffix]
+      .filter(Boolean)
+      .join(" ")
+      .trim() ||
+    "";
+  return {
+    available: true,
+    source: "live",
+    data: {
+      mlsId,
+      address,
+      city: p.City ?? "",
+      state: p.StateOrProvince ?? "GA",
+      zip: p.PostalCode ?? "",
+      priceUsd: p.ListPrice ?? undefined,
+      beds: p.BedroomsTotal ?? undefined,
+      baths: p.BathroomsTotalDecimal ?? p.BathroomsTotalInteger ?? undefined,
+      sqft: p.LivingArea ?? undefined,
+      lotAcres: p.LotSizeAcres ?? undefined,
+      yearBuilt: p.YearBuilt ?? undefined,
+      description: p.PublicRemarks ?? "",
+      agentName: p.ListAgentFullName ?? "",
+      agentEmail: p.ListAgentEmail ?? "",
+      agentPhone: p.ListAgentPreferredPhone ?? "",
+      agentBrokerage: p.ListOfficeName ?? "",
+    },
+  };
+}
+
+/* GET /admin/mls-lookup/:mlsId — pre-fill the admin "Add listing" form
+ * from the MLS feed. Returns `{ available: false, reason }` when MLS
+ * is unconfigured or the property can't be found so the admin form
+ * degrades to manual entry without surfacing an error to the operator. */
+router.get("/admin/mls-lookup/:mlsId", adminAuth, async (req, res) => {
   try {
-    // 1. Local cache hit — best-effort. The sync stores RESO `ListingKey`
-    //    (an opaque hex) in `listings.mls_listing_id`, but the operator
-    //    typically pastes the human-readable `ListingId` (MLS#). We try
-    //    the cache anyway so power users who paste a ListingKey, or
-    //    listings re-claimed via MLS#==Key boards, still get a no-network
-    //    fast path. Anything else falls through to the live RESO query
-    //    below, which is filtered by `ListingId` and is authoritative.
-    const [cached] = await db
-      .select()
-      .from(listingsTable)
-      .where(eq(listingsTable.mlsListingId, mlsId))
-      .limit(1);
-    if (cached) {
-      res.json({
-        available: true,
-        source: "cache",
-        data: {
-          mlsId: cached.mlsListingId ?? mlsId,
-          address: cached.address,
-          city: cached.city,
-          state: cached.state,
-          zip: cached.zip ?? "",
-          priceUsd: cached.priceUsd ?? undefined,
-          beds: cached.beds ?? undefined,
-          baths: cached.baths ?? undefined,
-          sqft: cached.sqft ?? undefined,
-          lotAcres: cached.lotAcres ?? undefined,
-          yearBuilt: cached.yearBuilt ?? undefined,
-          description: cached.description ?? "",
-          agentName: cached.listAgentName ?? "",
-          agentEmail: cached.listAgentEmail ?? "",
-          agentPhone: cached.listAgentPhone ?? "",
-          photoUrls: cached.photoUrls ?? [],
-        },
-      });
-      return;
-    }
-
-    // 2. Live MLS query — only attempt when configured.
-    const cfg = getMlsConfig();
-    if (!cfg.configured) {
-      res.json({
-        available: false,
-        reason: "MLS integration not yet configured",
-      });
-      return;
-    }
-
-    // SourceRE quirk: ListingId is the human MLS#, ListingKey is a
-    // stable hex. The admin operator types in the MLS#, so filter on
-    // ListingId. Both shapes work for generic RESO too.
-    const safe = mlsId.replace(/'/g, "''");
-    let found: ResoProperty | null = null;
-    for await (const page of mlsClient.iterateProperties({
-      filter: `ListingId eq '${safe}'`,
-      top: 1,
-    })) {
-      if (page.length > 0) {
-        found = page[0];
-        break;
-      }
-    }
-
-    if (!found) {
-      res.json({
-        available: false,
-        reason: `MLS #${mlsId} not found in feed`,
-      });
-      return;
-    }
-
-    const p = found;
-    const address =
-      p.UnparsedAddress?.trim() ||
-      [p.StreetNumber, p.StreetName, p.StreetSuffix]
-        .filter(Boolean)
-        .join(" ")
-        .trim() ||
-      "";
-
-    res.json({
-      available: true,
-      source: "live",
-      data: {
-        mlsId,
-        address,
-        city: p.City ?? "",
-        state: p.StateOrProvince ?? "GA",
-        zip: p.PostalCode ?? "",
-        priceUsd: p.ListPrice ?? undefined,
-        beds: p.BedroomsTotal ?? undefined,
-        baths:
-          p.BathroomsTotalDecimal ?? p.BathroomsTotalInteger ?? undefined,
-        sqft: p.LivingArea ?? undefined,
-        lotAcres: p.LotSizeAcres ?? undefined,
-        yearBuilt: p.YearBuilt ?? undefined,
-        description: p.PublicRemarks ?? "",
-        agentName: p.ListAgentFullName ?? "",
-        agentEmail: p.ListAgentEmail ?? "",
-        agentPhone: p.ListAgentPreferredPhone ?? "",
-      },
-    });
+    const result = await resolveMlsListing(String(req.params.mlsId || ""));
+    res.json(result);
   } catch (err) {
-    logger.warn({ err, mlsId }, "MLS lookup failed");
+    logger.warn({ err, mlsId: req.params.mlsId }, "MLS lookup failed");
     res.json({
       available: false,
-      reason:
-        err instanceof Error ? err.message : "MLS lookup failed unexpectedly",
+      reason: err instanceof Error ? err.message : "MLS lookup failed unexpectedly",
+    });
+  }
+});
+
+/* POST /admin/listings/import-from-mls — symmetric alias for the GET
+ * lookup, listed in the FG task spec. POSTing the MLS# in the body
+ * avoids URL-encoding edge cases for non-canonical MLS# formats.
+ * Returns the same `{ available, source, data }` shape; the admin form
+ * previews the payload and the operator clicks Save to actually create
+ * the row. */
+router.post("/admin/listings/import-from-mls", adminAuth, async (req, res) => {
+  const mlsNumber = String(req.body?.mlsNumber ?? req.body?.mlsId ?? "").trim();
+  if (!mlsNumber) {
+    res.status(400).json({ available: false, reason: "mlsNumber is required" });
+    return;
+  }
+  try {
+    const result = await resolveMlsListing(mlsNumber);
+    res.json(result);
+  } catch (err) {
+    logger.warn({ err, mlsNumber }, "MLS import lookup failed");
+    res.json({
+      available: false,
+      reason: err instanceof Error ? err.message : "MLS lookup failed unexpectedly",
     });
   }
 });

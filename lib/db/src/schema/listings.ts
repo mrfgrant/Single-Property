@@ -41,6 +41,18 @@ export const listingsTable = pgTable(
     domainName: text("domain_name"),
     closedReason: text("closed_reason"),
     mlsModificationTimestamp: timestamp("mls_modification_timestamp"),
+    // Listing office name from RESO `ListOfficeName` — drives the
+    // "Listing courtesy of …" attribution required by IDX display rules.
+    // Distinct from `agents.brokerage`, which is the on-platform agent's
+    // own brokerage; for MLS-sourced listings the IDX rules require the
+    // attribution to come from the MLS feed itself.
+    mlsBrokerageName: text("mls_brokerage_name"),
+    // When WE last refreshed this row from the MLS feed (set by sync.ts
+    // on every upsert). Distinct from `mlsModificationTimestamp` — that
+    // one is the MLS row's own ModificationTimestamp inside the feed,
+    // used to drive delta watermarking. `mlsLastSyncedAt` is what we
+    // surface to consumers for "Last updated …" in the IDX footer.
+    mlsLastSyncedAt: timestamp("mls_last_synced_at"),
     // Set when the listing has been purged by the unclaimed-preview
     // cleanup job. Acts as a tombstone: the row is preserved (so the
     // MLS sync can recognize the mlsListingId and skip re-creating it),
