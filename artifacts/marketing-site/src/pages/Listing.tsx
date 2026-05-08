@@ -35,6 +35,7 @@ type FullListing = SampleListing & {
   mode?: "preview" | "live" | "disabled";
   /** MLS listing number if this row was sourced from the MLS feed. */
   mlsId?: string;
+  mlsLastSyncedAt?: string;
 };
 
 function getTokenFromUrl(): string | null {
