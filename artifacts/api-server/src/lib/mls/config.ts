@@ -41,8 +41,13 @@ export function getMlsConfig(): MlsConfig {
   const accessToken =
     process.env.MLS_ACCESS_TOKEN?.trim() ||
     (isSourceRe ? process.env.SOURCERE_JWT?.trim() || null : null);
-  const boardIdRaw = process.env.MLS_BOARD_ID?.trim() || "";
-  const boardId = boardIdRaw || "UNCONFIGURED";
+  // Default to "AUG" (Augusta) when not explicitly set — this matches
+  // the same default used by routes/onboarding.ts for out-of-market
+  // agent validation, so the two code paths agree on market identity
+  // out-of-the-box for the CSRA/Augusta deployment without requiring
+  // operators to set the secret manually.
+  const boardIdRaw = process.env.MLS_BOARD_ID?.trim() || "AUG";
+  const boardId = boardIdRaw;
 
   // Operator hint: when MLS_PROVIDER=sourcere is set but the OData base
   // URL hasn't been provided, the integration silently stays unconfigured.
@@ -56,11 +61,10 @@ export function getMlsConfig(): MlsConfig {
       "[mls] MLS_PROVIDER=sourcere with SOURCERE_JWT set, but no base URL — set MLS_BASE_URL (or SOURCERE_BASE_URL) to your SourceRE OData endpoint to enable MLS sync.",
     );
   }
-  // MLS_BOARD_ID is required for "configured" operation — it's the single
-  // source of truth for market identity used by Task #4 out-of-market
-  // detection. Without it, treat MLS as unconfigured even if URL+token
-  // are present, so downstream code never gets a UNCONFIGURED board id.
-  const fullyConfigured = Boolean(baseUrl && accessToken && boardIdRaw);
+  // "Configured" means we can actually call the MLS feed: we need a
+  // base URL and an access token. The board id always has a sensible
+  // default (see above), so it doesn't gate configured-ness.
+  const fullyConfigured = Boolean(baseUrl && accessToken);
   const deltaIntervalMs = Number(process.env.MLS_DELTA_INTERVAL_MS ?? 15 * 60_000);
   const fullSyncOnBoot = (process.env.MLS_FULL_SYNC_ON_BOOT ?? "").toLowerCase() === "true";
   const maxPhotosPerListing = Number(process.env.MLS_MAX_PHOTOS_PER_LISTING ?? 25);
