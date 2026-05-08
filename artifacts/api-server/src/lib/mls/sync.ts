@@ -90,6 +90,9 @@ const TRACKED_FIELDS: (keyof Listing)[] = [
   "listAgentMlsId", "listAgentName", "listAgentEmail", "listAgentPhone",
   "mlsStatus", "status",
   "mlsModificationTimestamp",
+  // Brokerage attribution: required by IDX rules, so a change should
+  // be treated as a content change and propagate (event emit, etc.).
+  "mlsBrokerageName",
 ];
 
 function valuesEqual(a: unknown, b: unknown): boolean {
@@ -188,7 +191,22 @@ async function upsertProperty(p: ResoProperty): Promise<string | null> {
   }
 
   const changed = diffFields(existing, mapped);
-  if (changed.length === 0) return null;
+  if (changed.length === 0) {
+    // No tracked content changes — but we still need to refresh
+    // `mlsLastSyncedAt` so the IDX "Last updated …" footer reflects
+    // the most recent successful refresh (and to backfill the field
+    // for rows that were ingested before the column existed). Skip
+    // event emission since nothing the rest of the system cares about
+    // actually changed.
+    await db
+      .update(listingsTable)
+      .set({
+        mlsLastSyncedAt: mapped.mlsLastSyncedAt ?? new Date(),
+        mlsBrokerageName: mapped.mlsBrokerageName ?? existing.mlsBrokerageName,
+      })
+      .where(eq(listingsTable.id, existing.id));
+    return null;
+  }
 
   const [updated] = await db
     .update(listingsTable)
