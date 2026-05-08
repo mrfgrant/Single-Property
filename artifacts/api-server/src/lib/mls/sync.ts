@@ -77,6 +77,7 @@ function mapResoToListing(p: ResoProperty): Partial<Listing> & { mlsListingId: s
     status,
     mlsStatus: p.StandardStatus ?? p.MlsStatus ?? null,
     mlsModificationTimestamp: p.ModificationTimestamp ? new Date(p.ModificationTimestamp) : null,
+    mlsHumanId: p.ListingId ?? null,
     mlsBrokerageName: p.ListOfficeName ?? null,
     mlsLastSyncedAt: new Date(),
     updatedAt: new Date(),
@@ -156,6 +157,7 @@ async function upsertProperty(p: ResoProperty): Promise<string | null> {
         status: mapped.status ?? "active",
         mlsStatus: mapped.mlsStatus ?? undefined,
         mlsModificationTimestamp: mapped.mlsModificationTimestamp ?? undefined,
+        mlsHumanId: mapped.mlsHumanId ?? undefined,
         mlsBrokerageName: mapped.mlsBrokerageName ?? undefined,
         mlsLastSyncedAt: mapped.mlsLastSyncedAt ?? undefined,
       })

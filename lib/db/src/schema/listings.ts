@@ -46,6 +46,12 @@ export const listingsTable = pgTable(
     // Distinct from `agents.brokerage`, which is the on-platform agent's
     // own brokerage; for MLS-sourced listings the IDX rules require the
     // attribution to come from the MLS feed itself.
+    // Human-readable MLS number (RESO `ListingId`) — what agents and
+    // public IDX disclaimers display ("MLS #1234567"). Distinct from
+    // `mls_listing_id` above, which stores the opaque RESO `ListingKey`
+    // used internally as the stable identity for sync. Some boards
+    // happen to use the same value for both; many do not.
+    mlsHumanId: text("mls_human_id"),
     mlsBrokerageName: text("mls_brokerage_name"),
     // When WE last refreshed this row from the MLS feed (set by sync.ts
     // on every upsert). Distinct from `mlsModificationTimestamp` — that

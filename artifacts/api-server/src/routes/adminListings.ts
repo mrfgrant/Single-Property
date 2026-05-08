@@ -279,12 +279,13 @@ async function resolveMlsListing(rawMlsId: string): Promise<LookupResult> {
       .join(" ")
       .trim() ||
     "";
-  // Pull a photo preview alongside the property fields so the admin
-  // form's prefill carries thumbnails over to the listing on save.
-  // Best-effort — failures don't block the lookup. The actual long-
-  // term photos get downloaded into Object Storage by the sync run
-  // that picks the row up after first save.
-  const photoUrls = await mlsClient.fetchMediaUrlsTop(p.ListingKey, 12);
+  // Photos are intentionally NOT returned in the live admin preview.
+  // Raw RESO MediaURL values are third-party CDN URLs that must not
+  // reach the browser per IDX rules. After the operator saves the
+  // imported listing, the next sync tick downloads each photo into
+  // Object Storage and rewrites listings.photoUrls to `/objects/<id>`
+  // paths served through our /api/storage proxy.
+  const photoUrls: string[] = [];
   return {
     available: true,
     source: "live",

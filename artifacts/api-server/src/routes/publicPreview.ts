@@ -78,7 +78,11 @@ router.get("/listings/preview/:id", async (req, res) => {
   res.json({
     listing: {
       id: listing.id,
-      mlsId: listing.mlsListingId,
+      // Public IDX display: prefer the human MLS# (`mls_human_id`,
+      // RESO ListingId). Fall back to mls_listing_id (which stores
+      // ListingKey from sync, but on admin-imported rows holds the
+      // human MLS# the operator typed) so legacy rows still render.
+      mlsId: listing.mlsHumanId ?? listing.mlsListingId,
       // Marketing-site URL convention is /listing/:slug — for real
       // preview rows we use the UUID as the "slug" since the table has
       // no slug column. The client treats the id field as authoritative.
