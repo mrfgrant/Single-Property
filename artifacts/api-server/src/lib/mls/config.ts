@@ -27,10 +27,35 @@ export type MlsConfig = {
 };
 
 export function getMlsConfig(): MlsConfig {
-  const baseUrl = process.env.MLS_BASE_URL?.trim() || null;
-  const accessToken = process.env.MLS_ACCESS_TOKEN?.trim() || null;
+  // Provider bridge: when MLS_PROVIDER=sourcere, allow the SourceRE-
+  // specific secret name SOURCERE_JWT to satisfy MLS_ACCESS_TOKEN, and
+  // fall back to the documented SourceRE OData base URL. This lets the
+  // existing RESO Web API plumbing (which is OData 4.0 under the hood)
+  // talk to the SourceRE feed without renaming any existing env vars.
+  const provider = (process.env.MLS_PROVIDER?.trim() || "").toLowerCase();
+  const isSourceRe = provider === "sourcere";
+
+  const baseUrl =
+    process.env.MLS_BASE_URL?.trim() ||
+    (isSourceRe ? process.env.SOURCERE_BASE_URL?.trim() || null : null);
+  const accessToken =
+    process.env.MLS_ACCESS_TOKEN?.trim() ||
+    (isSourceRe ? process.env.SOURCERE_JWT?.trim() || null : null);
   const boardIdRaw = process.env.MLS_BOARD_ID?.trim() || "";
   const boardId = boardIdRaw || "UNCONFIGURED";
+
+  // Operator hint: when MLS_PROVIDER=sourcere is set but the OData base
+  // URL hasn't been provided, the integration silently stays unconfigured.
+  // We intentionally don't hard-code a SourceRE URL default because the
+  // canonical endpoint is per-tenant — the operator must paste theirs
+  // from the SourceRE portal — but we surface a clear hint so this
+  // doesn't get diagnosed as a credential problem.
+  if (isSourceRe && accessToken && !baseUrl) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[mls] MLS_PROVIDER=sourcere with SOURCERE_JWT set, but no base URL — set MLS_BASE_URL (or SOURCERE_BASE_URL) to your SourceRE OData endpoint to enable MLS sync.",
+    );
+  }
   // MLS_BOARD_ID is required for "configured" operation — it's the single
   // source of truth for market identity used by Task #4 out-of-market
   // detection. Without it, treat MLS as unconfigured even if URL+token

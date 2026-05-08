@@ -33,6 +33,8 @@ type FullListing = SampleListing & {
   brokerageLogoUrl?: string;
   domainName?: string;
   mode?: "preview" | "live" | "disabled";
+  /** MLS listing number if this row was sourced from the MLS feed. */
+  mlsId?: string;
 };
 
 function getTokenFromUrl(): string | null {
@@ -45,10 +47,62 @@ const NAV_SECTIONS = [
   { id: "story", label: "The Home" },
   { id: "gallery", label: "Gallery" },
   { id: "details", label: "Details" },
+  { id: "location", label: "Location" },
   { id: "finance", label: "Finance" },
   { id: "share", label: "Share" },
   { id: "contact", label: "Schedule" },
 ];
+
+const GOOGLE_MAPS_API_KEY =
+  (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined) ?? "";
+
+function MapSection({ address }: { address: string }) {
+  if (!GOOGLE_MAPS_API_KEY) return null;
+  const src = `https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(
+    GOOGLE_MAPS_API_KEY,
+  )}&q=${encodeURIComponent(address)}&zoom=15`;
+  const directionsHref = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+    address,
+  )}`;
+  return (
+    <section
+      id="location"
+      className="pl-24 md:pl-32 px-6 md:px-12 py-20 md:py-28 bg-warm-white"
+    >
+      <div className="max-w-6xl mx-auto">
+        <div className="text-center mb-12">
+          <p className="text-[10px] uppercase tracking-[0.4em] text-gold mb-4">
+            Location
+          </p>
+          <h2 className="font-serif text-3xl md:text-5xl text-ink">
+            On the map
+          </h2>
+        </div>
+        <div className="aspect-[16/9] w-full overflow-hidden border border-ink/10 bg-cream">
+          <iframe
+            title={`Map of ${address}`}
+            src={src}
+            className="w-full h-full"
+            style={{ border: 0 }}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+            allowFullScreen
+          />
+        </div>
+        <div className="text-center mt-6">
+          <a
+            href={directionsHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block text-xs uppercase tracking-[0.3em] text-ink border-b border-ink/40 hover:border-ink pb-1 transition-colors"
+          >
+            Get directions →
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 function MenuRail({
   open,
@@ -266,19 +320,85 @@ function MortgageCalculator({ price }: { price: number }) {
   );
 }
 
-function LeadForm({ listingId }: { listingId?: string }) {
+const API_BASE = import.meta.env.VITE_API_URL ?? "";
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function LeadForm({
+  listingId,
+  mode,
+}: {
+  listingId?: string;
+  mode?: "preview" | "live" | "disabled";
+}) {
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const handleSubmit = (e: React.FormEvent) => {
+  const [error, setError] = useState<string | null>(null);
+
+  // Real submission only happens against a LIVE listing whose id is a
+  // server UUID. Preview/sample listings keep the demo behavior.
+  const canSubmitLive = Boolean(
+    listingId && UUID_RE.test(listingId) && mode === "live",
+  );
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    trackLeadSubmitted(listingId);
-    setSubmitted(true);
+    setError(null);
+
+    if (!canSubmitLive) {
+      // Demo mode — fire analytics, show thank-you, no API call.
+      trackLeadSubmitted(listingId);
+      setSubmitted(true);
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const fullName = `${firstName} ${lastName}`.trim();
+      const resp = await fetch(`${API_BASE}/api/leads`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          listingId,
+          name: fullName,
+          email,
+          phone: phone.trim() || undefined,
+          message: message.trim() || undefined,
+          source: "listing_site",
+        }),
+      });
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => ({}));
+        throw new Error(body?.error ?? `Request failed (${resp.status})`);
+      }
+      trackLeadSubmitted(listingId);
+      setSubmitted(true);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong. Please try again or call the agent directly.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
+
   if (submitted) {
     return (
       <div className="text-center py-12">
         <div className="text-3xl text-gold mb-4 font-serif">Thank you</div>
         <p className="text-ink font-medium">Your request has been received.</p>
-        <p className="text-sm text-muted mt-2">This is a demo — no data was saved.</p>
+        <p className="text-sm text-muted mt-2">
+          {canSubmitLive
+            ? "The listing agent will be in touch shortly."
+            : "This is a demo — no data was saved."}
+        </p>
       </div>
     );
   }
@@ -288,11 +408,15 @@ function LeadForm({ listingId }: { listingId?: string }) {
         <input
           required
           placeholder="First name"
+          value={firstName}
+          onChange={(e) => setFirstName(e.target.value)}
           className="h-11 px-0 bg-transparent text-ink border-b border-ink/30 focus:outline-none focus:border-ink placeholder:text-muted/70 text-sm"
         />
         <input
           required
           placeholder="Last name"
+          value={lastName}
+          onChange={(e) => setLastName(e.target.value)}
           className="h-11 px-0 bg-transparent text-ink border-b border-ink/30 focus:outline-none focus:border-ink placeholder:text-muted/70 text-sm"
         />
       </div>
@@ -300,29 +424,43 @@ function LeadForm({ listingId }: { listingId?: string }) {
         required
         type="email"
         placeholder="Email address"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
         className="w-full h-11 px-0 bg-transparent text-ink border-b border-ink/30 focus:outline-none focus:border-ink placeholder:text-muted/70 text-sm"
       />
       <input
         placeholder="Phone (optional)"
+        value={phone}
+        onChange={(e) => setPhone(e.target.value)}
         className="w-full h-11 px-0 bg-transparent text-ink border-b border-ink/30 focus:outline-none focus:border-ink placeholder:text-muted/70 text-sm"
       />
       <textarea
         placeholder="Message (optional)"
         rows={3}
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
         className="w-full px-0 py-3 bg-transparent text-ink border-b border-ink/30 focus:outline-none focus:border-ink placeholder:text-muted/70 text-sm resize-none"
       />
+      {error && (
+        <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded px-3 py-2">
+          {error}
+        </p>
+      )}
       <button
         type="submit"
-        className="w-full h-14 bg-ink text-warm-white text-xs uppercase tracking-[0.3em] hover:bg-ink/90 transition-colors"
+        disabled={submitting}
+        className="w-full h-14 bg-ink text-warm-white text-xs uppercase tracking-[0.3em] hover:bg-ink/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
       >
-        Request a Showing
+        {submitting ? "Sending…" : "Request a Showing"}
       </button>
-      <p className="text-center text-[11px] text-muted">
-        Demo mode — sign up to capture real leads.{" "}
-        <a href={ONBOARDING_URL} className="underline hover:text-ink">
-          Get started →
-        </a>
-      </p>
+      {!canSubmitLive && (
+        <p className="text-center text-[11px] text-muted">
+          Demo mode — sign up to capture real leads.{" "}
+          <a href={ONBOARDING_URL} className="underline hover:text-ink">
+            Get started →
+          </a>
+        </p>
+      )}
     </form>
   );
 }
@@ -647,6 +785,9 @@ export default function Listing() {
         </div>
       </section>
 
+      {/* LOCATION / MAP */}
+      <MapSection address={fullAddress} />
+
       {/* GALLERY */}
       {remainingGallery.length > 0 && (
         <section id="gallery" className="pl-24 md:pl-32 px-0 md:px-0 py-20 md:py-28 bg-warm-white">
@@ -801,7 +942,7 @@ export default function Listing() {
             <p className="text-xs text-muted mb-8">
               We'll connect you with the agent in under a minute.
             </p>
-            <LeadForm listingId={listing.id} />
+            <LeadForm listingId={listing.id} mode={listing.mode} />
           </div>
         </div>
       </section>
@@ -821,6 +962,27 @@ export default function Listing() {
             </span>
           </Link>
         </div>
+        {/* IDX / MLS attribution — required when listing data comes from
+            the MLS. Shown only for MLS-sourced rows so demo and self-
+            entered listings stay clean. */}
+        {listing.mlsId && (
+          <div className="max-w-6xl mx-auto mt-8 pt-6 border-t border-ink/10 text-[11px] text-muted leading-relaxed">
+            <p>
+              MLS #{listing.mlsId}
+              {listing.agentBrokerage
+                ? ` · Listing courtesy of ${listing.agentBrokerage}`
+                : ""}
+            </p>
+            <p className="mt-1">
+              Listing data is provided by participating MLS members and is
+              deemed reliable but not guaranteed. Information is provided
+              exclusively for consumers' personal, non-commercial use and
+              may not be used for any purpose other than to identify
+              prospective properties consumers may be interested in
+              purchasing.
+            </p>
+          </div>
+        )}
       </footer>
 
       {/* MOBILE STICKY CTA */}

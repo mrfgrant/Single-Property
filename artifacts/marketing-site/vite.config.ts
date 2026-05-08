@@ -6,9 +6,17 @@ import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
 const port = Number(process.env.PORT ?? 5173);
 const basePath = process.env.BASE_PATH ?? "/";
+// Bridge the server-side `GOOGLE_MAPS_API_KEY` secret into the Vite client
+// bundle as `VITE_GOOGLE_MAPS_API_KEY` so the listing page can render
+// the embedded map without forcing operators to duplicate the secret
+// under a `VITE_*` name.
+const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY ?? "";
 
 export default defineConfig({
   base: basePath,
+  define: {
+    "import.meta.env.VITE_GOOGLE_MAPS_API_KEY": JSON.stringify(googleMapsApiKey),
+  },
   plugins: [
     react(),
     tailwindcss(),

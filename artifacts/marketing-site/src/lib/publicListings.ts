@@ -47,6 +47,8 @@ export interface PublicListing extends SampleListing {
   domainName?: string;
   /** Real listings.mode. Used by the activation banner to switch between claim/activate CTAs. */
   mode?: "preview" | "live" | "disabled";
+  /** MLS listing number when sourced from the MLS — drives the IDX disclaimer. */
+  mlsId?: string;
 }
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
@@ -99,6 +101,7 @@ export function apiToPublicListing(row: ApiListing): PublicListing {
       row.mode === "preview" || row.mode === "live" || row.mode === "disabled"
         ? row.mode
         : undefined,
+    mlsId: row.mlsId ?? undefined,
   };
 }
 
