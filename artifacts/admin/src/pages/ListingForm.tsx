@@ -411,24 +411,10 @@ export default function ListingForm({ listing, onSave, onCancel }: Props) {
             </div>
           </div>
 
-          {/* Neighborhood Scores */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
-            <h3 className="text-sm font-semibold text-gray-900 mb-5 pb-3 border-b border-gray-100">Neighborhood Scores (0–100)</h3>
-            <div className="grid grid-cols-4 gap-4">
-              <Field label="Walk Score">
-                <input className={inputClass} type="number" min={0} max={100} {...numericField("walkScore")} placeholder="72" />
-              </Field>
-              <Field label="Bike Score">
-                <input className={inputClass} type="number" min={0} max={100} {...numericField("bikeScore")} placeholder="58" />
-              </Field>
-              <Field label="School Rating (0–10)">
-                <input className={inputClass} type="number" min={0} max={10} {...numericField("schoolRating")} placeholder="8" />
-              </Field>
-              <Field label="Transit Score">
-                <input className={inputClass} type="number" min={0} max={100} {...numericField("transitScore")} placeholder="34" />
-              </Field>
-            </div>
-          </div>
+          {/* Neighborhood Scores section removed — no automated source available
+              (MLS feeds don't expose Walk/Bike/Transit/Schools). DB columns kept
+              so existing data isn't lost; re-enable this UI if a scores
+              integration (Walk Score / GreatSchools / Niche) is added. */}
 
           {/* Agent Info */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">

@@ -766,23 +766,7 @@ export default function Listing() {
             ))}
           </dl>
 
-          {(listing.walkScore || listing.bikeScore || listing.schoolRating || listing.transitScore) && (
-            <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto">
-              {[
-                ["Walk", listing.walkScore],
-                ["Bike", listing.bikeScore],
-                ["Schools", Math.round(listing.schoolRating * 10)],
-                ["Transit", listing.transitScore],
-              ].map(([label, score], i) => (
-                <div key={i} className="text-center">
-                  <p className="font-serif text-2xl text-ink">{score}</p>
-                  <p className="text-[10px] uppercase tracking-[0.3em] text-muted mt-2">
-                    {label} Score
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
+          {/* Neighborhood scores hidden — no automated source available; revisit if a Walk Score / GreatSchools integration is added. */}
         </div>
       </section>
 
