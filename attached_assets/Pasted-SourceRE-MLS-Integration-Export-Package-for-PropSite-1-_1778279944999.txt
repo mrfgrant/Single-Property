@@ -1,0 +1,323 @@
+SourceRE MLS Integration — Export Package for PropSite
+1. Credentials & Connection
+API Base URL
+https://api.sourceredb.com/odata
+
+The only endpoint in use is /Property (RESO-standard OData entity set).
+
+Secrets / Env Vars to Copy
+Name	Type	Detail
+SOURCERE_JWT	Secret	Copy the value from this project's secrets. This is the Bearer token.
+MLS_PROVIDER	Env var	Set to sourcere to activate. Default is local (returns stub data).
+Auth Method
+Authorization: Bearer <SOURCERE_JWT>
+Accept: application/json
+
+This is a long-lived JWT supplied directly by SourceRE — there is no OAuth2 flow, no client credentials exchange, and no refresh endpoint. When the token expires you request a replacement from SourceRE support. The code detects expiry via a 401 response and falls back to stub data automatically.
+
+MLS Boards / Feed Coverage
+The key covers the CSRA (Central Savannah River Area) feed under the Greater Augusta Association of REALTORS® (GAAR), which also includes the Aiken Board. Seven markets:
+
+Augusta, GA · Evans, GA · Martinez, GA · Grovetown, GA · Hephzibah, GA
+North Augusta, SC · Aiken, SC
+All queries hard-filter to these cities via:
+
+(City eq 'Augusta' or City eq 'Evans' or City eq 'Martinez' or City eq 'Grovetown'
+ or City eq 'Hephzibah' or City eq 'North Augusta' or City eq 'Aiken')
+
+Replace these with PropSite's geography.
+
+Rate Limits
+SourceRE hasn't published documented limits and we haven't hit any, but keep $top ≤ 200 and cache aggressively. Our cadence: search results cache 15 min, single listing 30 min, photos 24 h.
+
+Hard-Won OData Gotchas
+These will each cost you a day to rediscover on your own:
+
+Problem	What happens	Fix
+$orderby=CloseDate desc on closed listings	HTTP 500	Remove $orderby entirely from comp queries
+BuildingAreaTotal ge N in $filter	HTTP 500	Sqft fields are not OData-filterable. Over-fetch, filter client-side.
+LivingArea ge N in $filter	HTTP 500	Same — not filterable
+CloseDate ge 2025-11-10T00:00:00Z	HTTP 500	CloseDate is Edm.Date (date-only). Use 2025-11-10, not an ISO timestamp.
+SourceRE sqft field	LivingArea is almost always null	Always resolve: BuildingAreaTotal ?? LivingArea ?? AboveGradeFinishedArea
+Two ID fields	Confusing	ListingKey = stable hex key (use in URLs). ListingId = human MLS# (show to users).
+2. Database Schema
+No listings table — live pull only
+The live MLS feed is never written to Postgres. All listing data is on-demand pull from SourceRE, cached in-process. There is nothing to migrate for the core MLS integration.
+
+Tables that do reference MLS data
+saved_searches — buyer saved-search email alerts
+
+CREATE TABLE saved_searches (
+  id               SERIAL PRIMARY KEY,
+  email            TEXT NOT NULL,
+  name             TEXT NOT NULL DEFAULT 'Saved Search',
+  filters          JSONB NOT NULL DEFAULT '{}',
+  token            TEXT NOT NULL UNIQUE,          -- unsubscribe token
+  last_run_at      TIMESTAMPTZ,
+  seen_mls_numbers JSONB NOT NULL DEFAULT '[]',   -- array of ListingKey strings
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX saved_searches_email_idx ON saved_searches(email);
+CREATE INDEX saved_searches_token_idx ON saved_searches(token);
+
+filters JSONB shape:
+
+{ "listingType": "sale", "city": "Evans", "type": "Single Family Residence",
+  "minPrice": 300000, "maxPrice": 500000, "minBeds": 3 }
+
+saved_search_lookup_tokens — magic-link email verification for the "manage my searches" page
+
+CREATE TABLE saved_search_lookup_tokens (
+  id         SERIAL PRIMARY KEY,
+  token      TEXT NOT NULL UNIQUE,
+  email      TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,   -- 1-hour TTL
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+RTS transaction MLS columns (only relevant if PropSite has a transaction-management module):
+
+ALTER TABLE rts_transactions ADD COLUMN mls_number TEXT;
+ALTER TABLE rts_transactions ADD COLUMN mls_status TEXT;
+ALTER TABLE rts_transactions ADD COLUMN mls_list_date TIMESTAMPTZ;
+ALTER TABLE rts_transactions ADD COLUMN mls_expiration_date TIMESTAMPTZ;
+ALTER TABLE rts_transactions ADD COLUMN listing_agent_name TEXT;
+ALTER TABLE rts_transactions ADD COLUMN listing_agent_license TEXT;
+ALTER TABLE rts_transactions ADD COLUMN listing_agent_phone TEXT;
+ALTER TABLE rts_transactions ADD COLUMN listing_agent_email TEXT;
+ALTER TABLE rts_transactions ADD COLUMN listing_brokerage TEXT;
+ALTER TABLE rts_transactions ADD COLUMN mls_raw_data JSONB;
+ALTER TABLE rts_transactions ADD COLUMN mls_imported_at TIMESTAMPTZ;
+
+3. Field Mapping
+Active Listings: SourceRE → Internal
+SourceRE Field	Internal Field	Notes
+ListingKey	mlsNumber	Hex string, stable. Use in page URLs.
+ListingId	displayMlsId	e.g. "24015678". Show to users as "MLS#".
+UnparsedAddress	address	Fallback: StreetNumber + " " + StreetName
+City	city	
+StateOrProvince	state	
+PostalCode	zip	
+ListPrice	listPrice	number
+BedroomsTotal	beds	
+BathroomsTotalDecimal ?? BathroomsTotalInteger	baths	Prefer Decimal (includes half-baths)
+BuildingAreaTotal ?? LivingArea ?? AboveGradeFinishedArea	sqft	Always use this fallback chain
+YearBuilt	yearBuilt	
+LotSizeAcres ?? (LotSizeSquareFeet / 43560)	lotSizeAcres	
+PropertySubType ?? PropertyType	propertyType	Prefer SubType
+StandardStatus	mlsStatus	See status enum below
+CountyOrParish	county	
+SubdivisionName	subdivision	optional
+ParcelNumber	parcelNumber	optional
+DaysOnMarket	daysOnMarket	
+ListAgentFullName	listingAgentName	
+ListAgentMlsId	listingAgentLicense	
+ListAgentDirectPhone	listingAgentPhone	⚠ keep server-side only
+ListAgentEmail	listingAgentEmail	⚠ keep server-side only
+ListOfficeName	listingBrokerage	Used in "Listing courtesy of…"
+PublicRemarks	publicRemarks	
+PrivateRemarks	NEVER EXPOSE	Strip at API boundary
+GarageSpaces	garageSpaces	
+GarageYN	hasGarage	fallback: GarageSpaces > 0
+PoolPrivateYN	hasPool	
+Cooling[]	cooling	string array
+Heating[]	heating	string array
+FireplacesTotal	fireplaces	
+Basement[]	basement	
+AssociationFee	hoaFee	
+AssociationFeeFrequency	hoaFeeFrequency	
+AssociationYN	hasHoa	
+Levels[]	levels	
+PropertyCondition[]	propertyCondition	
+Media[].MediaURL (sorted by Order asc)	photos[]	Raw CDN URLs — proxy server-side, never send to browser
+Rooms[]	rooms[]	{type, description, lengthFt, widthFt, level}
+Closed Comps (CMA): SourceRE → Internal
+SourceRE Field	Comp Field	Notes
+ListingKey ?? ListingId	mlsNumber	
+ClosePrice	closePrice	
+CloseDate	closeDate	string, YYYY-MM-DD
+sqft fallback chain	sqft	same as above
+Derived closePrice / sqft	pricePerSqft	rounded to 2 decimals
+StandardStatus Enum
+Active · Closed · Pending · Active Under Contract · Withdrawn · Expired
+
+Listing Type Filter
+For-sale: PropertyType ne 'Residential Lease' and PropertyType ne 'Commercial Lease'
+For-rent: PropertyType eq 'Residential Lease'
+
+4. Sync Code
+Architecture: pull-on-demand, no background sync
+There is no cron sync job that writes listings to the database. Every request hits SourceRE live, results are cached in-process (Node Maps + LRU), and the cache is lost on server restart.
+
+Provider Interface (TypeScript)
+interface MlsProvider {
+  search(query: string): Promise<MlsSearchResult[]>;       // typeahead
+  getListing(key: string): Promise<MlsListing | null>;     // detail page
+  getListings(filters: ListingFilters): Promise<MlsListing[]>; // search/browse
+  searchComps(opts: CompSearchOptions): Promise<MlsComp[]>; // CMA
+}
+
+Queries Made to SourceRE
+search(query) — typeahead (10 results, thumbnail only)
+
+GET /odata/Property
+  $filter = StandardStatus eq 'Active' and [CITY_FILTER] and [FOR_SALE_FILTER]
+            and (contains(UnparsedAddress,'...') or contains(ListingId,'...') or ListingKey eq '...')
+  $top = 10
+  $select = ListingKey,ListingId,UnparsedAddress,City,StateOrProvince,PostalCode,
+            ListPrice,BedroomsTotal,BathroomsTotalDecimal,BathroomsTotalInteger,
+            LivingArea,BuildingAreaTotal,AboveGradeFinishedArea,StandardStatus
+  $expand = Media($top=1;$orderby=Order asc)
+
+getListing(mlsKey) — full detail page
+
+GET /odata/Property
+  $filter = ListingKey eq '...' or ListingId eq '...'
+  $top = 1
+  $expand = Media($orderby=Order asc),Rooms
+
+No $select — fetch all fields.
+
+getListings(filters) — search/browse (up to 200)
+
+GET /odata/Property
+  $filter = StandardStatus eq 'Active' and [CITY_FILTER] and [TYPE_FILTER]
+            [+ City, PostalCode, ListPrice ge/le, BedroomsTotal ge, ListOfficeName, PropertySubType]
+  $orderby = DaysOnMarket asc | ListPrice asc | ListPrice desc | LivingArea desc
+  $top = 50–200
+  $expand = Media
+
+searchComps(opts) — CMA comparable sales
+
+GET /odata/Property
+  $filter = StandardStatus eq 'Closed' and [CITY_FILTER]
+            and CloseDate ge YYYY-MM-DD          ← 180-day lookback, DATE ONLY
+            and BedroomsTotal ge N-1 and BedroomsTotal le N+1
+            [and PostalCode eq '...']
+  $top = 50
+  $select = ListingKey,ListingId,UnparsedAddress,StreetNumber,StreetName,City,
+            StateOrProvince,PostalCode,BedroomsTotal,BathroomsTotalInteger,
+            BathroomsTotalDecimal,LivingArea,BuildingAreaTotal,AboveGradeFinishedArea,
+            ClosePrice,CloseDate,DaysOnMarket
+
+⚠ No $orderby. ⚠ No sqft in $filter. Apply sqft ±30% band client-side after fetch.
+
+Pagination
+async function odataFetchAll(jwt, startUrl, limit) {
+  const results = [];
+  let nextUrl = startUrl;
+  while (nextUrl && results.length < limit) {
+    const res = await fetch(nextUrl, {
+      headers: { Authorization: `Bearer ${jwt}`, Accept: "application/json" }
+    });
+    if (res.status === 401) return null; // JWT expired → caller falls back to stub
+    if (!res.ok) throw new Error(`OData ${res.status}`);
+    const json = await res.json();
+    results.push(...json.value);
+    nextUrl = json["@odata.nextLink"];
+  }
+  return results;
+}
+
+In-Process Cache
+Cache	Key	TTL	Structure
+Listings list	JSON.stringify(filters)	15 min	Map<string, {data, cachedAt}>
+Single listing	mlsKey	30 min	Map<string, {data, cachedAt}>
+Photo buffer	mlsKey:photoIndex	24 h	LRU Map, max 500 entries
+Configure photo cache size: PHOTO_CACHE_MAX_ENTRIES env var (default 500). At ~100–400 KB per photo, 500 entries ≈ 50–200 MB worst-case.
+
+Photo Handling
+Photos are proxied server-side — raw SourceRE CDN URLs never reach the browser.
+
+Flow:
+
+Media[].MediaURL comes from SourceRE (CDN on sourceredb.com, cdn.sourceredb.com, etc.)
+API rewrites all photo references to: /api/listings/:mlsKey/photos/:index
+Proxy route validates the host against an allowlist, fetches from CDN, caches buffer, serves with ETag + Cache-Control: public, max-age=86400, stale-while-revalidate=3600
+SSRF allowlist (only fetch from these hosts, HTTPS only):
+
+sourceredb.com, cdn.sourceredb.com, media.sourceredb.com,
+mlsmatrix.com, cdnparap.paragonrels.com,
+s3.amazonaws.com, storage.googleapis.com
+
+No object storage. Photos live in memory only.
+
+Alert Job (saved searches)
+Runs every 4 hours via setInterval. For each row in saved_searches:
+
+Calls mlsProvider.getListings(filters)
+Diffs result against seen_mls_numbers array
+First run: seeds the seen list, sends no email (avoids flooding)
+Subsequent runs: emails new matches via Resend (max 10 cards per email)
+Updates seen_mls_numbers and last_run_at only after a confirmed send
+5. Compliance / Display Requirements
+Required IDX Disclaimer Text
+Must appear on every page that shows IDX listing data — search results, detail pages, and site footer:
+
+IDX information is provided exclusively for consumers' personal, non-commercial use and may not be used for any purpose other than to identify prospective properties consumers may be interested in purchasing. Listing data © [year] REALTORS® of Greater Augusta. Data is deemed reliable but is not guaranteed accurate by the MLS.
+
+In this project it appears in three places: the site-wide footer, inline below search results, and the Terms page.
+
+"Last Updated" Timestamp
+Show alongside the IDX disclaimer on search result pages. The /api/listings response includes updatedAt (ISO string). Display format used here:
+
+Last updated Dec 14, 2025, 3:45 PM
+
+Per-Listing Attribution
+On every listing card and every detail page, when listingBrokerage is non-empty:
+
+Listing courtesy of [ListOfficeName]
+
+No logo required in this implementation (text only). Check with your specific MLS board — some require a board logo badge.
+
+Fields That Must NOT Be Publicly Displayed
+Field	Reason
+PrivateRemarks	Agent-only confidential notes — fetched from SourceRE but stripped in sanitizeListing() before the API response
+Agent email / direct phone	Present in the server-side MlsListing type but not included in PublicListing (browser-facing type) — stripped at the API boundary
+Seller name / contact	Not in the SourceRE feed
+Commission sides (commissionListSide, commissionBuySide)	Defined in the type but never populated from SourceRE; never sent to browser
+Lockbox codes / showing instructions	Not in the SourceRE feed
+The sanitizeListing() function in routes/listings.ts is the strip boundary — anything not explicitly in PublicListing doesn't leave the server.
+
+6. UX Flow
+Consumer Search
+No "connect a listing" step — listings display directly from the live feed filtered to your geography.
+
+/homes-for-sale → user sets filters (city, price range, beds, property type, sort) → GET /api/listings?...
+Property card → /homes-for-sale/:ListingKey → GET /api/listings/:mlsKey
+URL uses ListingKey (hex). UI shows ListingId as "MLS# 24015678".
+Typeahead: search box calls GET /api/listings/search?q=... → matches address or MLS# → returns 10 results with thumbnail.
+
+Status Changes
+No confirmation flow — data is always live-pulled. When a listing goes Pending or Closes:
+
+The in-process cache will serve the last-known state for up to 30 minutes, then the updated status is fetched from SourceRE automatically
+No webhook or push mechanism — eventual consistency with a ≤30-minute lag
+For real-time status handling you'd need a SourceRE push webhook (check with their support) or a much shorter cache TTL.
+
+CMA Flow (agent-facing)
+Agent fills CMA form: subject address, beds, sqft, condition, zip
+POST /api/leads (variant: "cma") → creates lead, sends verification code via Resend
+Agent enters code → POST /api/leads/:id/cma-verify → runCma() → mlsProvider.searchComps()
+Returns: price range (P25/P50/P75 of $/sqft × subject sqft × condition multiplier) + up to 50 comparable sales
+POST /api/leads/:id/cma-report sends a full HTML report email via Resend
+Saved Search / Alert Flow (buyer-facing)
+Buyer sets filters, clicks "Save Search" → modal collects email → POST /api/saved-searches → confirmation email via Resend
+Alert job runs every 4 hours → diffs current results against seen_mls_numbers → emails new matches (10-card HTML email, with proxy photo URLs pointing at the site)
+Buyer manages alerts at /my-searches — accessed via magic link sent to their email (1-hour token TTL)
+Each alert email footer includes an unsubscribe link: /api/saved-searches/unsubscribe/:token
+Files to Port to PropSite
+File	What it does
+artifacts/api-server/src/lib/mls/index.ts	Provider interface + TypeScript types + provider selector
+artifacts/api-server/src/lib/mls/sourcereProvider.ts	Full SourceRE OData client — all four query methods
+artifacts/api-server/src/routes/listings.ts	Express routes + photo proxy + SSRF protection + in-process cache
+artifacts/api-server/src/lib/savedSearchAlerts.ts	4-hour alert job
+artifacts/api-server/src/routes/savedSearches.ts	Saved search CRUD API + magic-link routes
+artifacts/forrest-g-realty/src/lib/mlsApi.ts	Browser-side fetchListings() / fetchListing() helpers
+artifacts/forrest-g-realty/src/types/listing.ts	PublicListing TypeScript type (browser-facing shape)
+Secrets to add to PropSite:
+
+SOURCERE_JWT — copy the token value
+MLS_PROVIDER=sourcere — env var (not a secret)
+SITE_URL — set to PropSite's production URL (used in alert email links)
+RESEND_API_KEY — if using the same Resend account, or set up a new one
