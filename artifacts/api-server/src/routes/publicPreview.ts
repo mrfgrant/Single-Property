@@ -65,8 +65,14 @@ router.get("/listings/preview/:id", async (req, res) => {
     }
   }
   // Fallback to MLS-sourced agent fields when no agent is linked yet.
+  // SANITIZATION: only the MLS-published "preferred phone" and email
+  // (RESO ListAgentPreferredPhone / ListAgentEmail) are public IDX
+  // fields. listAgentDirectPhone / listAgentMobilePhone are internal-
+  // only — collected for our cold-outreach SMS targeting (see
+  // lib/outreach/phone.ts) — and MUST NOT leak to the browser per IDX
+  // private-field rules.
   if (!agentName) agentName = listing.listAgentName ?? null;
-  if (!agentPhone) agentPhone = listing.listAgentMobilePhone ?? listing.listAgentDirectPhone ?? listing.listAgentPhone ?? null;
+  if (!agentPhone) agentPhone = listing.listAgentPhone ?? null;
   if (!agentEmail) agentEmail = listing.listAgentEmail ?? null;
 
   res.json({

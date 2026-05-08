@@ -133,12 +133,24 @@ export class MlsClient {
     }
   }
 
-  async fetchMediaForListing(listingKey: string): Promise<ResoMedia[]> {
+  async fetchMediaUrlsTop(listingKey: string, top = 25): Promise<string[]> {
+    try {
+      const media = await this.fetchMediaForListing(listingKey, top);
+      return media
+        .sort((a, b) => (a.Order ?? 0) - (b.Order ?? 0))
+        .map((m) => m.MediaURL)
+        .filter((u): u is string => Boolean(u));
+    } catch {
+      return [];
+    }
+  }
+
+  async fetchMediaForListing(listingKey: string, topOverride?: number): Promise<ResoMedia[]> {
     const { mediaResource, maxPhotosPerListing } = this.cfg;
     const params: Record<string, string> = {
       $filter: `ResourceRecordKey eq '${listingKey.replace(/'/g, "''")}' and ResourceName eq 'Property'`,
       $orderby: "Order asc",
-      $top: String(maxPhotosPerListing),
+      $top: String(topOverride ?? maxPhotosPerListing),
     };
     const url = this.buildUrl(mediaResource, params);
     const page = await this.odataGet<ResoMedia>(url);

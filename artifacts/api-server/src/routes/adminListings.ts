@@ -279,6 +279,12 @@ async function resolveMlsListing(rawMlsId: string): Promise<LookupResult> {
       .join(" ")
       .trim() ||
     "";
+  // Pull a photo preview alongside the property fields so the admin
+  // form's prefill carries thumbnails over to the listing on save.
+  // Best-effort — failures don't block the lookup. The actual long-
+  // term photos get downloaded into Object Storage by the sync run
+  // that picks the row up after first save.
+  const photoUrls = await mlsClient.fetchMediaUrlsTop(p.ListingKey, 12);
   return {
     available: true,
     source: "live",
@@ -299,6 +305,7 @@ async function resolveMlsListing(rawMlsId: string): Promise<LookupResult> {
       agentEmail: p.ListAgentEmail ?? "",
       agentPhone: p.ListAgentPreferredPhone ?? "",
       agentBrokerage: p.ListOfficeName ?? "",
+      photoUrls,
     },
   };
 }
