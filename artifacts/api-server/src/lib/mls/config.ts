@@ -35,9 +35,20 @@ export function getMlsConfig(): MlsConfig {
   const provider = (process.env.MLS_PROVIDER?.trim() || "").toLowerCase();
   const isSourceRe = provider === "sourcere";
 
-  const baseUrl =
+  const rawBaseUrl =
     process.env.MLS_BASE_URL?.trim() ||
     (isSourceRe ? process.env.SOURCERE_BASE_URL?.trim() || null : null);
+  // Operators frequently paste the URL straight from the SourceRE
+  // portal which often points at a specific OData entity set
+  // (e.g. ".../odata/Property" or ".../odata/Media"). The client
+  // appends the resource itself when building requests, so strip a
+  // trailing "/Property" or "/Media" suffix and any trailing slash
+  // so either form works.
+  const baseUrl = rawBaseUrl
+    ? rawBaseUrl
+        .replace(/\/(Property|Media)\/?$/i, "")
+        .replace(/\/$/, "")
+    : null;
   const accessToken =
     process.env.MLS_ACCESS_TOKEN?.trim() ||
     (isSourceRe ? process.env.SOURCERE_JWT?.trim() || null : null);
