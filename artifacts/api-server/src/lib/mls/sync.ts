@@ -205,6 +205,7 @@ async function upsertProperty(p: ResoProperty): Promise<string | null> {
       .set({
         mlsLastSyncedAt: mapped.mlsLastSyncedAt ?? new Date(),
         mlsBrokerageName: mapped.mlsBrokerageName ?? existing.mlsBrokerageName,
+        mlsHumanId: mapped.mlsHumanId ?? existing.mlsHumanId,
       })
       .where(eq(listingsTable.id, existing.id));
     return null;
