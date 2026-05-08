@@ -197,7 +197,22 @@ export default function ListingForm({ listing, onSave, onCancel }: Props) {
       if (!res.available) {
         setMlsMsg("MLS integration not yet configured — please enter listing details manually.");
       } else if (res.data) {
-        setForm((prev) => ({ ...prev, ...res.data, mlsId: mlsId.trim() }));
+        setForm((prev) => {
+          const merged = { ...prev, ...res.data, mlsId: mlsId.trim() };
+          // Auto-generate slug from MLS-prefilled address/city/state.
+          // The handleChange path only computes slug on direct input,
+          // so MLS prefill needs its own slug derivation here. Only
+          // overwrite the slug on new (non-edit) listings to avoid
+          // clobbering an existing public URL.
+          if (!isEdit) {
+            merged.slug = slugify(
+              merged.address ?? "",
+              merged.city ?? "",
+              merged.state ?? "",
+            );
+          }
+          return merged;
+        });
         setTab("manual");
         setMlsMsg("Fields pre-populated from MLS. Review and save.");
       }
