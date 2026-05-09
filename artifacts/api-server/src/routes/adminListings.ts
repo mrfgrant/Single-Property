@@ -298,7 +298,9 @@ async function resolveMlsListing(rawMlsId: string): Promise<LookupResult> {
       priceUsd: p.ListPrice ?? undefined,
       beds: p.BedroomsTotal ?? undefined,
       baths: p.BathroomsTotalDecimal ?? p.BathroomsTotalInteger ?? undefined,
-      sqft: p.LivingArea ?? undefined,
+      // SourceRE uses BuildingAreaTotal; LivingArea is almost always null.
+      // Round to integer — the DB column is integer and SourceRE can return floats.
+      sqft: Math.round(p.BuildingAreaTotal ?? p.LivingArea ?? p.AboveGradeFinishedArea ?? 0) || undefined,
       lotAcres: p.LotSizeAcres ?? undefined,
       yearBuilt: p.YearBuilt ?? undefined,
       description: p.PublicRemarks ?? "",

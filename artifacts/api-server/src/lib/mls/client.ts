@@ -42,6 +42,8 @@ export type ResoProperty = {
   BathroomsTotalInteger?: number;
   BathroomsTotalDecimal?: number;
   LivingArea?: number;
+  BuildingAreaTotal?: number;
+  AboveGradeFinishedArea?: number;
   LotSizeAcres?: number;
   YearBuilt?: number;
   PublicRemarks?: string;
