@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "QVzgOIuxkRpcPYhjaoLgm"
+uri = "file://agents-export.csv"
+type = "table"
+title = "MLS Agents Export"
