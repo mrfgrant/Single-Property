@@ -7,6 +7,7 @@ import { adminAuth } from "../middleware/adminAuth.js";
 import { ObjectStorageService } from "../lib/objectStorage.js";
 import { mlsClient, type ResoProperty } from "../lib/mls/client.js";
 import { getMlsConfig } from "../lib/mls/config.js";
+import { downloadAndStorePhoto } from "../lib/mls/photoUtils.js";
 import { logger } from "../lib/logger.js";
 
 const router = Router();
@@ -21,6 +22,101 @@ const upload = multer({
 });
 
 const objectStorage = new ObjectStorageService();
+
+/**
+ * Resolve the opaque RESO ListingKey from a human MLS# (ListingId).
+ *
+ * Resolution order:
+ *  1. `listings` table — row may already have the ListingKey in
+ *     `mls_listing_id` if the background sync has ingested it.
+ *  2. Live RESO query — authoritative fallback for listings that
+ *     haven't been ingested yet.
+ *
+ * Returns null if MLS is unconfigured or the listing can't be found.
+ */
+async function resolveListingKey(mlsId: string): Promise<string | null> {
+  const trimmed = mlsId.trim();
+  if (!trimmed) return null;
+
+  // Try the sync cache first (mlsHumanId stores the human ListingId).
+  const [cached] = await db
+    .select({ listingKey: listingsTable.mlsListingId })
+    .from(listingsTable)
+    .where(eq(listingsTable.mlsHumanId, trimmed))
+    .limit(1);
+  if (cached?.listingKey) return cached.listingKey;
+
+  // Fall back to a live RESO query filtered by ListingId.
+  const cfg = getMlsConfig();
+  if (!cfg.configured) return null;
+  try {
+    const safe = trimmed.replace(/'/g, "''");
+    for await (const page of mlsClient.iterateProperties({
+      filter: `ListingId eq '${safe}'`,
+      top: 1,
+    })) {
+      if (page.length > 0) return page[0].ListingKey;
+    }
+  } catch (err) {
+    logger.warn({ err, mlsId: trimmed }, "resolveListingKey live query failed");
+  }
+  return null;
+}
+
+/**
+ * Fire-and-forget: fetch MLS photos for an example listing and store
+ * them in Object Storage, then write the `/objects/…` paths back to
+ * `example_listings.photo_urls`.
+ *
+ * Skips silently if:
+ *  - the listing already has photos (re-save idempotency)
+ *  - MLS is unconfigured
+ *  - the ListingKey can't be resolved
+ *  - any photo download/upload fails (those photos are omitted)
+ */
+async function triggerMlsPhotoSync(exampleListingId: string, mlsId: string): Promise<void> {
+  try {
+    // Re-read the row so we always have the freshest photoUrls state.
+    const [row] = await db
+      .select({ photoUrls: exampleListingsTable.photoUrls })
+      .from(exampleListingsTable)
+      .where(eq(exampleListingsTable.id, exampleListingId))
+      .limit(1);
+
+    // Skip if photos already populated (manual upload or previous sync).
+    if (row?.photoUrls && row.photoUrls.length > 0) return;
+
+    const listingKey = await resolveListingKey(mlsId);
+    if (!listingKey) {
+      logger.warn({ exampleListingId, mlsId }, "MLS photo sync: could not resolve ListingKey");
+      return;
+    }
+
+    const media = await mlsClient.fetchMediaForListing(listingKey);
+    if (media.length === 0) return;
+
+    const stored: string[] = [];
+    for (const m of media.sort((a, b) => (a.Order ?? 0) - (b.Order ?? 0))) {
+      if (!m.MediaURL) continue;
+      const path = await downloadAndStorePhoto(m.MediaURL);
+      if (path) stored.push(path);
+    }
+
+    if (stored.length === 0) return;
+
+    await db
+      .update(exampleListingsTable)
+      .set({ photoUrls: stored, updatedAt: new Date() })
+      .where(eq(exampleListingsTable.id, exampleListingId));
+
+    logger.info(
+      { exampleListingId, mlsId, photoCount: stored.length },
+      "MLS photo sync: stored photos for example listing",
+    );
+  } catch (err) {
+    logger.warn({ err, exampleListingId, mlsId }, "MLS photo sync failed");
+  }
+}
 
 /* GET /admin/listings */
 router.get("/admin/listings", adminAuth, async (_req, res) => {
@@ -40,6 +136,11 @@ router.post("/admin/listings", adminAuth, async (req, res) => {
   }
   const [row] = await db.insert(exampleListingsTable).values(parsed.data).returning();
   res.status(201).json({ listing: row });
+  // Fire-and-forget: download MLS photos and proxy them into Object Storage.
+  // Response is already sent; this runs in the background without blocking the client.
+  if (row.mlsId) {
+    void triggerMlsPhotoSync(row.id, row.mlsId);
+  }
 });
 
 /* PATCH /admin/listings/:id */
@@ -56,6 +157,10 @@ router.patch("/admin/listings/:id", adminAuth, async (req, res) => {
     .returning();
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
   res.json({ listing: row });
+  // Fire-and-forget: sync photos if this listing has an MLS# and no photos yet.
+  if (row.mlsId) {
+    void triggerMlsPhotoSync(row.id, row.mlsId);
+  }
 });
 
 /* DELETE /admin/listings/:id — hard delete */

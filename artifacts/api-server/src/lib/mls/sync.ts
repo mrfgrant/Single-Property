@@ -12,43 +12,7 @@ import { logger } from "../logger.js";
 import { mlsClient, MlsNotConfiguredError, type ResoProperty } from "./client.js";
 import { mlsEventBus } from "./eventBus.js";
 import { getMlsConfig, normalizeStatus } from "./config.js";
-import { ObjectStorageService } from "../objectStorage.js";
-
-const objectStorage = new ObjectStorageService();
-
-/**
- * Download a remote MLS photo and upload it into Object Storage so the
- * site renderer can serve it from our domain (and survive MLS URL churn).
- * Returns the canonical `/objects/<entityId>` path, or `null` if either
- * the download or upload fails. Failures are logged and swallowed — the
- * sync loop must not crash on a single bad photo.
- */
-async function downloadAndStorePhoto(sourceUrl: string): Promise<string | null> {
-  try {
-    const resp = await fetch(sourceUrl, { signal: AbortSignal.timeout(30_000) });
-    if (!resp.ok) {
-      logger.warn({ sourceUrl, status: resp.status }, "Photo download failed");
-      return null;
-    }
-    const contentType = resp.headers.get("content-type") || "application/octet-stream";
-    const buf = Buffer.from(await resp.arrayBuffer());
-    const uploadUrl = await objectStorage.getObjectEntityUploadURL();
-    const put = await fetch(uploadUrl, {
-      method: "PUT",
-      headers: { "Content-Type": contentType },
-      body: buf,
-      signal: AbortSignal.timeout(60_000),
-    });
-    if (!put.ok) {
-      logger.warn({ sourceUrl, status: put.status }, "Photo upload to Object Storage failed");
-      return null;
-    }
-    return objectStorage.normalizeObjectEntityPath(uploadUrl.split("?")[0]);
-  } catch (err) {
-    logger.warn({ err, sourceUrl }, "Photo download/upload errored");
-    return null;
-  }
-}
+import { downloadAndStorePhoto } from "./photoUtils.js";
 
 function buildAddress(p: ResoProperty): string {
   if (p.UnparsedAddress?.trim()) return p.UnparsedAddress.trim();
