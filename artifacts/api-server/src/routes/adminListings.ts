@@ -134,12 +134,34 @@ router.post("/admin/listings", adminAuth, async (req, res) => {
     res.status(400).json({ error: "Invalid request", issues: parsed.error.issues });
     return;
   }
-  const [row] = await db.insert(exampleListingsTable).values(parsed.data).returning();
-  res.status(201).json({ listing: row });
-  // Fire-and-forget: download MLS photos and proxy them into Object Storage.
-  // Response is already sent; this runs in the background without blocking the client.
-  if (row.mlsId) {
-    void triggerMlsPhotoSync(row.id, row.mlsId);
+  try {
+    const [row] = await db.insert(exampleListingsTable).values(parsed.data).returning();
+    res.status(201).json({ listing: row });
+    // Fire-and-forget: download MLS photos and proxy them into Object Storage.
+    // Response is already sent; this runs in the background without blocking the client.
+    if (row.mlsId) {
+      void triggerMlsPhotoSync(row.id, row.mlsId);
+    }
+  } catch (err: any) {
+    // PostgreSQL unique_violation on slug — the listing already exists.
+    // Return the existing row so the client can switch to edit mode rather
+    // than surfacing a confusing 500 to the operator.
+    if (err?.cause?.code === "23505" || err?.code === "23505" ||
+        (err?.message ?? "").includes("unique") || (err?.cause?.message ?? "").includes("unique")) {
+      const slug = parsed.data.slug;
+      if (slug) {
+        const [existing] = await db
+          .select()
+          .from(exampleListingsTable)
+          .where(eq(exampleListingsTable.slug, slug))
+          .limit(1);
+        if (existing) {
+          res.status(409).json({ error: `LISTING_EXISTS:${existing.id}`, listing: existing });
+          return;
+        }
+      }
+    }
+    throw err;
   }
 });
 

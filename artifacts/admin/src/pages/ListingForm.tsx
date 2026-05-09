@@ -259,7 +259,19 @@ export default function ListingForm({ listing, onSave, onCancel }: Props) {
       if (isEdit) {
         await api.listings.update(listing!.id, form);
       } else {
-        await api.listings.create(form);
+        try {
+          await api.listings.create(form);
+        } catch (createErr: any) {
+          // Server returns "LISTING_EXISTS:<id>" when the slug already exists
+          // (operator re-saving an MLS listing that was previously imported).
+          // Silently fall back to updating the existing listing instead.
+          const match = (createErr.message ?? "").match(/^LISTING_EXISTS:(.+)$/);
+          if (match) {
+            await api.listings.update(match[1], form);
+          } else {
+            throw createErr;
+          }
+        }
       }
       onSave();
     } catch (err: any) {

@@ -1,4 +1,4 @@
-modules = ["nodejs-24", "python-3.11"]
+modules = ["nodejs-24", "python-3.11", "postgresql-16"]
 
 [deployment]
 router = "application"
@@ -45,3 +45,6 @@ EMAIL_FROM = "noreply@reply.soracle.dev"
 EMAIL_FROM_NAME = "PropSite"
 MARKETING_SITE_URL = "https://app.propsite.io"
 ONBOARDING_URL = "https://app.propsite.io/onboarding"
+
+[nix]
+channel = "stable-25_05"
