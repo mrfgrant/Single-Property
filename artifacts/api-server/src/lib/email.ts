@@ -352,32 +352,40 @@ export function coldOutreachEmail(params: {
 
   const html = `
       <p style="margin:0 0 16px;">Hi ${escape(params.agentFirstName)},</p>
-      <p style="margin:0 0 20px;">I noticed your listing at <strong>${escape(params.address)}</strong> hit the MLS — so we built you a property website. No charge, no signup needed to view it.</p>
+      <p style="margin:0 0 16px;">I saw your listing at <strong>${escape(params.address)}</strong> just hit the market — so we quietly built something for you.</p>
+      <p style="margin:0 0 20px;color:#374151;">A dedicated property website that presents the home the way high-end buyers expect: clean, focused, and distraction-free.</p>
       ${photoBlock}
       ${specsBlock}
-      ${domainBlock}
       ${descBlock}
-      <p style="margin:24px 0;">
-        <a href="${escapeAttr(params.previewUrl)}" style="display:inline-block;padding:13px 28px;background:#c9a84c;color:#fff;font-weight:700;text-decoration:none;border-radius:9999px;font-size:15px;">View your free preview →</a>
+      <p style="margin:0 0 8px;color:#374151;">Take a look:</p>
+      <p style="margin:0 0 24px;">
+        <a href="${escapeAttr(params.previewUrl)}" style="display:inline-block;padding:13px 28px;background:#c9a84c;color:#fff;font-weight:700;text-decoration:none;border-radius:9999px;font-size:15px;">View your property website →</a>
       </p>
-      <p style="margin:0 0 12px;color:#374151;"><strong>What's included:</strong></p>
-      <ul style="margin:0 0 20px;padding-left:20px;color:#374151;line-height:1.8;">
-        <li>All MLS photos, full-screen gallery</li>
-        <li>Mortgage calculator</li>
-        <li>Lead capture — inquiries go straight to your inbox</li>
-        <li>Print-ready sign rider &amp; listing flyer (auto-generated)</li>
-        <li>Mobile-optimized, shareable link</li>
+      <p style="margin:0 0 12px;color:#374151;">Now imagine pairing it with this:</p>
+      ${domainBlock}
+      <p style="margin:0 0 12px;color:#374151;">A custom domain you can place on your sign rider, brochures, and ads — creating a direct, branded entry point into the property.</p>
+      <p style="margin:0 0 20px;color:#374151;">No competing agents. No third-party clutter. Just your listing, your brand, your client.</p>
+      <p style="margin:0 0 8px;color:#374151;"><strong>This is the kind of detail that:</strong></p>
+      <ul style="margin:0 0 20px;padding-left:20px;color:#374151;line-height:1.9;">
+        <li>Signals a higher level of service to sellers</li>
+        <li>Positions you above other agents in listing presentations</li>
+        <li>Creates a more curated, "luxury" buying experience</li>
+        <li>Keeps all inquiries and attention centered on you</li>
       </ul>
-      <p style="margin:0 0 20px;">To keep it live on <strong>${escape(domain)}</strong> (and have us do this automatically for every listing you take), it's <strong>$49/mo, or until sold</strong> — billing cancels automatically.</p>
-      <p style="margin:0 0 20px;"><a href="${escapeAttr(params.activateUrl)}" style="color:#0d1b2a;font-weight:600;">Activate this site →</a></p>
-      <p style="margin:0;">Either way, the preview is yours to share. Reply with any questions.</p>
+      <p style="margin:0 0 16px;color:#374151;">We've already built everything — full-screen gallery, lead capture, and print-ready materials.</p>
+      <p style="margin:0 0 20px;color:#374151;">To keep it live on its own domain, it's <strong>$49/month</strong> (and it cancels automatically when the home sells).</p>
+      <p style="margin:0 0 8px;color:#374151;">Activate it here:</p>
+      <p style="margin:0 0 24px;"><a href="${escapeAttr(params.activateUrl)}" style="color:#0d1b2a;font-weight:600;">Activate your site →</a></p>
+      <p style="margin:0 0 16px;color:#374151;">Even if you don't, feel free to use the preview while it's live.</p>
+      <p style="margin:0 0 8px;color:#374151;">But if you do — this becomes more than a listing.</p>
+      <p style="margin:0 0 20px;color:#374151;">It becomes part of your brand.</p>
       <p style="margin:20px 0 0;">— PropSite</p>
     `;
   return {
     to: params.agentEmail,
-    subject: `We built ${escape(domain)} for your listing at ${params.address}`,
+    subject: `I saw your listing at ${params.address} just hit the market`,
     html: withFooter(html, params.unsubscribeUrl),
-    text: `Hi ${params.agentFirstName}, we built you a property site for ${params.address} — potentially at ${domain}: ${params.previewUrl}. $49/mo or until sold, billing cancels automatically: ${params.activateUrl}. Includes MLS photos, mortgage calc, lead capture, sign rider & flyer. Unsubscribe: ${params.unsubscribeUrl}`,
+    text: `Hi ${params.agentFirstName},\n\nI saw your listing at ${params.address} just hit the market — so we quietly built something for you.\n\nA dedicated property website that presents the home the way high-end buyers expect: clean, focused, and distraction-free.\n\nTake a look: ${params.previewUrl}\n\nNow imagine pairing it with this: ${domain}\n\nA custom domain you can place on your sign rider, brochures, and ads — creating a direct, branded entry point into the property.\n\nNo competing agents. No third-party clutter. Just your listing, your brand, your client.\n\nThis is the kind of detail that:\n• Signals a higher level of service to sellers\n• Positions you above other agents in listing presentations\n• Creates a more curated, "luxury" buying experience\n• Keeps all inquiries and attention centered on you\n\nWe've already built everything — full-screen gallery, lead capture, and print-ready materials.\n\nTo keep it live on its own domain, it's $49/month (and it cancels automatically when the home sells).\n\nActivate it here: ${params.activateUrl}\n\nEven if you don't, feel free to use the preview while it's live.\n\nBut if you do — this becomes more than a listing. It becomes part of your brand.\n\n— PropSite\n\nUnsubscribe: ${params.unsubscribeUrl}`,
   };
 }
 
@@ -411,8 +419,8 @@ export function coldOutreachDigestEmail(params: {
 
   const subject =
     count === 1
-      ? `We built ${firstDomain} for your listing at ${firstListing.address}`
-      : `We built ${count} property websites for your new listings`;
+      ? `I saw your listing at ${firstListing.address} just hit the market`
+      : `I saw your ${count} new listings just hit the market`;
 
   const cardsHtml = params.listings
     .map((l) => {
@@ -459,46 +467,56 @@ export function coldOutreachDigestEmail(params: {
           <p style="margin:0 0 6px;font:600 16px/1.3 system-ui;">${escape(l.address)}</p>
           ${specsRow}
           ${descSnippet}
+          <p style="margin:0 0 8px;color:#374151;font-size:14px;">Take a look:</p>
+          <p style="margin:0 0 16px;">
+            <a href="${escapeAttr(l.previewUrl)}" style="display:inline-block;padding:10px 18px;background:#c9a84c;color:#fff;font-weight:600;text-decoration:none;border-radius:9999px;">View your property website →</a>
+          </p>
+          <p style="margin:0 0 8px;color:#374151;font-size:14px;">Now imagine pairing it with this:</p>
           <div style="margin:0 0 12px;padding:10px 12px;background:#0d1b2a;border-radius:4px;">
             <p style="margin:0 0 2px;font-size:10px;letter-spacing:0.08em;color:#c9a84c;text-transform:uppercase;">Potential domain</p>
             <p style="margin:0;font-size:16px;font-weight:700;color:#fff;font-family:Georgia,serif;">${escape(domain)}</p>
           </div>
-          <p style="margin:0;">
-            <a href="${escapeAttr(l.previewUrl)}" style="display:inline-block;padding:10px 18px;background:#c9a84c;color:#fff;font-weight:600;text-decoration:none;border-radius:9999px;">View preview →</a>
-            &nbsp;<a href="${escapeAttr(l.activateUrl)}" style="font-size:14px;color:#0d1b2a;">Activate →</a>
-          </p>
+          <p style="margin:0 0 12px;color:#374151;font-size:14px;">Activate it here: <a href="${escapeAttr(l.activateUrl)}" style="color:#0d1b2a;font-weight:600;">Activate your site →</a></p>
         </div>`;
     })
     .join("");
 
   const intro =
     count === 1
-      ? `<p style="margin:0 0 20px;">I noticed your listing at <strong>${escape(firstListing.address)}</strong> hit the MLS — so we built you a property website for it. No charge, no signup needed to view.</p>`
-      : `<p style="margin:0 0 20px;">I noticed <strong>${count} new listings</strong> from you hit the MLS — so we built a property website for each one. No charge, no signup needed.</p>`;
+      ? `<p style="margin:0 0 16px;">I saw your listing at <strong>${escape(firstListing.address)}</strong> just hit the market — so we quietly built something for you.</p>
+         <p style="margin:0 0 20px;color:#374151;">A dedicated property website that presents the home the way high-end buyers expect: clean, focused, and distraction-free.</p>`
+      : `<p style="margin:0 0 16px;">I saw <strong>${count} new listings</strong> from you just hit the market — so we quietly built something for each one.</p>
+         <p style="margin:0 0 20px;color:#374151;">Dedicated property websites that present each home the way high-end buyers expect: clean, focused, and distraction-free.</p>`;
 
   const html = `
       <p style="margin:0 0 16px;">Hi ${escape(params.agentFirstName)},</p>
       ${intro}
       ${cardsHtml}
-      <p style="margin:20px 0 12px;"><strong>What's included on each site:</strong></p>
-      <ul style="margin:0 0 20px;padding-left:20px;color:#374151;line-height:1.8;">
-        <li>All MLS photos, full-screen gallery</li>
-        <li>Mortgage calculator</li>
-        <li>Lead capture — inquiries go straight to your inbox</li>
-        <li>Print-ready sign rider &amp; listing flyer (auto-generated)</li>
-        <li>Mobile-optimized, shareable link</li>
+      <p style="margin:20px 0 8px;color:#374151;">A custom domain you can place on your sign rider, brochures, and ads — creating a direct, branded entry point into the property.</p>
+      <p style="margin:0 0 20px;color:#374151;">No competing agents. No third-party clutter. Just your listing, your brand, your client.</p>
+      <p style="margin:0 0 8px;color:#374151;"><strong>This is the kind of detail that:</strong></p>
+      <ul style="margin:0 0 20px;padding-left:20px;color:#374151;line-height:1.9;">
+        <li>Signals a higher level of service to sellers</li>
+        <li>Positions you above other agents in listing presentations</li>
+        <li>Creates a more curated, "luxury" buying experience</li>
+        <li>Keeps all inquiries and attention centered on you</li>
       </ul>
-      <p style="margin:0 0 20px;">To keep ${count === 1 ? "it" : "them"} live on a custom domain, it's <strong>$49/mo, or until sold</strong> — billing cancels automatically.</p>
-      <p style="margin:0;">Either way, the previews are yours. Reply with any questions.</p>
+      <p style="margin:0 0 16px;color:#374151;">We've already built everything — full-screen gallery, lead capture, and print-ready materials.</p>
+      <p style="margin:0 0 20px;color:#374151;">To keep ${count === 1 ? "it" : "them"} live on ${count === 1 ? "its" : "their"} own domain, it's <strong>$49/month per listing</strong> (and it cancels automatically when the home sells).</p>
+      <p style="margin:0 0 16px;color:#374151;">Even if you don't, feel free to use the ${count === 1 ? "preview" : "previews"} while ${count === 1 ? "it's" : "they're"} live.</p>
+      <p style="margin:0 0 8px;color:#374151;">But if you do — this becomes more than a listing.</p>
+      <p style="margin:0 0 20px;color:#374151;">It becomes part of your brand.</p>
       <p style="margin:20px 0 0;">— PropSite</p>
     `;
 
   const text =
-    `Hi ${params.agentFirstName}, we built ${count === 1 ? "a property site" : count + " property sites"} for your new listing${count === 1 ? "" : "s"}:\n\n` +
-    params.listings
-      .map((l) => `• ${l.address} (${suggestDomain(l.address)}) — preview: ${l.previewUrl}\n  activate ($49/mo or until sold): ${l.activateUrl}`)
-      .join("\n\n") +
-    `\n\nIncludes MLS photos, mortgage calc, lead capture, sign rider & flyer.\nUnsubscribe: ${params.unsubscribeUrl}`;
+    count === 1
+      ? `Hi ${params.agentFirstName},\n\nI saw your listing at ${firstListing.address} just hit the market — so we quietly built something for you.\n\nA dedicated property website that presents the home the way high-end buyers expect: clean, focused, and distraction-free.\n\nTake a look: ${firstListing.previewUrl}\n\nNow imagine pairing it with this: ${firstDomain}\n\nA custom domain you can place on your sign rider, brochures, and ads — creating a direct, branded entry point into the property.\n\nNo competing agents. No third-party clutter. Just your listing, your brand, your client.\n\nThis is the kind of detail that:\n• Signals a higher level of service to sellers\n• Positions you above other agents in listing presentations\n• Creates a more curated, "luxury" buying experience\n• Keeps all inquiries and attention centered on you\n\nWe've already built everything — full-screen gallery, lead capture, and print-ready materials.\n\nTo keep it live on its own domain, it's $49/month (and it cancels automatically when the home sells).\n\nActivate it here: ${firstListing.activateUrl}\n\nEven if you don't, feel free to use the preview while it's live.\n\nBut if you do — this becomes more than a listing. It becomes part of your brand.\n\n— PropSite\n\nUnsubscribe: ${params.unsubscribeUrl}`
+      : `Hi ${params.agentFirstName},\n\nI saw ${count} new listings from you just hit the market — so we quietly built something for each one.\n\n` +
+        params.listings
+          .map((l) => `• ${l.address}\n  Preview: ${l.previewUrl}\n  Domain: ${suggestDomain(l.address)}\n  Activate ($49/mo, cancels when sold): ${l.activateUrl}`)
+          .join("\n\n") +
+        `\n\nA custom domain on your sign rider, brochures, and ads — no competing agents, no clutter. Just your listing, your brand, your client.\n\nThis is the kind of detail that signals a higher level of service, positions you above other agents, creates a luxury experience, and keeps all inquiries centered on you.\n\nEven if you don't activate, feel free to use the previews while they're live.\n\nBut if you do — this becomes part of your brand.\n\n— PropSite\n\nUnsubscribe: ${params.unsubscribeUrl}`;
 
   return {
     to: params.agentEmail,
