@@ -502,7 +502,9 @@ export function coldOutreachDigestEmail(params: {
         <li>Keeps all inquiries and attention centered on you</li>
       </ul>
       <p style="margin:0 0 16px;color:#374151;">We've already built everything — full-screen gallery, lead capture, and print-ready materials.</p>
-      <p style="margin:0 0 20px;color:#374151;">To keep ${count === 1 ? "it" : "them"} live on ${count === 1 ? "its" : "their"} own domain, it's <strong>$49/month per listing</strong> (and it cancels automatically when the home sells).</p>
+      <p style="margin:0 0 ${count === 1 ? "8px" : "20px"};color:#374151;">To keep ${count === 1 ? "it" : "them"} live on ${count === 1 ? "its" : "their"} own domain, it's <strong>${count === 1 ? "$49/month" : "$49/month per listing"}</strong> (and it cancels automatically when the home sells).</p>
+      ${count === 1 ? `<p style="margin:0 0 8px;color:#374151;">Activate it here:</p>
+      <p style="margin:0 0 20px;"><a href="${escapeAttr(firstListing.activateUrl)}" style="color:#0d1b2a;font-weight:600;">Activate your site →</a></p>` : ""}
       <p style="margin:0 0 16px;color:#374151;">Even if you don't, feel free to use the ${count === 1 ? "preview" : "previews"} while ${count === 1 ? "it's" : "they're"} live.</p>
       <p style="margin:0 0 8px;color:#374151;">But if you do — this becomes more than a listing.</p>
       <p style="margin:0 0 20px;color:#374151;">It becomes part of your brand.</p>
