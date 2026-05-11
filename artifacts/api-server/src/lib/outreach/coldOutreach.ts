@@ -36,7 +36,8 @@ function resolvePhotoUrl(raw: string | null | undefined): string | null {
   if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
   if (raw.startsWith("/objects/")) {
     const entityId = raw.slice("/objects/".length);
-    return `${MARKETING_SITE_URL}/api/storage/objects/${entityId}`;
+    const base = MARKETING_SITE_URL.replace(/\/+$/, "");
+    return `${base}/api/storage/objects/${entityId}`;
   }
   return null;
 }

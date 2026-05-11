@@ -119,7 +119,7 @@ function buildHeroBlock(params: {
     </td>
   </tr>
   <tr>
-    <td style="background:#0d1b2a;padding:18px 20px;">
+    <td style="background:#1a2b4a;padding:18px 20px;">
       ${priceStr ? `<div style="font-size:28px;font-weight:700;color:#ffffff;font-family:Georgia,'Times New Roman',serif;margin:0 0 6px;">${escape(priceStr)}</div>` : ""}
       ${specStr ? `<div style="font-size:12px;color:#94a3b8;letter-spacing:0.06em;margin:0 0 6px;">${escape(specStr)}</div>` : ""}
       <div style="font-size:13px;color:#cbd5e1;font-weight:500;">${escape(addressUpper)}</div>
