@@ -86,6 +86,48 @@ function withFooter(html: string, unsubscribeUrl: string): string {
   return html + FOOTER_HTML.replace("{{UNSUBSCRIBE_URL}}", unsubscribeUrl);
 }
 
+/**
+ * Full-width photo hero + dark navy spec bar (table-based, email-safe).
+ * Returns "" when photoUrl is null/empty — callers must then fall back
+ * to the text-only spec tables.
+ */
+function buildHeroBlock(params: {
+  photoUrl: string | null | undefined;
+  address: string;
+  previewUrl: string;
+  price?: number | null;
+  beds?: number | null;
+  baths?: number | null;
+  sqft?: number | null;
+}): string {
+  if (!params.photoUrl) return "";
+  const priceStr = params.price ? `$${params.price.toLocaleString("en-US")}` : null;
+  const specParts = [
+    params.beds ? `${params.beds} BED` : null,
+    params.baths ? `${params.baths} BATH` : null,
+    params.sqft ? `${params.sqft.toLocaleString()} SQ FT` : null,
+  ].filter(Boolean);
+  const specStr = specParts.join(" \u00b7 ");
+  const addressUpper = params.address.toUpperCase();
+  return `<table style="width:100%;max-width:560px;border-collapse:collapse;margin:0 0 20px;" role="presentation">
+  <tr>
+    <td style="padding:0;line-height:0;font-size:0;">
+      <a href="${escapeAttr(params.previewUrl)}" style="display:block;line-height:0;">
+        <img src="${escapeAttr(params.photoUrl)}" alt="${escapeAttr(params.address)}"
+          style="display:block;width:100%;height:auto;max-width:560px;" />
+      </a>
+    </td>
+  </tr>
+  <tr>
+    <td style="background:#0d1b2a;padding:18px 20px;">
+      ${priceStr ? `<div style="font-size:28px;font-weight:700;color:#ffffff;font-family:Georgia,'Times New Roman',serif;margin:0 0 6px;">${escape(priceStr)}</div>` : ""}
+      ${specStr ? `<div style="font-size:12px;color:#94a3b8;letter-spacing:0.06em;margin:0 0 6px;">${escape(specStr)}</div>` : ""}
+      <div style="font-size:13px;color:#cbd5e1;font-weight:500;">${escape(addressUpper)}</div>
+    </td>
+  </tr>
+</table>`;
+}
+
 export function previewReadyEmail(params: {
   agentEmail: string;
   agentFirstName: string;
@@ -316,14 +358,19 @@ export function coldOutreachEmail(params: {
     params.garage ? "Garage" : null,
   ].filter(Boolean);
 
-  const photoBlock = params.photoUrl
-    ? `<a href="${escapeAttr(params.previewUrl)}" style="display:block;margin:0 0 20px;">
-        <img src="${escapeAttr(params.photoUrl)}" alt="${escapeAttr(params.address)}"
-          style="display:block;width:100%;max-width:560px;height:auto;border-radius:6px;"/>
-      </a>`
-    : "";
+  const heroBlock = buildHeroBlock({
+    photoUrl: params.photoUrl,
+    address: params.address,
+    previewUrl: params.previewUrl,
+    price: params.price,
+    beds: params.beds,
+    baths: params.baths,
+    sqft: params.sqft,
+  });
 
-  const specsBlock = specsItems.length
+  // Only show the separate tan spec table when there is no photo hero
+  // (specs are already in the hero's dark bar when a photo is present).
+  const specsBlock = !heroBlock && specsItems.length
     ? `<table style="width:100%;max-width:560px;border-collapse:collapse;margin:0 0 ${extraSpecs.length ? "8px" : "20px"};background:#f9f6f1;border-radius:${extraSpecs.length ? "6px 6px 0 0" : "6px"};overflow:hidden;"><tr>${
         specsItems.map((s, i) => {
           const border = i < specsItems.length - 1 ? "border-right:1px solid #e5ddd0;" : "";
@@ -354,7 +401,7 @@ export function coldOutreachEmail(params: {
       <p style="margin:0 0 16px;">Hi ${escape(params.agentFirstName)},</p>
       <p style="margin:0 0 16px;">I saw your listing at <strong>${escape(params.address)}</strong> just hit the market — so we quietly built something for you.</p>
       <p style="margin:0 0 20px;color:#374151;">A dedicated property website that presents the home the way high-end buyers expect: clean, focused, and distraction-free.</p>
-      ${photoBlock}
+      ${heroBlock}
       ${specsBlock}
       ${descBlock}
       <p style="margin:0 0 8px;color:#374151;">Take a look:</p>
@@ -481,13 +528,17 @@ export function coldOutreachDigestEmail(params: {
 
   if (count === 1) {
     // Single-listing: linear layout matching coldOutreachEmail exactly.
-    // Photo → specs → desc → "Take a look" CTA → domain hook → close.
+    // Hero (photo + spec bar) → desc → "Take a look" CTA → domain hook → close.
     const l = firstListing;
-    const photoBlock = l.photoUrl
-      ? `<a href="${escapeAttr(l.previewUrl)}" style="display:block;margin:0 0 12px;">
-          <img src="${escapeAttr(l.photoUrl)}" alt="${escapeAttr(l.address)}" style="display:block;width:100%;max-width:560px;height:auto;border-radius:6px;"/>
-         </a>`
-      : "";
+    const heroBlock = buildHeroBlock({
+      photoUrl: l.photoUrl,
+      address: l.address,
+      previewUrl: l.previewUrl,
+      price: l.price,
+      beds: l.beds,
+      baths: l.baths,
+      sqft: l.sqft,
+    });
     const descBlock = l.description
       ? `<p style="margin:0 0 20px;color:#374151;font-size:14px;line-height:1.7;">${escape(
           l.description.length > 280 ? l.description.slice(0, 277) + "…" : l.description
@@ -502,8 +553,8 @@ export function coldOutreachDigestEmail(params: {
       <p style="margin:0 0 16px;">Hi ${escape(params.agentFirstName)},</p>
       <p style="margin:0 0 16px;">I saw your listing at <strong>${escape(l.address)}</strong> just hit the market — so we quietly built something for you.</p>
       <p style="margin:0 0 20px;color:#374151;">A dedicated property website that presents the home the way high-end buyers expect: clean, focused, and distraction-free.</p>
-      ${photoBlock}
-      ${listingSpecsHtml(l)}
+      ${heroBlock}
+      ${heroBlock ? "" : listingSpecsHtml(l)}
       ${descBlock}
       <p style="margin:0 0 8px;color:#374151;">Take a look:</p>
       <p style="margin:0 0 24px;">
@@ -519,21 +570,25 @@ export function coldOutreachDigestEmail(params: {
     const cardsHtml = params.listings
       .map((l) => {
         const domain = suggestDomain(l.address);
-        const photo = l.photoUrl
-          ? `<a href="${escapeAttr(l.previewUrl)}" style="display:block;margin-bottom:12px;">
-              <img src="${escapeAttr(l.photoUrl)}" alt="${escapeAttr(l.address)}" style="display:block;width:100%;border-radius:6px;"/>
-             </a>`
-          : "";
+        const cardHero = buildHeroBlock({
+          photoUrl: l.photoUrl,
+          address: l.address,
+          previewUrl: l.previewUrl,
+          price: l.price,
+          beds: l.beds,
+          baths: l.baths,
+          sqft: l.sqft,
+        });
         const descSnippet = l.description
           ? `<p style="margin:0 0 10px;font-size:12px;color:#555;line-height:1.6;">${escape(
               l.description.length > 160 ? l.description.slice(0, 157) + "…" : l.description
             )}</p>`
           : "";
         return `
-          <div style="margin:24px 0;padding:16px;border:1px solid #e5e7eb;border-radius:10px;">
-            ${photo}
-            <p style="margin:0 0 6px;font:600 16px/1.3 system-ui;">${escape(l.address)}</p>
-            ${listingSpecsHtml(l)}
+          <div style="margin:24px 0;padding:16px;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
+            ${cardHero}
+            ${cardHero ? "" : `<p style="margin:0 0 6px;font:600 16px/1.3 system-ui;">${escape(l.address)}</p>`}
+            ${cardHero ? "" : listingSpecsHtml(l)}
             ${descSnippet}
             <p style="margin:0 0 8px;color:#374151;font-size:14px;">Take a look:</p>
             <p style="margin:0 0 14px;">

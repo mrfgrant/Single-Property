@@ -21,6 +21,27 @@ const MARKETING_SITE_URL =
   process.env.MARKETING_SITE_URL ?? process.env.PLATFORM_HOMEPAGE_URL ?? "https://app.propsite.io";
 
 /**
+ * Convert a stored photo path to a full absolute URL suitable for use in
+ * outgoing emails. Email clients (Gmail, Outlook, Apple Mail) require
+ * absolute HTTPS URLs — they cannot load relative paths.
+ *
+ * - Already-absolute URLs (http/https) are returned unchanged.
+ *   These are raw MLS CDN URLs used when our Object Storage upload failed.
+ * - Relative `/objects/<uuid>` paths are served by the API at
+ *   `GET /api/storage/objects/<uuid>` — we prepend the public base URL.
+ * - Anything else is dropped (returns null) so we never embed a broken src.
+ */
+function resolvePhotoUrl(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+  if (raw.startsWith("/objects/")) {
+    const entityId = raw.slice("/objects/".length);
+    return `${MARKETING_SITE_URL}/api/storage/objects/${entityId}`;
+  }
+  return null;
+}
+
+/**
  * Per-agent batching window: while the agent's digest email is still
  * pending in the outbox (i.e. send_after has not yet been reached), any
  * additional `listing.upserted` events for that agent get APPENDED to
@@ -108,7 +129,7 @@ async function upsertDigestForAgent(recipient: string, listing: ListingRow): Pro
 
   const previewUrl = `${MARKETING_SITE_URL}/listing/${listing.id}`;
   const onboardingUrl = `${MARKETING_SITE_URL}/onboarding?listing=${listing.id}`;
-  const photoUrl = listing.photoUrls?.[0] ?? null;
+  const photoUrl = resolvePhotoUrl(listing.photoUrls?.[0]);
   const firstName = firstNameOf(listing.listAgentName);
   const unsubscribeUrl = buildUnsubscribeUrl(MARKETING_SITE_URL, recipient);
 
@@ -171,7 +192,7 @@ async function upsertDigestForAgent(recipient: string, listing: ListingRow): Pro
             address: l.address,
             previewUrl,
             activateUrl,
-            photoUrl: l.photoUrls?.[0] ?? null,
+            photoUrl: resolvePhotoUrl(l.photoUrls?.[0]),
             beds: l.beds,
             baths: l.baths,
             sqft: l.sqft,
