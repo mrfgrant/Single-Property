@@ -422,77 +422,43 @@ export function coldOutreachDigestEmail(params: {
       ? `I saw your listing at ${firstListing.address} just hit the market`
       : `I saw your ${count} new listings just hit the market`;
 
-  const cardsHtml = params.listings
-    .map((l) => {
-      const domain = suggestDomain(l.address);
-      const priceStr = l.price ? `$${l.price.toLocaleString("en-US")}` : null;
-      const specs = [
-        priceStr,
-        l.beds ? `${l.beds} bed` : null,
-        l.baths ? `${l.baths} bath` : null,
-        l.sqft ? `${l.sqft.toLocaleString()} sq ft` : null,
-      ].filter(Boolean);
-      const extra = [
-        l.yearBuilt ? `Built ${l.yearBuilt}` : null,
-        l.lotAcres ? `${l.lotAcres} acres` : null,
-        l.garage ? "Garage" : null,
-      ].filter(Boolean);
-      const photo = l.photoUrl
-        ? `<a href="${escapeAttr(l.previewUrl)}" style="display:block;margin-bottom:12px;">
-            <img src="${escapeAttr(l.photoUrl)}" alt="${escapeAttr(l.address)}" style="display:block;width:100%;border-radius:6px;"/>
-           </a>`
-        : "";
-      const specsRow = specs.length
-        ? `<table style="width:100%;border-collapse:collapse;margin:0 0 ${extra.length ? "4px" : "12px"};background:#f9f6f1;border-radius:${extra.length ? "4px 4px 0 0" : "4px"};"><tr>${
-            specs.map((s, i) => {
-              const border = i < specs.length - 1 ? "border-right:1px solid #e5ddd0;" : "";
-              return `<td style="text-align:center;padding:8px 6px;font-size:13px;font-weight:600;color:#0d1b2a;${border}">${escape(s!)}</td>`;
+  // Shared helper: build specs + extra-specs tables for one listing
+  function listingSpecsHtml(l: (typeof params.listings)[0]): string {
+    const priceStr = l.price ? `$${l.price.toLocaleString("en-US")}` : null;
+    const specs = [
+      priceStr,
+      l.beds ? `${l.beds} bed` : null,
+      l.baths ? `${l.baths} bath` : null,
+      l.sqft ? `${l.sqft.toLocaleString()} sq ft` : null,
+    ].filter(Boolean);
+    const extra = [
+      l.yearBuilt ? `Built ${l.yearBuilt}` : null,
+      l.lotAcres ? `${l.lotAcres} acres` : null,
+      l.garage ? "Garage" : null,
+    ].filter(Boolean);
+    if (!specs.length) return "";
+    return (
+      `<table style="width:100%;border-collapse:collapse;margin:0 0 ${extra.length ? "4px" : "12px"};background:#f9f6f1;border-radius:${extra.length ? "4px 4px 0 0" : "4px"};"><tr>${
+        specs.map((s, i) => {
+          const border = i < specs.length - 1 ? "border-right:1px solid #e5ddd0;" : "";
+          return `<td style="text-align:center;padding:8px 6px;font-size:13px;font-weight:600;color:#0d1b2a;${border}">${escape(s!)}</td>`;
+        }).join("")
+      }</tr></table>` +
+      (extra.length
+        ? `<table style="width:100%;border-collapse:collapse;margin:0 0 12px;background:#f0ebe3;border-radius:0 0 4px 4px;"><tr>${
+            extra.map((s, i) => {
+              const border = i < extra.length - 1 ? "border-right:1px solid #e5ddd0;" : "";
+              return `<td style="text-align:center;padding:5px 6px;font-size:11px;color:#555;${border}">${escape(s!)}</td>`;
             }).join("")
-          }</tr></table>${extra.length
-            ? `<table style="width:100%;border-collapse:collapse;margin:0 0 12px;background:#f0ebe3;border-radius:0 0 4px 4px;"><tr>${
-                extra.map((s, i) => {
-                  const border = i < extra.length - 1 ? "border-right:1px solid #e5ddd0;" : "";
-                  return `<td style="text-align:center;padding:5px 6px;font-size:11px;color:#555;${border}">${escape(s!)}</td>`;
-                }).join("")
-              }</tr></table>` : ""}`
-        : "";
-      const descSnippet = l.description
-        ? `<p style="margin:0 0 10px;font-size:12px;color:#555;line-height:1.6;">${escape(
-            l.description.length > 160 ? l.description.slice(0, 157) + "…" : l.description
-          )}</p>`
-        : "";
-      return `
-        <div style="margin:24px 0;padding:16px;border:1px solid #e5e7eb;border-radius:10px;">
-          ${photo}
-          <p style="margin:0 0 6px;font:600 16px/1.3 system-ui;">${escape(l.address)}</p>
-          ${specsRow}
-          ${descSnippet}
-          <p style="margin:0 0 8px;color:#374151;font-size:14px;">Take a look:</p>
-          <p style="margin:0 0 16px;">
-            <a href="${escapeAttr(l.previewUrl)}" style="display:inline-block;padding:10px 18px;background:#c9a84c;color:#fff;font-weight:600;text-decoration:none;border-radius:9999px;">View your property website →</a>
-          </p>
-          <p style="margin:0 0 8px;color:#374151;font-size:14px;">Now imagine pairing it with this:</p>
-          <div style="margin:0 0 12px;padding:10px 12px;background:#0d1b2a;border-radius:4px;">
-            <p style="margin:0 0 2px;font-size:10px;letter-spacing:0.08em;color:#c9a84c;text-transform:uppercase;">Potential domain</p>
-            <p style="margin:0;font-size:16px;font-weight:700;color:#fff;font-family:Georgia,serif;">${escape(domain)}</p>
-          </div>
-          <p style="margin:0 0 12px;color:#374151;font-size:14px;">Activate it here: <a href="${escapeAttr(l.activateUrl)}" style="color:#0d1b2a;font-weight:600;">Activate your site →</a></p>
-        </div>`;
-    })
-    .join("");
+          }</tr></table>`
+        : "")
+    );
+  }
 
-  const intro =
-    count === 1
-      ? `<p style="margin:0 0 16px;">I saw your listing at <strong>${escape(firstListing.address)}</strong> just hit the market — so we quietly built something for you.</p>
-         <p style="margin:0 0 20px;color:#374151;">A dedicated property website that presents the home the way high-end buyers expect: clean, focused, and distraction-free.</p>`
-      : `<p style="margin:0 0 16px;">I saw <strong>${count} new listings</strong> from you just hit the market — so we quietly built something for each one.</p>
-         <p style="margin:0 0 20px;color:#374151;">Dedicated property websites that present each home the way high-end buyers expect: clean, focused, and distraction-free.</p>`;
-
-  const html = `
-      <p style="margin:0 0 16px;">Hi ${escape(params.agentFirstName)},</p>
-      ${intro}
-      ${cardsHtml}
-      <p style="margin:20px 0 8px;color:#374151;">A custom domain you can place on your sign rider, brochures, and ads — creating a direct, branded entry point into the property.</p>
+  // Shared close block (bullets → pricing → optional CTA → close)
+  function sharedCloseHtml(activateUrl: string | null, pricingLabel: string): string {
+    return `
+      <p style="margin:0 0 12px;color:#374151;">A custom domain you can place on your sign rider, brochures, and ads — creating a direct, branded entry point into the property.</p>
       <p style="margin:0 0 20px;color:#374151;">No competing agents. No third-party clutter. Just your listing, your brand, your client.</p>
       <p style="margin:0 0 8px;color:#374151;"><strong>This is the kind of detail that:</strong></p>
       <ul style="margin:0 0 20px;padding-left:20px;color:#374151;line-height:1.9;">
@@ -502,23 +468,104 @@ export function coldOutreachDigestEmail(params: {
         <li>Keeps all inquiries and attention centered on you</li>
       </ul>
       <p style="margin:0 0 16px;color:#374151;">We've already built everything — full-screen gallery, lead capture, and print-ready materials.</p>
-      <p style="margin:0 0 ${count === 1 ? "8px" : "20px"};color:#374151;">To keep ${count === 1 ? "it" : "them"} live on ${count === 1 ? "its" : "their"} own domain, it's <strong>${count === 1 ? "$49/month" : "$49/month per listing"}</strong> (and it cancels automatically when the home sells).</p>
-      ${count === 1 ? `<p style="margin:0 0 8px;color:#374151;">Activate it here:</p>
-      <p style="margin:0 0 20px;"><a href="${escapeAttr(firstListing.activateUrl)}" style="color:#0d1b2a;font-weight:600;">Activate your site →</a></p>` : ""}
-      <p style="margin:0 0 16px;color:#374151;">Even if you don't, feel free to use the ${count === 1 ? "preview" : "previews"} while ${count === 1 ? "it's" : "they're"} live.</p>
+      <p style="margin:0 0 ${activateUrl ? "8px" : "20px"};color:#374151;">To keep ${activateUrl ? "it" : "them"} live on ${activateUrl ? "its" : "their"} own domain, it's <strong>${pricingLabel}</strong> (and it cancels automatically when the home sells).</p>
+      ${activateUrl ? `<p style="margin:0 0 8px;color:#374151;">Activate it here:</p>
+      <p style="margin:0 0 20px;"><a href="${escapeAttr(activateUrl)}" style="color:#0d1b2a;font-weight:600;">Activate your site →</a></p>` : ""}
+      <p style="margin:0 0 16px;color:#374151;">Even if you don't, feel free to use the ${activateUrl ? "preview" : "previews"} while ${activateUrl ? "it's" : "they're"} live.</p>
       <p style="margin:0 0 8px;color:#374151;">But if you do — this becomes more than a listing.</p>
       <p style="margin:0 0 20px;color:#374151;">It becomes part of your brand.</p>
-      <p style="margin:20px 0 0;">— PropSite</p>
+      <p style="margin:20px 0 0;">— PropSite</p>`;
+  }
+
+  let html: string;
+
+  if (count === 1) {
+    // Single-listing: linear layout matching coldOutreachEmail exactly.
+    // Photo → specs → desc → "Take a look" CTA → domain hook → close.
+    const l = firstListing;
+    const photoBlock = l.photoUrl
+      ? `<a href="${escapeAttr(l.previewUrl)}" style="display:block;margin:0 0 12px;">
+          <img src="${escapeAttr(l.photoUrl)}" alt="${escapeAttr(l.address)}" style="display:block;width:100%;max-width:560px;height:auto;border-radius:6px;"/>
+         </a>`
+      : "";
+    const descBlock = l.description
+      ? `<p style="margin:0 0 20px;color:#374151;font-size:14px;line-height:1.7;">${escape(
+          l.description.length > 280 ? l.description.slice(0, 277) + "…" : l.description
+        )}</p>`
+      : "";
+    const domainBlock = `<div style="margin:20px 0;padding:14px 16px;background:#0d1b2a;border-radius:6px;max-width:560px;">
+        <p style="margin:0 0 4px;font-size:11px;letter-spacing:0.08em;color:#c9a84c;text-transform:uppercase;">Potential domain we can secure for this listing</p>
+        <p style="margin:0;font-size:20px;font-weight:700;color:#fff;font-family:Georgia,serif;">${escape(firstDomain)}</p>
+      </div>`;
+
+    html = `
+      <p style="margin:0 0 16px;">Hi ${escape(params.agentFirstName)},</p>
+      <p style="margin:0 0 16px;">I saw your listing at <strong>${escape(l.address)}</strong> just hit the market — so we quietly built something for you.</p>
+      <p style="margin:0 0 20px;color:#374151;">A dedicated property website that presents the home the way high-end buyers expect: clean, focused, and distraction-free.</p>
+      ${photoBlock}
+      ${listingSpecsHtml(l)}
+      ${descBlock}
+      <p style="margin:0 0 8px;color:#374151;">Take a look:</p>
+      <p style="margin:0 0 24px;">
+        <a href="${escapeAttr(l.previewUrl)}" style="display:inline-block;padding:13px 28px;background:#c9a84c;color:#fff;font-weight:700;text-decoration:none;border-radius:9999px;font-size:15px;">View your property website →</a>
+      </p>
+      <p style="margin:0 0 12px;color:#374151;">Now imagine pairing it with this:</p>
+      ${domainBlock}
+      ${sharedCloseHtml(l.activateUrl, "$49/month")}
     `;
+  } else {
+    // Multi-listing: one bordered card per listing (photo, specs, desc,
+    // preview CTA, domain block, activate link), then shared close.
+    const cardsHtml = params.listings
+      .map((l) => {
+        const domain = suggestDomain(l.address);
+        const photo = l.photoUrl
+          ? `<a href="${escapeAttr(l.previewUrl)}" style="display:block;margin-bottom:12px;">
+              <img src="${escapeAttr(l.photoUrl)}" alt="${escapeAttr(l.address)}" style="display:block;width:100%;border-radius:6px;"/>
+             </a>`
+          : "";
+        const descSnippet = l.description
+          ? `<p style="margin:0 0 10px;font-size:12px;color:#555;line-height:1.6;">${escape(
+              l.description.length > 160 ? l.description.slice(0, 157) + "…" : l.description
+            )}</p>`
+          : "";
+        return `
+          <div style="margin:24px 0;padding:16px;border:1px solid #e5e7eb;border-radius:10px;">
+            ${photo}
+            <p style="margin:0 0 6px;font:600 16px/1.3 system-ui;">${escape(l.address)}</p>
+            ${listingSpecsHtml(l)}
+            ${descSnippet}
+            <p style="margin:0 0 8px;color:#374151;font-size:14px;">Take a look:</p>
+            <p style="margin:0 0 14px;">
+              <a href="${escapeAttr(l.previewUrl)}" style="display:inline-block;padding:10px 18px;background:#c9a84c;color:#fff;font-weight:600;text-decoration:none;border-radius:9999px;">View your property website →</a>
+            </p>
+            <p style="margin:0 0 6px;color:#374151;font-size:13px;">Now imagine pairing it with this:</p>
+            <div style="margin:0 0 10px;padding:10px 12px;background:#0d1b2a;border-radius:4px;">
+              <p style="margin:0 0 2px;font-size:10px;letter-spacing:0.08em;color:#c9a84c;text-transform:uppercase;">Potential domain</p>
+              <p style="margin:0;font-size:16px;font-weight:700;color:#fff;font-family:Georgia,serif;">${escape(domain)}</p>
+            </div>
+            <p style="margin:0;font-size:13px;"><a href="${escapeAttr(l.activateUrl)}" style="color:#0d1b2a;font-weight:600;">Activate your site →</a></p>
+          </div>`;
+      })
+      .join("");
+
+    html = `
+      <p style="margin:0 0 16px;">Hi ${escape(params.agentFirstName)},</p>
+      <p style="margin:0 0 16px;">I saw <strong>${count} new listings</strong> from you just hit the market — so we quietly built something for each one.</p>
+      <p style="margin:0 0 20px;color:#374151;">Dedicated property websites that present each home the way high-end buyers expect: clean, focused, and distraction-free.</p>
+      ${cardsHtml}
+      ${sharedCloseHtml(null, "$49/month")}
+    `;
+  }
 
   const text =
     count === 1
       ? `Hi ${params.agentFirstName},\n\nI saw your listing at ${firstListing.address} just hit the market — so we quietly built something for you.\n\nA dedicated property website that presents the home the way high-end buyers expect: clean, focused, and distraction-free.\n\nTake a look: ${firstListing.previewUrl}\n\nNow imagine pairing it with this: ${firstDomain}\n\nA custom domain you can place on your sign rider, brochures, and ads — creating a direct, branded entry point into the property.\n\nNo competing agents. No third-party clutter. Just your listing, your brand, your client.\n\nThis is the kind of detail that:\n• Signals a higher level of service to sellers\n• Positions you above other agents in listing presentations\n• Creates a more curated, "luxury" buying experience\n• Keeps all inquiries and attention centered on you\n\nWe've already built everything — full-screen gallery, lead capture, and print-ready materials.\n\nTo keep it live on its own domain, it's $49/month (and it cancels automatically when the home sells).\n\nActivate it here: ${firstListing.activateUrl}\n\nEven if you don't, feel free to use the preview while it's live.\n\nBut if you do — this becomes more than a listing. It becomes part of your brand.\n\n— PropSite\n\nUnsubscribe: ${params.unsubscribeUrl}`
       : `Hi ${params.agentFirstName},\n\nI saw ${count} new listings from you just hit the market — so we quietly built something for each one.\n\n` +
         params.listings
-          .map((l) => `• ${l.address}\n  Preview: ${l.previewUrl}\n  Domain: ${suggestDomain(l.address)}\n  Activate ($49/mo, cancels when sold): ${l.activateUrl}`)
+          .map((l) => `• ${l.address}\n  Preview: ${l.previewUrl}\n  Domain: ${suggestDomain(l.address)}\n  Activate ($49/month, cancels when sold): ${l.activateUrl}`)
           .join("\n\n") +
-        `\n\nA custom domain on your sign rider, brochures, and ads — no competing agents, no clutter. Just your listing, your brand, your client.\n\nThis is the kind of detail that signals a higher level of service, positions you above other agents, creates a luxury experience, and keeps all inquiries centered on you.\n\nEven if you don't activate, feel free to use the previews while they're live.\n\nBut if you do — this becomes part of your brand.\n\n— PropSite\n\nUnsubscribe: ${params.unsubscribeUrl}`;
+        `\n\nA custom domain you can place on your sign rider, brochures, and ads — no competing agents, no clutter. Just your listing, your brand, your client.\n\nThis is the kind of detail that:\n• Signals a higher level of service to sellers\n• Positions you above other agents in listing presentations\n• Creates a more curated, "luxury" buying experience\n• Keeps all inquiries and attention centered on you\n\nWe've already built everything — full-screen gallery, lead capture, and print-ready materials.\n\nTo keep them live on their own domains, it's $49/month (and it cancels automatically when the home sells).\n\nEven if you don't, feel free to use the previews while they're live.\n\nBut if you do — this becomes part of your brand.\n\n— PropSite\n\nUnsubscribe: ${params.unsubscribeUrl}`;
 
   return {
     to: params.agentEmail,
