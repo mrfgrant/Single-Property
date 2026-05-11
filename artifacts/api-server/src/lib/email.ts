@@ -296,17 +296,24 @@ export function coldOutreachEmail(params: {
   baths?: number | null;
   sqft?: number | null;
   price?: number | null;
+  yearBuilt?: number | null;
+  lotAcres?: number | null;
+  garage?: boolean | null;
+  description?: string | null;
   suggestedDomain?: string | null;
 }): EmailPayload {
   const domain = params.suggestedDomain ?? suggestDomain(params.address);
-  const priceStr = params.price
-    ? `$${params.price.toLocaleString("en-US")}`
-    : null;
+  const priceStr = params.price ? `$${params.price.toLocaleString("en-US")}` : null;
   const specsItems = [
     priceStr,
     params.beds ? `${params.beds} bed` : null,
     params.baths ? `${params.baths} bath` : null,
     params.sqft ? `${params.sqft.toLocaleString()} sq ft` : null,
+  ].filter(Boolean);
+  const extraSpecs = [
+    params.yearBuilt ? `Built ${params.yearBuilt}` : null,
+    params.lotAcres ? `${params.lotAcres} acres` : null,
+    params.garage ? "Garage" : null,
   ].filter(Boolean);
 
   const photoBlock = params.photoUrl
@@ -317,12 +324,19 @@ export function coldOutreachEmail(params: {
     : "";
 
   const specsBlock = specsItems.length
-    ? `<table style="width:100%;max-width:560px;border-collapse:collapse;margin:0 0 20px;background:#f9f6f1;border-radius:6px;overflow:hidden;"><tr>${
+    ? `<table style="width:100%;max-width:560px;border-collapse:collapse;margin:0 0 ${extraSpecs.length ? "8px" : "20px"};background:#f9f6f1;border-radius:${extraSpecs.length ? "6px 6px 0 0" : "6px"};overflow:hidden;"><tr>${
         specsItems.map((s, i) => {
           const border = i < specsItems.length - 1 ? "border-right:1px solid #e5ddd0;" : "";
           return `<td style="text-align:center;padding:10px 8px;font-size:14px;font-weight:600;color:#0d1b2a;${border}">${escape(s!)}</td>`;
         }).join("")
-      }</tr></table>`
+      }</tr></table>${extraSpecs.length
+        ? `<table style="width:100%;max-width:560px;border-collapse:collapse;margin:0 0 20px;background:#f0ebe3;border-radius:0 0 6px 6px;overflow:hidden;"><tr>${
+            extraSpecs.map((s, i) => {
+              const border = i < extraSpecs.length - 1 ? "border-right:1px solid #e5ddd0;" : "";
+              return `<td style="text-align:center;padding:6px 8px;font-size:12px;color:#555;${border}">${escape(s!)}</td>`;
+            }).join("")
+          }</tr></table>`
+        : ""}`
     : "";
 
   const domainBlock = `<div style="margin:20px 0;padding:14px 16px;background:#0d1b2a;border-radius:6px;max-width:560px;">
@@ -330,12 +344,19 @@ export function coldOutreachEmail(params: {
       <p style="margin:0;font-size:20px;font-weight:700;color:#fff;font-family:Georgia,serif;">${escape(domain)}</p>
     </div>`;
 
+  const descBlock = params.description
+    ? `<p style="margin:0 0 20px;color:#374151;font-size:14px;line-height:1.7;">${escape(
+        params.description.length > 280 ? params.description.slice(0, 277) + "…" : params.description
+      )}</p>`
+    : "";
+
   const html = `
       <p style="margin:0 0 16px;">Hi ${escape(params.agentFirstName)},</p>
       <p style="margin:0 0 20px;">I noticed your listing at <strong>${escape(params.address)}</strong> hit the MLS — so we built you a property website. No charge, no signup needed to view it.</p>
       ${photoBlock}
       ${specsBlock}
       ${domainBlock}
+      ${descBlock}
       <p style="margin:24px 0;">
         <a href="${escapeAttr(params.previewUrl)}" style="display:inline-block;padding:13px 28px;background:#c9a84c;color:#fff;font-weight:700;text-decoration:none;border-radius:9999px;font-size:15px;">View your free preview →</a>
       </p>
@@ -343,11 +364,11 @@ export function coldOutreachEmail(params: {
       <ul style="margin:0 0 20px;padding-left:20px;color:#374151;line-height:1.8;">
         <li>All MLS photos, full-screen gallery</li>
         <li>Mortgage calculator</li>
-        <li>Walk, bike &amp; school scores</li>
-        <li>Lead capture form — inquiries go straight to your inbox</li>
+        <li>Lead capture — inquiries go straight to your inbox</li>
+        <li>Print-ready sign rider &amp; listing flyer (auto-generated)</li>
         <li>Mobile-optimized, shareable link</li>
       </ul>
-      <p style="margin:0 0 20px;">To keep it live on <strong>${escape(domain)}</strong> (and have us do this automatically for every listing you take), it's <strong>$49/mo per active listing</strong> — billing stops the day the listing closes.</p>
+      <p style="margin:0 0 20px;">To keep it live on <strong>${escape(domain)}</strong> (and have us do this automatically for every listing you take), it's <strong>$49/mo, or until sold</strong> — billing cancels automatically.</p>
       <p style="margin:0 0 20px;"><a href="${escapeAttr(params.activateUrl)}" style="color:#0d1b2a;font-weight:600;">Activate this site →</a></p>
       <p style="margin:0;">Either way, the preview is yours to share. Reply with any questions.</p>
       <p style="margin:20px 0 0;">— PropSite</p>
@@ -356,7 +377,7 @@ export function coldOutreachEmail(params: {
     to: params.agentEmail,
     subject: `We built ${escape(domain)} for your listing at ${params.address}`,
     html: withFooter(html, params.unsubscribeUrl),
-    text: `Hi ${params.agentFirstName}, we built you a property site for ${params.address} — potentially at ${domain}: ${params.previewUrl}. Keep it live for $49/mo: ${params.activateUrl}. Includes MLS photos, mortgage calc, walk/school scores, lead capture. Unsubscribe: ${params.unsubscribeUrl}`,
+    text: `Hi ${params.agentFirstName}, we built you a property site for ${params.address} — potentially at ${domain}: ${params.previewUrl}. $49/mo or until sold, billing cancels automatically: ${params.activateUrl}. Includes MLS photos, mortgage calc, lead capture, sign rider & flyer. Unsubscribe: ${params.unsubscribeUrl}`,
   };
 }
 
@@ -377,6 +398,10 @@ export function coldOutreachDigestEmail(params: {
     baths?: number | null;
     sqft?: number | null;
     price?: number | null;
+    yearBuilt?: number | null;
+    lotAcres?: number | null;
+    garage?: boolean | null;
+    description?: string | null;
   }>;
   unsubscribeUrl: string;
 }): EmailPayload {
@@ -399,24 +424,41 @@ export function coldOutreachDigestEmail(params: {
         l.baths ? `${l.baths} bath` : null,
         l.sqft ? `${l.sqft.toLocaleString()} sq ft` : null,
       ].filter(Boolean);
+      const extra = [
+        l.yearBuilt ? `Built ${l.yearBuilt}` : null,
+        l.lotAcres ? `${l.lotAcres} acres` : null,
+        l.garage ? "Garage" : null,
+      ].filter(Boolean);
       const photo = l.photoUrl
         ? `<a href="${escapeAttr(l.previewUrl)}" style="display:block;margin-bottom:12px;">
             <img src="${escapeAttr(l.photoUrl)}" alt="${escapeAttr(l.address)}" style="display:block;width:100%;border-radius:6px;"/>
            </a>`
         : "";
       const specsRow = specs.length
-        ? `<table style="width:100%;border-collapse:collapse;margin:0 0 12px;background:#f9f6f1;border-radius:4px;"><tr>${
+        ? `<table style="width:100%;border-collapse:collapse;margin:0 0 ${extra.length ? "4px" : "12px"};background:#f9f6f1;border-radius:${extra.length ? "4px 4px 0 0" : "4px"};"><tr>${
             specs.map((s, i) => {
               const border = i < specs.length - 1 ? "border-right:1px solid #e5ddd0;" : "";
               return `<td style="text-align:center;padding:8px 6px;font-size:13px;font-weight:600;color:#0d1b2a;${border}">${escape(s!)}</td>`;
             }).join("")
-          }</tr></table>`
+          }</tr></table>${extra.length
+            ? `<table style="width:100%;border-collapse:collapse;margin:0 0 12px;background:#f0ebe3;border-radius:0 0 4px 4px;"><tr>${
+                extra.map((s, i) => {
+                  const border = i < extra.length - 1 ? "border-right:1px solid #e5ddd0;" : "";
+                  return `<td style="text-align:center;padding:5px 6px;font-size:11px;color:#555;${border}">${escape(s!)}</td>`;
+                }).join("")
+              }</tr></table>` : ""}`
+        : "";
+      const descSnippet = l.description
+        ? `<p style="margin:0 0 10px;font-size:12px;color:#555;line-height:1.6;">${escape(
+            l.description.length > 160 ? l.description.slice(0, 157) + "…" : l.description
+          )}</p>`
         : "";
       return `
         <div style="margin:24px 0;padding:16px;border:1px solid #e5e7eb;border-radius:10px;">
           ${photo}
           <p style="margin:0 0 6px;font:600 16px/1.3 system-ui;">${escape(l.address)}</p>
           ${specsRow}
+          ${descSnippet}
           <div style="margin:0 0 12px;padding:10px 12px;background:#0d1b2a;border-radius:4px;">
             <p style="margin:0 0 2px;font-size:10px;letter-spacing:0.08em;color:#c9a84c;text-transform:uppercase;">Potential domain</p>
             <p style="margin:0;font-size:16px;font-weight:700;color:#fff;font-family:Georgia,serif;">${escape(domain)}</p>
@@ -442,11 +484,11 @@ export function coldOutreachDigestEmail(params: {
       <ul style="margin:0 0 20px;padding-left:20px;color:#374151;line-height:1.8;">
         <li>All MLS photos, full-screen gallery</li>
         <li>Mortgage calculator</li>
-        <li>Walk, bike &amp; school scores</li>
         <li>Lead capture — inquiries go straight to your inbox</li>
+        <li>Print-ready sign rider &amp; listing flyer (auto-generated)</li>
         <li>Mobile-optimized, shareable link</li>
       </ul>
-      <p style="margin:0 0 20px;">To keep ${count === 1 ? "it" : "them"} live on a custom domain, it's <strong>$49/mo per active listing</strong> — billing stops the day each listing closes.</p>
+      <p style="margin:0 0 20px;">To keep ${count === 1 ? "it" : "them"} live on a custom domain, it's <strong>$49/mo, or until sold</strong> — billing cancels automatically.</p>
       <p style="margin:0;">Either way, the previews are yours. Reply with any questions.</p>
       <p style="margin:20px 0 0;">— PropSite</p>
     `;
@@ -454,15 +496,48 @@ export function coldOutreachDigestEmail(params: {
   const text =
     `Hi ${params.agentFirstName}, we built ${count === 1 ? "a property site" : count + " property sites"} for your new listing${count === 1 ? "" : "s"}:\n\n` +
     params.listings
-      .map((l) => `• ${l.address} (${suggestDomain(l.address)}) — preview: ${l.previewUrl}\n  activate ($49/mo): ${l.activateUrl}`)
+      .map((l) => `• ${l.address} (${suggestDomain(l.address)}) — preview: ${l.previewUrl}\n  activate ($49/mo or until sold): ${l.activateUrl}`)
       .join("\n\n") +
-    `\n\nIncludes MLS photos, mortgage calc, walk/school scores, lead capture.\nUnsubscribe: ${params.unsubscribeUrl}`;
+    `\n\nIncludes MLS photos, mortgage calc, lead capture, sign rider & flyer.\nUnsubscribe: ${params.unsubscribeUrl}`;
 
   return {
     to: params.agentEmail,
     subject,
     html: withFooter(html, params.unsubscribeUrl),
     text,
+  };
+}
+
+/**
+ * Notification email sent to the listing agent when someone views their
+ * auto-built preview site. Lets them know the page is live and nudges
+ * them to activate. Rate-limited by the caller; this function only
+ * renders the email.
+ */
+export function previewViewedEmail(params: {
+  agentEmail: string;
+  agentFirstName: string;
+  address: string;
+  previewUrl: string;
+  activateUrl: string;
+  unsubscribeUrl: string;
+}): EmailPayload {
+  const domain = suggestDomain(params.address);
+  const html = `
+    <p style="margin:0 0 16px;">Hi ${escape(params.agentFirstName)},</p>
+    <p style="margin:0 0 20px;">Someone just viewed your property preview site for <strong>${escape(params.address)}</strong>. Your page is live and working — here's the link:</p>
+    <p style="margin:0 0 24px;">
+      <a href="${escapeAttr(params.previewUrl)}" style="display:inline-block;padding:12px 24px;background:#c9a84c;color:#fff;font-weight:700;text-decoration:none;border-radius:9999px;">View your preview →</a>
+    </p>
+    <p style="margin:0 0 20px;">Ready to make it official? We can put it on <strong>${escape(domain)}</strong> today. It's <strong>$49/mo, or until sold</strong> — billing cancels automatically the day it closes.</p>
+    <p style="margin:0 0 20px;"><a href="${escapeAttr(params.activateUrl)}" style="color:#0d1b2a;font-weight:600;">Activate &amp; claim your domain →</a></p>
+    <p style="margin:0;">— PropSite</p>
+  `;
+  return {
+    to: params.agentEmail,
+    subject: `Someone viewed your listing preview — ${params.address}`,
+    html: withFooter(html, params.unsubscribeUrl),
+    text: `Hi ${params.agentFirstName}, someone just viewed your preview site for ${params.address}: ${params.previewUrl}. Activate it on ${domain} for $49/mo or until sold: ${params.activateUrl}. Unsubscribe: ${params.unsubscribeUrl}`,
   };
 }
 

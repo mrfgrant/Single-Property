@@ -610,6 +610,22 @@ export default function Listing() {
 
     cleanups.push(initListingAnalytics(listing.id));
 
+    // Fire-and-forget preview-viewed notification to the listing agent.
+    // Only fires for API-backed preview listings (not static sample listings).
+    // The server rate-limits to once per hour per listing.
+    if (listing.id && listing.mode === "preview") {
+      const UUID_RE_LOCAL =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      const body = UUID_RE_LOCAL.test(listing.id)
+        ? { id: listing.id }
+        : { slug: listing.slug };
+      fetch(`${API_BASE}/api/listings/preview-viewed`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }).catch(() => {/* best-effort */});
+    }
+
     return () => {
       for (const fn of cleanups) fn();
     };

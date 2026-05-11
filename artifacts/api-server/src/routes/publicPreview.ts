@@ -1,6 +1,10 @@
 import { Router } from "express";
 import { db, listingsTable, agentsTable } from "@workspace/db";
+import { exampleListingsTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
+import { sendEmail, previewViewedEmail } from "../lib/email.js";
+import { buildUnsubscribeUrl } from "../lib/outreach/unsubscribe.js";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
 
@@ -118,6 +122,101 @@ router.get("/listings/preview/:id", async (req, res) => {
         : null,
     },
   });
+});
+
+/**
+ * In-memory rate-limit: only send a preview-viewed notification once per
+ * listing per hour, regardless of how many page loads occur.
+ */
+const previewViewedSentAt = new Map<string, number>();
+const PREVIEW_VIEWED_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
+const log = logger.child({ component: "preview-viewed" });
+
+const MARKETING_SITE_URL =
+  process.env.MARKETING_SITE_URL ?? process.env.PLATFORM_HOMEPAGE_URL ?? "https://app.propsite.io";
+
+/**
+ * POST /api/listings/preview-viewed
+ *
+ * Called fire-and-forget by the marketing site when a visitor loads a
+ * preview listing page. Sends a one-time notification email to the
+ * listing agent so they know the auto-built site is live.
+ *
+ * Body: { id?: string, slug?: string }
+ * - id  — UUID of an MLS-sourced row in the `listings` table
+ * - slug — slug of a row in `example_listings`
+ * (one of the two must be present)
+ *
+ * Always responds 204 — the caller ignores the result.
+ */
+router.post("/listings/preview-viewed", async (req, res) => {
+  res.status(204).end(); // respond immediately; notification is best-effort
+
+  try {
+    const id = typeof req.body?.id === "string" ? req.body.id.trim() : null;
+    const slug = typeof req.body?.slug === "string" ? req.body.slug.trim() : null;
+
+    if (!id && !slug) return;
+
+    const cacheKey = id ?? slug!;
+    const lastSent = previewViewedSentAt.get(cacheKey);
+    if (lastSent && Date.now() - lastSent < PREVIEW_VIEWED_COOLDOWN_MS) return;
+
+    let agentEmail: string | null = null;
+    let agentFirstName = "there";
+    let address = "";
+    let listingIdOrSlug = cacheKey;
+
+    if (id && UUID_RE.test(id)) {
+      // MLS-sourced listing
+      const [row] = await db.select().from(listingsTable).where(eq(listingsTable.id, id)).limit(1);
+      if (!row || row.purgedAt || row.mode !== "preview") return;
+      address = row.address;
+      listingIdOrSlug = row.id;
+      agentEmail = row.listAgentEmail ?? null;
+      if (row.listAgentName) {
+        agentFirstName = row.listAgentName.split(/\s+/)[0]!;
+      }
+      if (row.agentId) {
+        const [agent] = await db.select().from(agentsTable).where(eq(agentsTable.id, row.agentId)).limit(1);
+        if (agent) {
+          agentEmail = agent.email;
+          agentFirstName = agent.firstName;
+        }
+      }
+    } else if (slug) {
+      // Example listing
+      const [row] = await db.select().from(exampleListingsTable).where(eq(exampleListingsTable.slug, slug)).limit(1);
+      if (!row || row.status !== "active") return;
+      address = row.address;
+      agentEmail = row.agentEmail ?? null;
+      if (row.agentName) {
+        agentFirstName = row.agentName.split(/\s+/)[0]!;
+      }
+    }
+
+    if (!agentEmail || !address) return;
+
+    previewViewedSentAt.set(cacheKey, Date.now());
+
+    const previewUrl = `${MARKETING_SITE_URL}/listing/${listingIdOrSlug}`;
+    const activateUrl = `${MARKETING_SITE_URL}/onboarding?listing=${listingIdOrSlug}`;
+    const unsubscribeUrl = buildUnsubscribeUrl(agentEmail);
+
+    const payload = previewViewedEmail({
+      agentEmail,
+      agentFirstName,
+      address,
+      previewUrl,
+      activateUrl,
+      unsubscribeUrl,
+    });
+
+    await sendEmail(payload);
+    log.info({ agentEmail, address }, "Preview-viewed notification sent");
+  } catch (err) {
+    log.error({ err }, "Failed to send preview-viewed notification");
+  }
 });
 
 export default router;

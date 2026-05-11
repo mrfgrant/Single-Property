@@ -163,6 +163,10 @@ async function upsertDigestForAgent(recipient: string, listing: ListingRow): Pro
           baths: l.baths,
           sqft: l.sqft,
           price: l.priceUsd,
+          yearBuilt: l.yearBuilt,
+          lotAcres: l.lotAcres,
+          garage: l.garage,
+          description: l.description,
         }));
       if (items.length === 0) {
         log.info({ recipient }, "No eligible listings remain in digest — leaving row untouched");
@@ -209,6 +213,10 @@ async function upsertDigestForAgent(recipient: string, listing: ListingRow): Pro
           baths: listing.baths,
           sqft: listing.sqft,
           price: listing.priceUsd,
+          yearBuilt: listing.yearBuilt,
+          lotAcres: listing.lotAcres,
+          garage: listing.garage,
+          description: listing.description,
         },
       ],
       unsubscribeUrl,
