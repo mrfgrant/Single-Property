@@ -17,6 +17,7 @@ import mlsRouter from "./mls.js";
 import storageRouter from "./storage.js";
 import leadsRouter from "./leads.js";
 import unsubscribeRouter from "./unsubscribe.js";
+import clickTrackingRouter from "./clickTracking.js";
 
 const router: IRouter = Router();
 
@@ -38,5 +39,6 @@ router.use(mlsRouter);
 router.use(storageRouter);
 router.use(leadsRouter);
 router.use(unsubscribeRouter);
+router.use(clickTrackingRouter);
 
 export default router;

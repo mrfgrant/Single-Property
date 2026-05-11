@@ -9,6 +9,7 @@ import { eq, inArray, sql } from "drizzle-orm";
 import { mlsEventBus, type ListingUpsertedEvent } from "../mls/eventBus.js";
 import { enqueueSms } from "../outbox/sms.js";
 import { coldOutreachDigestEmail, coldOutreachSms } from "../email.js";
+import { createListingTrackingUrls } from "../tracking.js";
 import { pickAgentMobile } from "./phone.js";
 import { buildUnsubscribeUrl } from "./unsubscribe.js";
 import { nextSendWindow7to9amET } from "./sendWindow.js";
@@ -152,22 +153,36 @@ async function upsertDigestForAgent(recipient: string, listing: ListingRow): Pro
         .select()
         .from(listingsTable)
         .where(inArray(listingsTable.id, newIds));
-      const items = allListings
-        .filter((l) => !l.purgedAt && !l.agentId && l.mode === "preview" && l.status === "active")
-        .map((l) => ({
-          address: l.address,
-          previewUrl: `${MARKETING_SITE_URL}/listing/${l.id}`,
-          activateUrl: `${MARKETING_SITE_URL}/onboarding?listing=${l.id}`,
-          photoUrl: l.photoUrls?.[0] ?? null,
-          beds: l.beds,
-          baths: l.baths,
-          sqft: l.sqft,
-          price: l.priceUsd,
-          yearBuilt: l.yearBuilt,
-          lotAcres: l.lotAcres,
-          garage: null,
-          description: l.description,
-        }));
+      const eligibleListings = allListings.filter(
+        (l) => !l.purgedAt && !l.agentId && l.mode === "preview" && l.status === "active",
+      );
+      const items = await Promise.all(
+        eligibleListings.map(async (l) => {
+          const { previewUrl, activateUrl } = await createListingTrackingUrls(
+            {
+              agentEmail: recipient,
+              listingId: l.id,
+              rawPreviewUrl: `${MARKETING_SITE_URL}/listing/${l.id}`,
+              rawActivateUrl: `${MARKETING_SITE_URL}/onboarding?listing=${l.id}`,
+            },
+            tx,
+          );
+          return {
+            address: l.address,
+            previewUrl,
+            activateUrl,
+            photoUrl: l.photoUrls?.[0] ?? null,
+            beds: l.beds,
+            baths: l.baths,
+            sqft: l.sqft,
+            price: l.priceUsd,
+            yearBuilt: l.yearBuilt,
+            lotAcres: l.lotAcres,
+            garage: null,
+            description: l.description,
+          };
+        }),
+      );
       if (items.length === 0) {
         log.info({ recipient }, "No eligible listings remain in digest — leaving row untouched");
         return;
@@ -200,14 +215,24 @@ async function upsertDigestForAgent(recipient: string, listing: ListingRow): Pro
 
     // No pending digest — create a fresh one inside the same transaction.
     const sendAfter = nextSendWindow7to9amET();
+    const { previewUrl: trackedPreviewUrl, activateUrl: trackedActivateUrl } =
+      await createListingTrackingUrls(
+        {
+          agentEmail: recipient,
+          listingId: listing.id,
+          rawPreviewUrl: previewUrl,
+          rawActivateUrl: onboardingUrl,
+        },
+        tx,
+      );
     const rendered = coldOutreachDigestEmail({
       agentEmail: recipient,
       agentFirstName: firstName,
       listings: [
         {
           address: listing.address,
-          previewUrl,
-          activateUrl: onboardingUrl,
+          previewUrl: trackedPreviewUrl,
+          activateUrl: trackedActivateUrl,
           photoUrl,
           beds: listing.beds,
           baths: listing.baths,

@@ -1,5 +1,7 @@
 import { Router } from "express";
 import { z } from "zod/v4";
+import { db, emailClickEventsTable } from "@workspace/db";
+import { desc, isNotNull, eq } from "drizzle-orm";
 import { adminAuth } from "../middleware/adminAuth.js";
 import { backfillWeeklyReport } from "../lib/analytics/cron.js";
 import { logger } from "../lib/logger.js";
@@ -45,6 +47,27 @@ router.post("/admin/listings/:id/weekly-report", adminAuth, async (req, res) => 
     log.error({ err, listingId: id }, "Backfill failed");
     res.status(500).json({ error: "Backfill failed" });
   }
+});
+
+/**
+ * GET /api/admin/click-events
+ * Returns recent email link click events, newest first.
+ * Optional query params: ?clicked=1 (only clicked), ?listingId=uuid, ?agentEmail=x, ?limit=50
+ */
+router.get("/admin/click-events", adminAuth, async (req, res) => {
+  const limit = Math.min(parseInt(String(req.query.limit ?? "100"), 10) || 100, 500);
+  const onlyClicked = req.query.clicked === "1";
+  const listingId = typeof req.query.listingId === "string" ? req.query.listingId : null;
+  const agentEmail = typeof req.query.agentEmail === "string" ? req.query.agentEmail.toLowerCase() : null;
+
+  let query = db.select().from(emailClickEventsTable).$dynamic();
+
+  if (onlyClicked) query = query.where(isNotNull(emailClickEventsTable.clickedAt));
+  if (listingId) query = query.where(eq(emailClickEventsTable.listingId, listingId));
+  if (agentEmail) query = query.where(eq(emailClickEventsTable.agentEmail, agentEmail));
+
+  const rows = await query.orderBy(desc(emailClickEventsTable.createdAt)).limit(limit);
+  res.json({ clickEvents: rows });
 });
 
 export default router;

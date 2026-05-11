@@ -15,3 +15,4 @@ export * from "./leads";
 export * from "./emailOutbox";
 export * from "./smsOutbox";
 export * from "./analyticsEvents";
+export * from "./emailClickEvents";
