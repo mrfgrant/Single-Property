@@ -3,6 +3,7 @@ import { eq, and } from "drizzle-orm";
 import { pickAvailableDomain } from "./domainGenerator.js";
 import { registerDomain, disableAutoRenew } from "./registrar.js";
 import { ensureZone, upsertDnsRecord, getDeploymentHostname } from "./dns.js";
+import { setListingRootRedirect } from "./redirectRules.js";
 import { logger } from "../logger.js";
 
 export interface ProvisionResult {
@@ -127,6 +128,14 @@ export async function provisionDomainForListing(
         content: hostname,
         proxied: true,
       });
+
+      logger.info({ domainName, zoneId, listingId }, "Writing root → listing redirect rule");
+      try {
+        await setListingRootRedirect(zoneId, domainName, listingId);
+      } catch (redirectErr) {
+        logger.warn({ redirectErr, domainName }, "Failed to set root redirect rule — continuing");
+      }
+
       await advanceRun(runId, "dns_record_created", {
         cloudflareDnsRecordId: record.id,
       });

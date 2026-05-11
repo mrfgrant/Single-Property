@@ -165,7 +165,7 @@ async function upsertDigestForAgent(recipient: string, listing: ListingRow): Pro
           price: l.priceUsd,
           yearBuilt: l.yearBuilt,
           lotAcres: l.lotAcres,
-          garage: l.garage,
+          garage: null,
           description: l.description,
         }));
       if (items.length === 0) {
@@ -215,7 +215,7 @@ async function upsertDigestForAgent(recipient: string, listing: ListingRow): Pro
           price: listing.priceUsd,
           yearBuilt: listing.yearBuilt,
           lotAcres: listing.lotAcres,
-          garage: listing.garage,
+          garage: null,
           description: listing.description,
         },
       ],
