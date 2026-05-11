@@ -260,6 +260,26 @@ export function listingArchivedEmail(params: {
 }
 
 /**
+ * Suggests a memorable domain from a street address.
+ * "2323 Overton Road" → "2323overtonrd.com"
+ */
+export function suggestDomain(address: string): string {
+  const streetPart = address.split(",")[0].trim().toLowerCase();
+  const suffixMap: Record<string, string> = {
+    road: "rd", street: "st", avenue: "ave", drive: "dr",
+    lane: "ln", court: "ct", circle: "cir", boulevard: "blvd",
+    place: "pl", way: "way", trail: "trl", terrace: "ter",
+    highway: "hwy", parkway: "pkwy", run: "run", ridge: "ridge",
+  };
+  const shortened = streetPart
+    .split(/\s+/)
+    .map((w) => suffixMap[w] ?? w)
+    .join("")
+    .replace(/[^a-z0-9]/g, "");
+  return `${shortened}.com`;
+}
+
+/**
  * Cold-outreach Email #1 — sent to a not-yet-customer agent whose new
  * MLS listing we just auto-built a preview for. Single CTA, CAN-SPAM
  * footer with one-click unsubscribe.
@@ -271,24 +291,72 @@ export function coldOutreachEmail(params: {
   previewUrl: string;
   activateUrl: string;
   unsubscribeUrl: string;
+  photoUrl?: string | null;
+  beds?: number | null;
+  baths?: number | null;
+  sqft?: number | null;
+  price?: number | null;
+  suggestedDomain?: string | null;
 }): EmailPayload {
+  const domain = params.suggestedDomain ?? suggestDomain(params.address);
+  const priceStr = params.price
+    ? `$${params.price.toLocaleString("en-US")}`
+    : null;
+  const specsItems = [
+    priceStr,
+    params.beds ? `${params.beds} bed` : null,
+    params.baths ? `${params.baths} bath` : null,
+    params.sqft ? `${params.sqft.toLocaleString()} sq ft` : null,
+  ].filter(Boolean);
+
+  const photoBlock = params.photoUrl
+    ? `<a href="${escapeAttr(params.previewUrl)}" style="display:block;margin:0 0 20px;">
+        <img src="${escapeAttr(params.photoUrl)}" alt="${escapeAttr(params.address)}"
+          style="display:block;width:100%;max-width:560px;height:auto;border-radius:6px;"/>
+      </a>`
+    : "";
+
+  const specsBlock = specsItems.length
+    ? `<table style="width:100%;max-width:560px;border-collapse:collapse;margin:0 0 20px;background:#f9f6f1;border-radius:6px;overflow:hidden;"><tr>${
+        specsItems.map((s, i) => {
+          const border = i < specsItems.length - 1 ? "border-right:1px solid #e5ddd0;" : "";
+          return `<td style="text-align:center;padding:10px 8px;font-size:14px;font-weight:600;color:#0d1b2a;${border}">${escape(s!)}</td>`;
+        }).join("")
+      }</tr></table>`
+    : "";
+
+  const domainBlock = `<div style="margin:20px 0;padding:14px 16px;background:#0d1b2a;border-radius:6px;max-width:560px;">
+      <p style="margin:0 0 4px;font-size:11px;letter-spacing:0.08em;color:#c9a84c;text-transform:uppercase;">Potential domain we can secure for this listing</p>
+      <p style="margin:0;font-size:20px;font-weight:700;color:#fff;font-family:Georgia,serif;">${escape(domain)}</p>
+    </div>`;
+
   const html = `
-      <p>Hi ${escape(params.agentFirstName)},</p>
-      <p>I noticed your new listing at <strong>${escape(params.address)}</strong> hit the MLS — so we built you a property website for it. No charge, no signup needed to view.</p>
+      <p style="margin:0 0 16px;">Hi ${escape(params.agentFirstName)},</p>
+      <p style="margin:0 0 20px;">I noticed your listing at <strong>${escape(params.address)}</strong> hit the MLS — so we built you a property website. No charge, no signup needed to view it.</p>
+      ${photoBlock}
+      ${specsBlock}
+      ${domainBlock}
       <p style="margin:24px 0;">
-        <a href="${escapeAttr(params.previewUrl)}" style="display:inline-block;padding:12px 24px;background:#c9a84c;color:#fff;font-weight:600;text-decoration:none;border-radius:9999px;">View your free preview →</a>
+        <a href="${escapeAttr(params.previewUrl)}" style="display:inline-block;padding:13px 28px;background:#c9a84c;color:#fff;font-weight:700;text-decoration:none;border-radius:9999px;font-size:15px;">View your free preview →</a>
       </p>
-      <p>It's mobile-optimized, includes MLS photos, mortgage calculator, walk/school scores, and an instant lead-capture form that emails you any inquiry.</p>
-      <p>If you'd like to keep it live on a custom domain (and have us auto-build one for every listing going forward), it's <strong>$49/mo per active listing</strong> — billing stops the day the listing closes.</p>
-      <p><a href="${escapeAttr(params.activateUrl)}">Activate this site →</a></p>
-      <p>Either way, the preview is yours. Reply with any questions.</p>
-      <p>— PropSite</p>
+      <p style="margin:0 0 12px;color:#374151;"><strong>What's included:</strong></p>
+      <ul style="margin:0 0 20px;padding-left:20px;color:#374151;line-height:1.8;">
+        <li>All MLS photos, full-screen gallery</li>
+        <li>Mortgage calculator</li>
+        <li>Walk, bike &amp; school scores</li>
+        <li>Lead capture form — inquiries go straight to your inbox</li>
+        <li>Mobile-optimized, shareable link</li>
+      </ul>
+      <p style="margin:0 0 20px;">To keep it live on <strong>${escape(domain)}</strong> (and have us do this automatically for every listing you take), it's <strong>$49/mo per active listing</strong> — billing stops the day the listing closes.</p>
+      <p style="margin:0 0 20px;"><a href="${escapeAttr(params.activateUrl)}" style="color:#0d1b2a;font-weight:600;">Activate this site →</a></p>
+      <p style="margin:0;">Either way, the preview is yours to share. Reply with any questions.</p>
+      <p style="margin:20px 0 0;">— PropSite</p>
     `;
   return {
     to: params.agentEmail,
-    subject: `Your site for ${params.address} is ready`,
+    subject: `We built ${escape(domain)} for your listing at ${params.address}`,
     html: withFooter(html, params.unsubscribeUrl),
-    text: `Hi ${params.agentFirstName}, we built you a property site for ${params.address}: ${params.previewUrl}. Keep it live for $49/mo: ${params.activateUrl}. Unsubscribe: ${params.unsubscribeUrl}`,
+    text: `Hi ${params.agentFirstName}, we built you a property site for ${params.address} — potentially at ${domain}: ${params.previewUrl}. Keep it live for $49/mo: ${params.activateUrl}. Includes MLS photos, mortgage calc, walk/school scores, lead capture. Unsubscribe: ${params.unsubscribeUrl}`,
   };
 }
 
@@ -305,27 +373,57 @@ export function coldOutreachDigestEmail(params: {
     previewUrl: string;
     activateUrl: string;
     photoUrl: string | null;
+    beds?: number | null;
+    baths?: number | null;
+    sqft?: number | null;
+    price?: number | null;
   }>;
   unsubscribeUrl: string;
 }): EmailPayload {
   const count = params.listings.length;
+  const firstListing = params.listings[0]!;
+  const firstDomain = suggestDomain(firstListing.address);
+
   const subject =
     count === 1
-      ? `Your site for ${params.listings[0]!.address} is ready`
-      : `We built ${count} websites for your new listings`;
+      ? `We built ${firstDomain} for your listing at ${firstListing.address}`
+      : `We built ${count} property websites for your new listings`;
 
   const cardsHtml = params.listings
     .map((l) => {
+      const domain = suggestDomain(l.address);
+      const priceStr = l.price ? `$${l.price.toLocaleString("en-US")}` : null;
+      const specs = [
+        priceStr,
+        l.beds ? `${l.beds} bed` : null,
+        l.baths ? `${l.baths} bath` : null,
+        l.sqft ? `${l.sqft.toLocaleString()} sq ft` : null,
+      ].filter(Boolean);
       const photo = l.photoUrl
-        ? `<img src="${escapeAttr(l.photoUrl)}" alt="${escapeAttr(l.address)}" style="display:block;width:100%;max-width:480px;border-radius:8px;margin-bottom:12px;"/>`
+        ? `<a href="${escapeAttr(l.previewUrl)}" style="display:block;margin-bottom:12px;">
+            <img src="${escapeAttr(l.photoUrl)}" alt="${escapeAttr(l.address)}" style="display:block;width:100%;border-radius:6px;"/>
+           </a>`
+        : "";
+      const specsRow = specs.length
+        ? `<table style="width:100%;border-collapse:collapse;margin:0 0 12px;background:#f9f6f1;border-radius:4px;"><tr>${
+            specs.map((s, i) => {
+              const border = i < specs.length - 1 ? "border-right:1px solid #e5ddd0;" : "";
+              return `<td style="text-align:center;padding:8px 6px;font-size:13px;font-weight:600;color:#0d1b2a;${border}">${escape(s!)}</td>`;
+            }).join("")
+          }</tr></table>`
         : "";
       return `
         <div style="margin:24px 0;padding:16px;border:1px solid #e5e7eb;border-radius:10px;">
           ${photo}
-          <p style="margin:0 0 8px;font:600 16px/1.3 system-ui;">${escape(l.address)}</p>
-          <p style="margin:0 0 14px;">
+          <p style="margin:0 0 6px;font:600 16px/1.3 system-ui;">${escape(l.address)}</p>
+          ${specsRow}
+          <div style="margin:0 0 12px;padding:10px 12px;background:#0d1b2a;border-radius:4px;">
+            <p style="margin:0 0 2px;font-size:10px;letter-spacing:0.08em;color:#c9a84c;text-transform:uppercase;">Potential domain</p>
+            <p style="margin:0;font-size:16px;font-weight:700;color:#fff;font-family:Georgia,serif;">${escape(domain)}</p>
+          </div>
+          <p style="margin:0;">
             <a href="${escapeAttr(l.previewUrl)}" style="display:inline-block;padding:10px 18px;background:#c9a84c;color:#fff;font-weight:600;text-decoration:none;border-radius:9999px;">View preview →</a>
-            &nbsp;<a href="${escapeAttr(l.activateUrl)}" style="font-size:14px;color:#0d1b2a;">Activate this site →</a>
+            &nbsp;<a href="${escapeAttr(l.activateUrl)}" style="font-size:14px;color:#0d1b2a;">Activate →</a>
           </p>
         </div>`;
     })
@@ -333,26 +431,32 @@ export function coldOutreachDigestEmail(params: {
 
   const intro =
     count === 1
-      ? `<p>I noticed your new listing at <strong>${escape(params.listings[0]!.address)}</strong> hit the MLS — so we built you a property website for it. No charge, no signup needed to view.</p>`
-      : `<p>I noticed <strong>${count} new listings</strong> from you hit the MLS — so we built a property website for each one. No charge, no signup needed to view.</p>`;
+      ? `<p style="margin:0 0 20px;">I noticed your listing at <strong>${escape(firstListing.address)}</strong> hit the MLS — so we built you a property website for it. No charge, no signup needed to view.</p>`
+      : `<p style="margin:0 0 20px;">I noticed <strong>${count} new listings</strong> from you hit the MLS — so we built a property website for each one. No charge, no signup needed.</p>`;
 
   const html = `
-      <p>Hi ${escape(params.agentFirstName)},</p>
+      <p style="margin:0 0 16px;">Hi ${escape(params.agentFirstName)},</p>
       ${intro}
       ${cardsHtml}
-      <p>Each site is mobile-optimized, includes MLS photos, mortgage calculator, walk/school scores, and an instant lead-capture form that emails you any inquiry.</p>
-      <p>If you'd like to keep ${count === 1 ? "it" : "them"} live on a custom domain (and have us auto-build one for every listing going forward), it's <strong>$49/mo per active listing</strong> — billing stops the day each listing closes.</p>
-      <p>Either way, the previews are yours. Reply with any questions.</p>
-      <p>— PropSite</p>
+      <p style="margin:20px 0 12px;"><strong>What's included on each site:</strong></p>
+      <ul style="margin:0 0 20px;padding-left:20px;color:#374151;line-height:1.8;">
+        <li>All MLS photos, full-screen gallery</li>
+        <li>Mortgage calculator</li>
+        <li>Walk, bike &amp; school scores</li>
+        <li>Lead capture — inquiries go straight to your inbox</li>
+        <li>Mobile-optimized, shareable link</li>
+      </ul>
+      <p style="margin:0 0 20px;">To keep ${count === 1 ? "it" : "them"} live on a custom domain, it's <strong>$49/mo per active listing</strong> — billing stops the day each listing closes.</p>
+      <p style="margin:0;">Either way, the previews are yours. Reply with any questions.</p>
+      <p style="margin:20px 0 0;">— PropSite</p>
     `;
 
-  // Plain-text fallback.
   const text =
     `Hi ${params.agentFirstName}, we built ${count === 1 ? "a property site" : count + " property sites"} for your new listing${count === 1 ? "" : "s"}:\n\n` +
     params.listings
-      .map((l) => `• ${l.address} — preview: ${l.previewUrl}\n  activate ($49/mo): ${l.activateUrl}`)
+      .map((l) => `• ${l.address} (${suggestDomain(l.address)}) — preview: ${l.previewUrl}\n  activate ($49/mo): ${l.activateUrl}`)
       .join("\n\n") +
-    `\n\nUnsubscribe: ${params.unsubscribeUrl}`;
+    `\n\nIncludes MLS photos, mortgage calc, walk/school scores, lead capture.\nUnsubscribe: ${params.unsubscribeUrl}`;
 
   return {
     to: params.agentEmail,

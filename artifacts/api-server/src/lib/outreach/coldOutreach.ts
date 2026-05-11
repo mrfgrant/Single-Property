@@ -159,6 +159,10 @@ async function upsertDigestForAgent(recipient: string, listing: ListingRow): Pro
           previewUrl: `${MARKETING_SITE_URL}/listing/${l.id}`,
           activateUrl: `${MARKETING_SITE_URL}/onboarding?listing=${l.id}`,
           photoUrl: l.photoUrls?.[0] ?? null,
+          beds: l.beds,
+          baths: l.baths,
+          sqft: l.sqft,
+          price: l.priceUsd,
         }));
       if (items.length === 0) {
         log.info({ recipient }, "No eligible listings remain in digest — leaving row untouched");
@@ -201,6 +205,10 @@ async function upsertDigestForAgent(recipient: string, listing: ListingRow): Pro
           previewUrl,
           activateUrl: onboardingUrl,
           photoUrl,
+          beds: listing.beds,
+          baths: listing.baths,
+          sqft: listing.sqft,
+          price: listing.priceUsd,
         },
       ],
       unsubscribeUrl,
