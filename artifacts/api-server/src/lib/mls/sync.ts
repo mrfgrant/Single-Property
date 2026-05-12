@@ -13,6 +13,7 @@ import { mlsClient, MlsNotConfiguredError, type ResoProperty } from "./client.js
 import { mlsEventBus } from "./eventBus.js";
 import { getMlsConfig, normalizeStatus } from "./config.js";
 import { downloadAndStorePhoto } from "./photoUtils.js";
+import { refreshColdOutreachPhoto } from "../outreach/coldOutreach.js";
 
 function buildAddress(p: ResoProperty): string {
   if (p.UnparsedAddress?.trim()) return p.UnparsedAddress.trim();
@@ -81,11 +82,13 @@ function diffFields(prev: Listing, next: Partial<Listing>): string[] {
 }
 
 /**
- * Upsert a single MLS property and return its listingId if the row was
- * touched (inserted or updated), otherwise null. Returning the id lets
- * the caller drive selective photo sync without re-querying.
+ * Upsert a single MLS property and return { id, isNew } if the row was
+ * touched (inserted or updated), otherwise null. `isNew` lets the caller
+ * trigger a cold-outreach photo refresh after photos are synced for the
+ * first time — the initial cold-outreach email is rendered before photos
+ * are available, so we patch it immediately after syncPhotos() completes.
  */
-async function upsertProperty(p: ResoProperty): Promise<string | null> {
+async function upsertProperty(p: ResoProperty): Promise<{ id: string; isNew: boolean } | null> {
   const mapped = mapResoToListing(p);
   const [existing] = await db
     .select()
@@ -155,7 +158,7 @@ async function upsertProperty(p: ResoProperty): Promise<string | null> {
         occurredAt: new Date(),
       });
     }
-    return inserted.id;
+    return { id: inserted.id, isNew: true };
   }
 
   const changed = diffFields(existing, mapped);
@@ -208,7 +211,7 @@ async function upsertProperty(p: ResoProperty): Promise<string | null> {
     isNew: false,
     changedFields: changed,
   });
-  return updated.id;
+  return { id: updated.id, isNew: false };
 }
 
 async function syncPhotos(listingId: string, listingKey: string): Promise<void> {
@@ -359,13 +362,15 @@ export async function runSync(kind: "full" | "delta"): Promise<SyncResult> {
     }
 
     // Track listings touched during this run so we photo-sync only what
-    // changed (delta) or everything (full).
-    const touched = new Map<string, string>(); // listingId -> mlsListingKey
+    // changed (delta) or everything (full). isNew drives the post-photo
+    // cold-outreach refresh that patches the pre-rendered email HTML once
+    // photos are available.
+    const touched = new Map<string, { listingKey: string; isNew: boolean }>();
 
     for await (const page of mlsClient.iterateProperties({ filter })) {
       for (const p of page) {
-        const touchedId = await upsertProperty(p);
-        if (touchedId) touched.set(touchedId, p.ListingKey);
+        const result = await upsertProperty(p);
+        if (result) touched.set(result.id, { listingKey: p.ListingKey, isNew: result.isNew });
         processed += 1;
         if (p.ModificationTimestamp) {
           const ts = new Date(p.ModificationTimestamp);
@@ -378,17 +383,39 @@ export async function runSync(kind: "full" | "delta"): Promise<SyncResult> {
     // Photo sync: full sync covers every MLS listing in the DB; delta sync
     // only refreshes media for listings touched in this run. Both use the
     // same dedup path (unique on listing_id + mls_media_key).
+    //
+    // For brand-new listings (isNew), after photos are stored we patch the
+    // pending cold-outreach outbox entry so the email includes the photo.
+    // The initial email was rendered before photos were available — this
+    // closes that race.
     if (kind === "full") {
       const allWithKeys = await db
         .select({ id: listingsTable.id, mlsListingId: listingsTable.mlsListingId })
         .from(listingsTable)
         .where(sql`${listingsTable.mlsListingId} is not null`);
       for (const row of allWithKeys) {
-        if (row.mlsListingId) await syncPhotos(row.id, row.mlsListingId);
+        if (row.mlsListingId) {
+          await syncPhotos(row.id, row.mlsListingId);
+          const meta = touched.get(row.id);
+          if (meta?.isNew) {
+            try {
+              await refreshColdOutreachPhoto(row.id);
+            } catch (err) {
+              logger.warn({ err, listingId: row.id }, "Cold-outreach photo refresh failed — non-fatal");
+            }
+          }
+        }
       }
     } else {
-      for (const [listingId, listingKey] of touched) {
+      for (const [listingId, { listingKey, isNew }] of touched) {
         await syncPhotos(listingId, listingKey);
+        if (isNew) {
+          try {
+            await refreshColdOutreachPhoto(listingId);
+          } catch (err) {
+            logger.warn({ err, listingId }, "Cold-outreach photo refresh failed — non-fatal");
+          }
+        }
       }
     }
 
