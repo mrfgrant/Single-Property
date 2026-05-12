@@ -22,7 +22,7 @@ export function Hero() {
   const exampleHref = featured ? `/listing/${featured.slug}` : DEMO_EXAMPLE_URL;
 
   return (
-    <section className="min-h-[88vh] pt-32 pb-16 border-b border-border flex items-center">
+    <section className="min-h-[88vh] pt-12 pb-16 border-b border-border flex items-center">
       <div className="max-w-[1200px] mx-auto px-6 lg:px-12 w-full grid grid-cols-1 lg:grid-cols-2">
         <div className="flex flex-col justify-center py-12 lg:pr-12 lg:border-r border-border">
           <motion.div

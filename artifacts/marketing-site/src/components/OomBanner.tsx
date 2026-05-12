@@ -3,7 +3,7 @@ import { MapPin, X } from "lucide-react";
 
 const SESSION_KEY = "propsite_geo_check";
 
-export function OomBanner() {
+export function useOomBanner() {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
@@ -25,6 +25,21 @@ export function OomBanner() {
       .catch(() => {});
   }, []);
 
+  const dismiss = () => {
+    sessionStorage.setItem(SESSION_KEY, "in-market");
+    setShow(false);
+  };
+
+  return { show, dismiss };
+}
+
+export function OomBanner({
+  show,
+  onClose,
+}: {
+  show: boolean;
+  onClose: () => void;
+}) {
   if (!show) return null;
 
   const scrollToWaitlist = (e: React.MouseEvent) => {
@@ -47,7 +62,7 @@ export function OomBanner() {
         </a>
       </span>
       <button
-        onClick={() => setShow(false)}
+        onClick={onClose}
         className="ml-1 text-white/50 hover:text-white transition-colors shrink-0"
         aria-label="Dismiss"
       >
