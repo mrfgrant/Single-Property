@@ -1,7 +1,9 @@
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-import { db, emailClickEventsTable } from "@workspace/db";
+import { sql } from "drizzle-orm";
+import { db, emailClickEventsTable, listingsTable } from "@workspace/db";
+import { inArray } from "drizzle-orm";
 import { logger } from "../logger.js";
 
 const log = logger.child({ component: "seed-click-events" });
@@ -13,6 +15,7 @@ interface SeedRow {
   linkType: string;
   destinationUrl: string;
   createdAt: string;
+  mlsListingId?: string;
 }
 
 /**
@@ -21,6 +24,10 @@ interface SeedRow {
  * before the outbox drain was restricted to production).
  *
  * Runs idempotently via ON CONFLICT DO NOTHING — safe to call on every boot.
+ *
+ * Also repairs listing_id / destination_url for any seeded token whose stored
+ * listing_id is a dev-environment UUID that doesn't exist locally, but whose
+ * MLS listing does exist locally under a different UUID.
  */
 export async function seedClickEvents(): Promise<void> {
   const __filename = fileURLToPath(import.meta.url);
@@ -64,4 +71,66 @@ export async function seedClickEvents(): Promise<void> {
   }
 
   log.info({ inserted }, "Click events seed complete");
+
+  // --- Repair step ---
+  // For tokens whose listing_id is a dev UUID that doesn't exist locally,
+  // look up the matching production listing by mlsListingId and remap.
+  const rowsWithMlsId = rows.filter((r) => r.mlsListingId);
+  if (!rowsWithMlsId.length) return;
+
+  const uniqueMlsIds = [...new Set(rowsWithMlsId.map((r) => r.mlsListingId!))];
+
+  const prodListings = await db
+    .select({ id: listingsTable.id, mlsListingId: listingsTable.mlsListingId })
+    .from(listingsTable)
+    .where(inArray(listingsTable.mlsListingId, uniqueMlsIds));
+
+  const mlsToLocalId = new Map(
+    prodListings
+      .filter((l) => l.mlsListingId)
+      .map((l) => [l.mlsListingId!, l.id]),
+  );
+
+  // Build (token, devListingId, localListingId) for rows that need remapping
+  const repairs: Array<{ token: string; devId: string; localId: string }> = [];
+  for (const r of rowsWithMlsId) {
+    const localId = mlsToLocalId.get(r.mlsListingId!);
+    if (localId && localId !== r.listingId) {
+      repairs.push({ token: r.token, devId: r.listingId, localId });
+    }
+  }
+
+  if (!repairs.length) {
+    log.info("No listing ID remapping needed");
+    return;
+  }
+
+  log.info({ count: repairs.length }, "Remapping dev listing IDs to local production UUIDs");
+
+  // Execute in batches using a VALUES-based UPDATE to avoid N+1 queries
+  const REPAIR_BATCH = 200;
+  let remapped = 0;
+
+  for (let i = 0; i < repairs.length; i += REPAIR_BATCH) {
+    const batch = repairs.slice(i, i + REPAIR_BATCH);
+
+    // Build VALUES clause: (token, localId)
+    const valuesClause = batch
+      .map((r) => `('${r.token}', '${r.localId}', '${r.devId}')`)
+      .join(",\n");
+
+    await db.execute(sql.raw(`
+      UPDATE email_click_events AS ece
+      SET
+        listing_id      = m.local_id::uuid,
+        destination_url = REPLACE(ece.destination_url, m.dev_id, m.local_id)
+      FROM (VALUES ${valuesClause}) AS m(token, local_id, dev_id)
+      WHERE ece.token = m.token
+        AND ece.listing_id::text = m.dev_id
+    `));
+
+    remapped += batch.length;
+  }
+
+  log.info({ remapped }, "Listing ID remap complete");
 }
