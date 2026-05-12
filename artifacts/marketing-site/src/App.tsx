@@ -4,6 +4,9 @@ import Listing from "@/pages/Listing";
 import Onboarding from "@/pages/Onboarding";
 import OnboardingSuccess from "@/pages/OnboardingSuccess";
 import Profile from "@/pages/Profile";
+import Privacy from "@/pages/Privacy";
+import Terms from "@/pages/Terms";
+import Support from "@/pages/Support";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -14,6 +17,9 @@ function Router() {
       <Route path="/onboarding" component={Onboarding} />
       <Route path="/onboarding/success" component={OnboardingSuccess} />
       <Route path="/profile" component={Profile} />
+      <Route path="/privacy" component={Privacy} />
+      <Route path="/terms" component={Terms} />
+      <Route path="/support" component={Support} />
       <Route component={NotFound} />
     </Switch>
   );
