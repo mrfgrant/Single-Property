@@ -131,12 +131,8 @@ export default function Onboarding() {
     <div className="min-h-[100dvh] bg-warm-white text-ink font-sans flex flex-col">
       {/* Top bar */}
       <header className="px-6 md:px-10 py-6 flex items-center justify-between border-b border-ink/10">
-        <Link
-          href="/"
-          className="font-sans text-base font-bold uppercase tracking-[0.18em] text-ink hover:text-gold transition-colors"
-        >
-          {WORDMARK_PREFIX}
-          {WORDMARK_SUFFIX}
+        <Link href="/">
+          <img src="/propsite-logo.png" alt="PropSite" className="h-6 w-auto" />
         </Link>
         <p className="text-[10px] uppercase tracking-[0.3em] text-muted">
           90 seconds · {REGION.marketName}

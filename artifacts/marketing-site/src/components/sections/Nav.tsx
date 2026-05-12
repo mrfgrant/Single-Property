@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { WORDMARK_PREFIX, WORDMARK_SUFFIX } from "@/lib/copy";
+
 import { ONBOARDING_URL } from "@/lib/config";
 import { track } from "@/lib/analytics";
 import { Menu, X } from "lucide-react";
@@ -46,9 +46,7 @@ export function Nav() {
       >
         <div className="max-w-[1200px] mx-auto px-6 lg:px-12 h-20 flex items-center justify-between">
           <Link href="/" className="flex flex-col leading-none">
-            <span className="font-sans font-bold text-ink uppercase tracking-[0.18em] text-base md:text-lg">
-              {WORDMARK_PREFIX}{WORDMARK_SUFFIX}
-            </span>
+            <img src="/propsite-logo.png" alt="PropSite" className="h-7 w-auto" />
             <span className="hidden sm:block font-mono text-[0.6rem] tracking-[0.12em] text-gold mt-1">
               CSRA's Property Site Engine · Est. 2026
             </span>

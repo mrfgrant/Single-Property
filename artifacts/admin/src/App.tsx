@@ -29,9 +29,7 @@ function NavBar({
   return (
     <header className="bg-white border-b border-gray-200 px-6 py-0 flex items-center justify-between sticky top-0 z-10 h-14">
       <div className="flex items-center gap-6 h-full">
-        <p className="text-lg font-bold text-gray-900 shrink-0">
-          <span>Prop</span><span className="text-amber-600">Site</span>
-        </p>
+        <img src="/propsite-logo.png" alt="PropSite" className="h-6 w-auto shrink-0" />
         <nav className="flex items-center h-full">
           {navItems.map((item) => (
             <button

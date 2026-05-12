@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
-import { WORDMARK_PREFIX, WORDMARK_SUFFIX } from "@/lib/copy";
 import { setPageSeo } from "@/lib/seo";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
@@ -50,12 +49,8 @@ export default function OnboardingSuccess() {
   return (
     <div className="min-h-[100dvh] bg-warm-white text-ink font-sans flex flex-col">
       <header className="px-6 md:px-10 py-6 flex items-center justify-between border-b border-ink/10">
-        <Link
-          href="/"
-          className="font-sans text-base font-bold uppercase tracking-[0.18em] text-ink hover:text-gold transition-colors"
-        >
-          {WORDMARK_PREFIX}
-          {WORDMARK_SUFFIX}
+        <Link href="/">
+          <img src="/propsite-logo.png" alt="PropSite" className="h-6 w-auto" />
         </Link>
       </header>
 

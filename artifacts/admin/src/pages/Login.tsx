@@ -35,9 +35,7 @@ export default function Login({ onSuccess }: Props) {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm w-full max-w-sm p-8">
         <div className="mb-8 text-center">
-          <p className="text-2xl font-bold text-gray-900">
-            <span>Prop</span><span className="text-amber-600">Site</span>
-          </p>
+          <img src="/propsite-logo.png" alt="PropSite" className="h-8 w-auto mx-auto" />
           <p className="text-sm text-gray-500 mt-1">Admin Panel</p>
         </div>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">

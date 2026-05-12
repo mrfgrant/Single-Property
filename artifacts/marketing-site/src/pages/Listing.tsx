@@ -3,7 +3,6 @@ import { Link, useParams } from "wouter";
 import { getListingBySlug, formatPrice, type SampleListing } from "@/data/sampleListings";
 import { fetchPublicListingBySlug, type PublicListing } from "@/lib/publicListings";
 import { setPageSeo, injectJsonLd } from "@/lib/seo";
-import { WORDMARK_PREFIX, WORDMARK_SUFFIX } from "@/lib/copy";
 import { ONBOARDING_URL } from "@/lib/config";
 import { initListingAnalytics, trackPhotoView, trackLeadSubmitted } from "@/lib/analytics";
 import { Phone, Mail, MessageCircle, X, Menu as MenuIcon } from "lucide-react";
@@ -181,12 +180,8 @@ function MenuRail({
           </ul>
           <div className="mt-auto pt-8 border-t border-border">
             <p className="text-[10px] tracking-[0.3em] uppercase text-muted mb-2">Auto-built by</p>
-            <Link
-              href="/"
-              className="font-sans text-base font-bold uppercase tracking-[0.18em] text-ink hover:text-gold transition-colors"
-            >
-              {WORDMARK_PREFIX}
-              {WORDMARK_SUFFIX}
+            <Link href="/">
+              <img src="/propsite-logo.png" alt="PropSite" className="h-5 w-auto" />
             </Link>
           </div>
         </nav>
@@ -952,15 +947,9 @@ export default function Listing() {
       <footer className="pl-24 md:pl-32 px-6 md:px-12 py-12 bg-warm-white border-t border-ink/10 pb-24 md:pb-12">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4 text-center md:text-left">
           <p className="text-xs text-muted uppercase tracking-[0.2em]">{fullAddress}</p>
-          <Link
-            href="/"
-            className="text-xs text-muted hover:text-ink transition-colors uppercase tracking-[0.2em]"
-          >
+          <Link href="/" className="flex items-center gap-1 text-xs text-muted hover:text-ink transition-colors">
             Auto-built by{" "}
-            <span className="text-ink font-bold">
-              {WORDMARK_PREFIX}
-              {WORDMARK_SUFFIX}
-            </span>
+            <img src="/propsite-logo.png" alt="PropSite" className="h-4 w-auto inline-block align-middle ml-1" />
           </Link>
         </div>
         {/* IDX / MLS attribution — required when listing data comes from
