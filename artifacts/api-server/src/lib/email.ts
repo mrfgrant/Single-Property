@@ -26,7 +26,7 @@ async function sendViaResend(payload: EmailPayload): Promise<SendEmailResult> {
     },
     body: JSON.stringify({
       from: `${FROM_NAME} <${FROM_EMAIL}>`,
-      to: [payload.to],
+      to: payload.to,
       ...(payload.cc ? { cc: [payload.cc] } : {}),
       subject: payload.subject,
       html: payload.html,

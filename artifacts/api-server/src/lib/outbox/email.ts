@@ -197,13 +197,46 @@ async function isAddressSuppressed(email: string): Promise<boolean> {
  * then mark sent or failed-with-backoff.
  */
 export async function drainEmailOutbox(limit = 25): Promise<{ processed: number }> {
+  // db.execute() with raw SQL RETURNING * gives back snake_case column names
+  // (e.g. `to_email`, `max_attempts`) while the Drizzle ORM query builder
+  // produces camelCase. This normalizer handles both so the drain loop can
+  // access properties by their camelCase ORM names regardless of which path
+  // produced the row.
+  function normalizeRow(raw: unknown): typeof emailOutboxTable.$inferSelect {
+    const r = raw as Record<string, unknown>;
+    return {
+      id:                r.id,
+      toEmail:           r.toEmail           ?? r.to_email,
+      ccEmail:           r.ccEmail           ?? r.cc_email           ?? null,
+      subject:           r.subject,
+      html:              r.html,
+      textBody:          r.textBody          ?? r.text_body          ?? null,
+      kind:              r.kind,
+      dedupeKey:         r.dedupeKey         ?? r.dedupe_key         ?? null,
+      status:            r.status,
+      attempts:          r.attempts,
+      maxAttempts:       r.maxAttempts       ?? r.max_attempts,
+      sendAfter:         r.sendAfter         ?? r.send_after,
+      sentAt:            r.sentAt            ?? r.sent_at            ?? null,
+      failedAt:          r.failedAt          ?? r.failed_at          ?? null,
+      lastError:         r.lastError         ?? r.last_error         ?? null,
+      providerMessageId: r.providerMessageId ?? r.provider_message_id ?? null,
+      metadata:          r.metadata          ?? null,
+      createdAt:         r.createdAt         ?? r.created_at,
+      updatedAt:         r.updatedAt         ?? r.updated_at,
+    } as typeof emailOutboxTable.$inferSelect;
+  }
+
   // Helper to normalize the two result shapes Drizzle can return from
-  // db.execute (driver-dependent: either `.rows` array or bare array).
+  // db.execute (driver-dependent: either `.rows` array or bare array),
+  // and apply the snake_case → camelCase normalizer to every row.
   const extractRows = (
     r: unknown,
-  ): Array<typeof emailOutboxTable.$inferSelect> =>
-    (r as { rows?: Array<typeof emailOutboxTable.$inferSelect> }).rows ??
-    (r as Array<typeof emailOutboxTable.$inferSelect>);
+  ): Array<typeof emailOutboxTable.$inferSelect> => {
+    const raw: unknown[] =
+      (r as { rows?: unknown[] }).rows ?? (r as unknown[]);
+    return raw.map(normalizeRow);
+  };
 
   // Pass 1 — non-cold_outreach: transactional, lead-alert, weekly reports
   // etc. are never rate-limited. Claim up to `limit` rows unconditionally.
@@ -343,6 +376,8 @@ export async function drainEmailOutbox(limit = 25): Promise<{ processed: number 
           updatedAt: new Date(),
         })
         .where(eq(emailOutboxTable.id, row.id));
+      // Stay well under Resend's 5 req/s rate limit.
+      await new Promise((resolve) => setTimeout(resolve, 220));
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       const nextAttempts = row.attempts + 1;
