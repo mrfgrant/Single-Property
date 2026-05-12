@@ -59,6 +59,10 @@ const TRACKED_FIELDS: (keyof Listing)[] = [
   "listAgentMlsId", "listAgentName", "listAgentEmail", "listAgentPhone",
   "mlsStatus", "status",
   "mlsModificationTimestamp",
+  // MLS contract date drives the 45-day cold-outreach age gate. Tracking
+  // it ensures existing rows get backfilled when the MLS feed starts
+  // supplying ListingContractDate on a subsequent delta sync.
+  "mlsListDate",
   // Brokerage attribution: required by IDX rules, so a change should
   // be treated as a content change and propagate (event emit, etc.).
   "mlsBrokerageName",
@@ -127,6 +131,7 @@ async function upsertProperty(p: ResoProperty): Promise<{ id: string; isNew: boo
         status: mapped.status ?? "active",
         mlsStatus: mapped.mlsStatus ?? undefined,
         mlsModificationTimestamp: mapped.mlsModificationTimestamp ?? undefined,
+        mlsListDate: mapped.mlsListDate ?? undefined,
         mlsHumanId: mapped.mlsHumanId ?? undefined,
         mlsBrokerageName: mapped.mlsBrokerageName ?? undefined,
         mlsLastSyncedAt: mapped.mlsLastSyncedAt ?? undefined,
@@ -176,6 +181,8 @@ async function upsertProperty(p: ResoProperty): Promise<{ id: string; isNew: boo
         mlsLastSyncedAt: mapped.mlsLastSyncedAt ?? new Date(),
         mlsBrokerageName: mapped.mlsBrokerageName ?? existing.mlsBrokerageName,
         mlsHumanId: mapped.mlsHumanId ?? existing.mlsHumanId,
+        // Backfill mlsListDate for rows ingested before the column existed.
+        mlsListDate: mapped.mlsListDate ?? existing.mlsListDate,
       })
       .where(eq(listingsTable.id, existing.id));
     return null;

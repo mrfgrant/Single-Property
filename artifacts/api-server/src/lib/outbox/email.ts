@@ -183,9 +183,12 @@ async function isAddressSuppressed(email: string): Promise<boolean> {
  * then mark sent or failed-with-backoff.
  */
 export async function drainEmailOutbox(limit = 25): Promise<{ processed: number }> {
-  // Check how many cold outreach emails have been sent today (ET calendar
-  // day). If we're at or above the daily cap, exclude cold_outreach rows
-  // from this drain tick so they roll to tomorrow without being claimed.
+  // Count cold outreach sent today (ET calendar day) to enforce the
+  // hard daily cap.  Two separate atomic claims follow — one for every
+  // non-cold_outreach kind (always up to `limit`) and one exclusively
+  // for cold_outreach (up to `remaining` slots left in today's quota).
+  // Using separate claims lets us set a precise ceiling without the
+  // batch-overflow bug of a single `limit`-sized claim.
   const capResult = await db.execute<{ count: string }>(sql`
     SELECT count(*) AS count
       FROM ${emailOutboxTable}
@@ -198,42 +201,55 @@ export async function drainEmailOutbox(limit = 25): Promise<{ processed: number 
     (capResult as unknown as { rows: Array<{ count: string }> }).rows ??
     (capResult as unknown as Array<{ count: string }>);
   const sentToday = parseInt(capRows[0]?.count ?? "0", 10);
-  const coldOutreachCapped = sentToday >= COLD_OUTREACH_DAILY_CAP;
-  if (coldOutreachCapped) {
+  const remaining = Math.max(0, COLD_OUTREACH_DAILY_CAP - sentToday);
+  if (remaining === 0) {
     log.info(
       { sentToday, cap: COLD_OUTREACH_DAILY_CAP },
       "Cold outreach daily cap reached — skipping cold_outreach rows this tick",
     );
   }
 
-  // ATOMIC CLAIM: flip pending → sending in a single UPDATE so concurrent
-  // workers (or overlapping ticks) cannot select the same rows. Postgres
-  // FOR UPDATE SKIP LOCKED guarantees the inner SELECT only returns rows
-  // we can lock; the outer UPDATE then mutates them and RETURNs the
-  // claimed payload. After this call, no other worker will see these rows
-  // as pending.
+  // ATOMIC CLAIM — two passes.
   //
-  // When the cold outreach daily cap is reached we add an extra filter to
-  // exclude cold_outreach kind from the claimed set. All other kinds
-  // (transactional, lead_alert, weekly_seller_report, etc.) are unaffected.
-  const kindFilter = coldOutreachCapped
-    ? sql`AND kind != 'cold_outreach'`
-    : sql``;
-  const claimed = await db.execute<typeof emailOutboxTable.$inferSelect>(sql`
+  // Pass 1: non-cold_outreach. Transactional, lead-alert, weekly reports
+  // etc. are never rate-limited — claim up to `limit`.
+  const claimedOther = await db.execute<typeof emailOutboxTable.$inferSelect>(sql`
     UPDATE ${emailOutboxTable}
        SET status = 'sending', updated_at = NOW()
      WHERE id IN (
        SELECT id FROM ${emailOutboxTable}
         WHERE status = 'pending' AND send_after <= NOW()
-          ${kindFilter}
+          AND kind != 'cold_outreach'
         ORDER BY send_after ASC
         LIMIT ${limit}
         FOR UPDATE SKIP LOCKED
      )
      RETURNING *
   `);
-  const due = (claimed as unknown as { rows: Array<typeof emailOutboxTable.$inferSelect> })
-    .rows ?? (claimed as unknown as Array<typeof emailOutboxTable.$inferSelect>);
+
+  // Pass 2: cold_outreach only, capped to the exact quota remaining for
+  // today. If remaining is 0, this UPDATE matches no rows.
+  const claimedCold = await db.execute<typeof emailOutboxTable.$inferSelect>(sql`
+    UPDATE ${emailOutboxTable}
+       SET status = 'sending', updated_at = NOW()
+     WHERE id IN (
+       SELECT id FROM ${emailOutboxTable}
+        WHERE status = 'pending' AND send_after <= NOW()
+          AND kind = 'cold_outreach'
+        ORDER BY send_after ASC
+        LIMIT ${remaining}
+        FOR UPDATE SKIP LOCKED
+     )
+     RETURNING *
+  `);
+
+  const extractRows = (
+    r: unknown,
+  ): Array<typeof emailOutboxTable.$inferSelect> =>
+    (r as { rows?: Array<typeof emailOutboxTable.$inferSelect> }).rows ??
+    (r as Array<typeof emailOutboxTable.$inferSelect>);
+
+  const due = [...extractRows(claimedOther), ...extractRows(claimedCold)];
 
   let processed = 0;
   for (const row of due) {
