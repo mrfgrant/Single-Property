@@ -225,6 +225,28 @@ async function recoverStuckSends(): Promise<void> {
   `);
 }
 
+/**
+ * Cancel all pending cold_outreach SMS rows.
+ * Called on boot before the worker starts to wipe any queued cold outreach.
+ */
+export async function cancelAllPendingColdOutreachSms(): Promise<number> {
+  const result = await db.execute<{ id: string }>(sql`
+    UPDATE ${smsOutboxTable}
+       SET status = 'cancelled', updated_at = NOW()
+     WHERE status IN ('pending', 'sending')
+       AND kind = 'cold_outreach'
+    RETURNING id
+  `);
+  const rows =
+    (result as unknown as { rows: unknown[] }).rows ??
+    (result as unknown as unknown[]);
+  const count = rows.length;
+  if (count > 0) {
+    log.warn({ count }, "Boot-time cancel: wiped pending cold_outreach SMS from outbox");
+  }
+  return count;
+}
+
 let timer: NodeJS.Timeout | null = null;
 export function startSmsOutboxWorker(intervalMs = 15_000): void {
   if (timer) return;

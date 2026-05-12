@@ -4,7 +4,7 @@ import { startMlsIngestion } from "./lib/mls/cron";
 import { initBillingLifecycleBridge } from "./lib/billing/lifecycleBridge";
 import { initColdOutreachBridge } from "./lib/outreach/coldOutreach";
 import { startEmailOutboxWorker, cancelAllPendingColdOutreach } from "./lib/outbox/email";
-import { startSmsOutboxWorker } from "./lib/outbox/sms";
+import { cancelAllPendingColdOutreachSms } from "./lib/outbox/sms";
 import { startWeeklyReportCron } from "./lib/analytics/cron";
 import { startColdOutreachFollowupCron } from "./lib/outreach/followupCron";
 import { startPurgeUnclaimedCron } from "./lib/mls/purgeCron";
@@ -58,8 +58,8 @@ app.listen(port, async (err) => {
 
   if (isProduction) {
     await cancelAllPendingColdOutreach();
+    await cancelAllPendingColdOutreachSms();
     startEmailOutboxWorker();
-    startSmsOutboxWorker();
     startColdOutreachFollowupCron();
     startDailyOutreachReportCron();
     logger.info("Outbox drain and outreach crons started (production)");
