@@ -3,7 +3,7 @@ import { logger } from "./lib/logger";
 import { startMlsIngestion } from "./lib/mls/cron";
 import { initBillingLifecycleBridge } from "./lib/billing/lifecycleBridge";
 import { initColdOutreachBridge } from "./lib/outreach/coldOutreach";
-import { startEmailOutboxWorker } from "./lib/outbox/email";
+import { startEmailOutboxWorker, cancelAllPendingColdOutreach } from "./lib/outbox/email";
 import { startSmsOutboxWorker } from "./lib/outbox/sms";
 import { startWeeklyReportCron } from "./lib/analytics/cron";
 import { startColdOutreachFollowupCron } from "./lib/outreach/followupCron";
@@ -57,6 +57,7 @@ app.listen(port, async (err) => {
   startMlsIngestion();
 
   if (isProduction) {
+    await cancelAllPendingColdOutreach();
     startEmailOutboxWorker();
     startSmsOutboxWorker();
     startColdOutreachFollowupCron();
