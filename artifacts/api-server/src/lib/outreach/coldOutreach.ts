@@ -17,6 +17,20 @@ import { logger } from "../logger.js";
 
 const log = logger.child({ component: "cold-outreach" });
 
+/** Listings older than this will never receive a cold-outreach email. */
+const LISTING_MAX_AGE_DAYS = 45;
+const LISTING_MAX_AGE_MS = LISTING_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+
+/**
+ * Return the effective "on-market" date for age-gating purposes.
+ * Prefers the MLS contract date when available; falls back to when we
+ * first ingested the row.
+ */
+function listingOnMarketDate(listing: { mlsListDate?: string | null; createdAt: Date }): Date {
+  if (listing.mlsListDate) return new Date(listing.mlsListDate);
+  return listing.createdAt;
+}
+
 const MARKETING_SITE_URL =
   process.env.MARKETING_SITE_URL ?? process.env.PLATFORM_HOMEPAGE_URL ?? "https://app.propsite.io";
 
@@ -89,6 +103,19 @@ async function onListingUpserted(event: ListingUpsertedEvent): Promise<void> {
     log.info(
       { listingId: listing.id, mlsAgentId: listing.listAgentMlsId },
       "MLS agent is already a PropSite customer — skipping cold outreach",
+    );
+    return;
+  }
+
+  // 45-day recency gate: never queue outreach for a listing that has been
+  // on the market for more than 45 days. Use MLS contract date when
+  // available; fall back to when we first ingested the row.
+  const onMarketDate = listingOnMarketDate(listing);
+  const ageMs = Date.now() - onMarketDate.getTime();
+  if (ageMs > LISTING_MAX_AGE_MS) {
+    log.info(
+      { listingId: listing.id, onMarketDate, ageDays: Math.floor(ageMs / 86_400_000) },
+      "Listing older than 45 days — skipping cold outreach",
     );
     return;
   }

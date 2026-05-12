@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, timestamp, integer, real, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, timestamp, integer, real, date, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -66,6 +66,12 @@ export const listingsTable = pgTable(
     // it again.
     purgedAt: timestamp("purged_at"),
     purgedReason: text("purged_reason"),
+    // MLS contract / listing date (RESO `ListingContractDate`). Used to
+    // enforce the 45-day recency filter on cold-outreach emails so we
+    // never contact an agent about a listing that's been on the market
+    // for more than 45 days.  Nullable because older ingested rows and
+    // some MLS boards may not supply this field.
+    mlsListDate: date("mls_list_date"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

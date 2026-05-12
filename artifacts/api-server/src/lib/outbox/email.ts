@@ -12,6 +12,17 @@ import { logger } from "../logger.js";
  *
  * Returns true if the row should be SUPPRESSED (do not send).
  */
+/** Listings older than this are ineligible for cold outreach at send time. */
+const LISTING_MAX_AGE_MS = 45 * 24 * 60 * 60 * 1000;
+
+/** Maximum number of cold_outreach emails sent per ET calendar day. */
+export const COLD_OUTREACH_DAILY_CAP = 100;
+
+function listingEffectiveDate(r: { mlsListDate: string | null; createdAt: Date }): Date {
+  if (r.mlsListDate) return new Date(r.mlsListDate);
+  return r.createdAt;
+}
+
 async function shouldCancelColdOutreach(
   metadata: Record<string, unknown> | null,
 ): Promise<{ cancel: boolean; reason?: string }> {
@@ -36,23 +47,33 @@ async function shouldCancelColdOutreach(
       status: listingsTable.status,
       agentId: listingsTable.agentId,
       purgedAt: listingsTable.purgedAt,
+      mlsListDate: listingsTable.mlsListDate,
+      createdAt: listingsTable.createdAt,
     })
     .from(listingsTable)
     .where(inArray(listingsTable.id, listingIds));
 
+  const now = Date.now();
+
   // For the digest case, send if AT LEAST ONE referenced listing is
-  // still a viable preview. Only cancel when every listing has been
-  // activated, gone off-market, been purged, or vanished.
+  // still a viable preview AND is within the 45-day recency window.
+  // Only cancel when every listing has been activated, gone off-market,
+  // been purged, vanished, or is too old.
   const stillEligible = rows.filter(
     (r) =>
       !r.purgedAt &&
       !r.agentId &&
       r.mode === "preview" &&
-      r.status === "active",
+      r.status === "active" &&
+      now - listingEffectiveDate(r).getTime() <= LISTING_MAX_AGE_MS,
   );
   if (stillEligible.length > 0) return { cancel: false };
 
   if (rows.length === 0) return { cancel: true, reason: "listing_deleted" };
+  // Check if every listing is simply too old — most useful log reason.
+  if (rows.every((r) => now - listingEffectiveDate(r).getTime() > LISTING_MAX_AGE_MS)) {
+    return { cancel: true, reason: "listing_too_old" };
+  }
   // Pick a representative reason from the first row for the log.
   const r = rows[0]!;
   if (r.purgedAt) return { cancel: true, reason: "purged" };
@@ -162,18 +183,49 @@ async function isAddressSuppressed(email: string): Promise<boolean> {
  * then mark sent or failed-with-backoff.
  */
 export async function drainEmailOutbox(limit = 25): Promise<{ processed: number }> {
+  // Check how many cold outreach emails have been sent today (ET calendar
+  // day). If we're at or above the daily cap, exclude cold_outreach rows
+  // from this drain tick so they roll to tomorrow without being claimed.
+  const capResult = await db.execute<{ count: string }>(sql`
+    SELECT count(*) AS count
+      FROM ${emailOutboxTable}
+     WHERE kind = 'cold_outreach'
+       AND status = 'sent'
+       AND DATE(sent_at AT TIME ZONE 'America/New_York') =
+           (CURRENT_TIMESTAMP AT TIME ZONE 'America/New_York')::date
+  `);
+  const capRows =
+    (capResult as unknown as { rows: Array<{ count: string }> }).rows ??
+    (capResult as unknown as Array<{ count: string }>);
+  const sentToday = parseInt(capRows[0]?.count ?? "0", 10);
+  const coldOutreachCapped = sentToday >= COLD_OUTREACH_DAILY_CAP;
+  if (coldOutreachCapped) {
+    log.info(
+      { sentToday, cap: COLD_OUTREACH_DAILY_CAP },
+      "Cold outreach daily cap reached — skipping cold_outreach rows this tick",
+    );
+  }
+
   // ATOMIC CLAIM: flip pending → sending in a single UPDATE so concurrent
   // workers (or overlapping ticks) cannot select the same rows. Postgres
   // FOR UPDATE SKIP LOCKED guarantees the inner SELECT only returns rows
   // we can lock; the outer UPDATE then mutates them and RETURNs the
   // claimed payload. After this call, no other worker will see these rows
   // as pending.
+  //
+  // When the cold outreach daily cap is reached we add an extra filter to
+  // exclude cold_outreach kind from the claimed set. All other kinds
+  // (transactional, lead_alert, weekly_seller_report, etc.) are unaffected.
+  const kindFilter = coldOutreachCapped
+    ? sql`AND kind != 'cold_outreach'`
+    : sql``;
   const claimed = await db.execute<typeof emailOutboxTable.$inferSelect>(sql`
     UPDATE ${emailOutboxTable}
        SET status = 'sending', updated_at = NOW()
      WHERE id IN (
        SELECT id FROM ${emailOutboxTable}
         WHERE status = 'pending' AND send_after <= NOW()
+          ${kindFilter}
         ORDER BY send_after ASC
         LIMIT ${limit}
         FOR UPDATE SKIP LOCKED

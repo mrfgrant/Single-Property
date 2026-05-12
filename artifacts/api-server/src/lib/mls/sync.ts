@@ -44,6 +44,7 @@ function mapResoToListing(p: ResoProperty): Partial<Listing> & { mlsListingId: s
     status,
     mlsStatus: p.StandardStatus ?? p.MlsStatus ?? null,
     mlsModificationTimestamp: p.ModificationTimestamp ? new Date(p.ModificationTimestamp) : null,
+    mlsListDate: p.ListingContractDate ?? null,
     mlsHumanId: p.ListingId ?? null,
     mlsBrokerageName: p.ListOfficeName ?? null,
     mlsLastSyncedAt: new Date(),
