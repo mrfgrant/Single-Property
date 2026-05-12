@@ -1,7 +1,7 @@
 import { logger } from "./logger.js";
 
 const FROM_EMAIL = process.env.EMAIL_FROM ?? "support@mail.propsite.io";
-const FROM_NAME = process.env.EMAIL_FROM_NAME ?? "PropSite";
+const FROM_NAME = process.env.EMAIL_FROM_NAME ?? "PropSite Team";
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
 
@@ -77,9 +77,9 @@ export async function sendEmail(payload: EmailPayload): Promise<SendEmailResult>
 
 const FOOTER_HTML = `<hr style="border:none;border-top:1px solid #e5e7eb;margin:32px 0 16px;"/>
 <p style="color:#5d6577;font-size:12px;line-height:1.5;">
-  PropSite — built for CSRA real estate professionals.<br/>
   You're receiving this because your name was on a recently-listed CSRA-area property.
-  <a href="{{UNSUBSCRIBE_URL}}" style="color:#5d6577;">Unsubscribe with one click</a>.
+  <a href="{{UNSUBSCRIBE_URL}}" style="color:#5d6577;">Unsubscribe with one click</a>.<br/>
+  &copy; 2026 PropSite. A service of <a href="https://soracle.dev" style="color:#5d6577;">Soracle.dev</a>.
 </p>`;
 
 function withFooter(html: string, unsubscribeUrl: string): string {
@@ -146,7 +146,7 @@ export function previewReadyEmail(params: {
       <p>If you'd like to keep it live (and have us do this automatically every time you list), it's <strong>$49/mo per active listing</strong> — billing stops the day the listing closes.</p>
       <p><a href="${params.activateUrl}">Activate this site →</a></p>
       <p>Either way, the preview is yours to share. Reply if you have any questions.</p>
-      <p>— The PropSite Team<br/><em style="color:#5d6577;font-size:12px;">CSRA's Property Site Engine</em></p>
+      <p>— PropSite Team</p>
     `,
     text: `Hi ${params.agentFirstName}, we built you a free property website for ${params.address}: ${params.previewUrl}. Activate it permanently for $49/mo: ${params.activateUrl}`,
   };
@@ -161,7 +161,7 @@ export function welcomeEmail(agent: { firstName: string; email: string }): Email
       <p>Welcome to PropSite! You're all set. When your next listing goes live in the MLS, we'll automatically build a property website for it and notify you.</p>
       <p>Each site is built in minutes and published at a dedicated address domain like <strong>412magnolia.com</strong>.</p>
       <p>Questions? Reply to this email anytime.</p>
-      <p>— The PropSite Team</p>
+      <p>— PropSite Team</p>
     `,
     text: `Hi ${agent.firstName}, welcome to PropSite! Your listing sites will be ready automatically when your MLS listings go live.`,
   };
@@ -186,7 +186,7 @@ export function siteLiveEmail(params: {
       <p><strong>One more step — add your seller's email.</strong></p>
       <p>We'll send them a friendly weekly traffic + activity report so they can see what's happening with their listing. (You'll be CC'd.)</p>
       <p><a href="${params.sellerEmailCollectionUrl}" style="display:inline-block;padding:10px 16px;background:#0d1b2a;color:#fff;text-decoration:none;border-radius:6px;">Add seller's email →</a></p>
-      <p>— The PropSite Team</p>
+      <p>— PropSite Team</p>
     `,
     text: `Your PropSite for ${params.address} is live at https://${params.domainName}\n\nAdd your seller's email so we can send them a weekly report: ${params.sellerEmailCollectionUrl}`,
   };
@@ -207,7 +207,7 @@ export function paymentFailedEmail(params: {
       <p><strong>Your site will be taken offline in 5 days</strong> if payment is not resolved.</p>
       <p><a href="${params.portalUrl}">Update your payment method →</a></p>
       <p>Once your card is updated, we'll retry the charge and your site will continue running without interruption.</p>
-      <p>— The PropSite Team</p>
+      <p>— PropSite Team</p>
     `,
     text: `Payment failed for ${params.address}. Update your card within 5 days to keep your site live: ${params.portalUrl}`,
   };
@@ -251,7 +251,7 @@ export function leadAlertEmail(params: {
       </table>
       ${messageBlock}
       <p style="margin-top:24px;">Reply within 5 minutes for the best conversion.</p>
-      <p>— PropSite</p>
+      <p>— PropSite Team</p>
     `,
     text: `New lead on ${params.address}\n\n${params.buyerName} <${params.buyerEmail}>${params.buyerPhone ? "  " + params.buyerPhone : ""}\n${params.message ?? ""}`,
   };
@@ -272,7 +272,7 @@ export function buyerAutoReplyEmail(params: {
       <p>Hi ${escape(params.buyerName)},</p>
       <p>Thanks for your interest in <strong>${escape(params.address)}</strong>. The listing agent has been notified and will be in touch shortly — typically within an hour during business hours.</p>
       <p>In the meantime, feel free to revisit the listing site for floor plans, mortgage calculator, and neighborhood info.</p>
-      <p>— PropSite, on behalf of the listing agent</p>
+      <p>— PropSite Team, on behalf of the listing agent</p>
     `,
     text: `Thanks for your interest in ${params.address}. The listing agent has been notified and will reach out shortly.`,
   };
@@ -295,7 +295,7 @@ export function listingArchivedEmail(params: {
       <p>Your listing at <strong>${escape(params.address)}</strong> went off-market in the MLS (${escape(params.closeStatus)}), so we've archived your property site and stopped billing.</p>
       <p>If a buyer visits the URL, they'll be redirected to your personal website (or a polite "no longer available" page if you don't have one on file).</p>
       <p>When you have your next listing, we'll automatically build a new site for it. No action needed.</p>
-      <p>— PropSite</p>
+      <p>— PropSite Team</p>
     `,
     text: `Your PropSite for ${params.address} has been archived (${params.closeStatus}). Billing has stopped. We'll auto-build a site for your next MLS listing.`,
   };
@@ -426,13 +426,13 @@ export function coldOutreachEmail(params: {
       <p style="margin:0 0 16px;color:#374151;">Even if you don't, feel free to use the preview while it's live.</p>
       <p style="margin:0 0 8px;color:#374151;">But if you do — this becomes more than a listing.</p>
       <p style="margin:0 0 20px;color:#374151;">It becomes part of your brand.</p>
-      <p style="margin:20px 0 0;">— PropSite</p>
+      <p style="margin:20px 0 0;">— PropSite Team</p>
     `;
   return {
     to: params.agentEmail,
     subject: `I saw your listing at ${params.address} just hit the market`,
     html: withFooter(html, params.unsubscribeUrl),
-    text: `Hi ${params.agentFirstName},\n\nI saw your listing at ${params.address} just hit the market — so we quietly built something for you.\n\nA dedicated property website that presents the home the way high-end buyers expect: clean, focused, and distraction-free.\n\nTake a look: ${params.previewUrl}\n\nNow imagine pairing it with this: ${domain}\n\nA custom domain you can place on your sign rider, brochures, and ads — creating a direct, branded entry point into the property.\n\nNo competing agents. No third-party clutter. Just your listing, your brand, your client.\n\nThis is the kind of detail that:\n• Signals a higher level of service to sellers\n• Positions you above other agents in listing presentations\n• Creates a more curated, "luxury" buying experience\n• Keeps all inquiries and attention centered on you\n\nWe've already built everything — full-screen gallery, lead capture, and print-ready materials.\n\nTo keep it live on its own domain, it's $49/month (and it cancels automatically when the home sells).\n\nActivate it here: ${params.activateUrl}\n\nEven if you don't, feel free to use the preview while it's live.\n\nBut if you do — this becomes more than a listing. It becomes part of your brand.\n\n— PropSite\n\nUnsubscribe: ${params.unsubscribeUrl}`,
+    text: `Hi ${params.agentFirstName},\n\nI saw your listing at ${params.address} just hit the market — so we quietly built something for you.\n\nA dedicated property website that presents the home the way high-end buyers expect: clean, focused, and distraction-free.\n\nTake a look: ${params.previewUrl}\n\nNow imagine pairing it with this: ${domain}\n\nA custom domain you can place on your sign rider, brochures, and ads — creating a direct, branded entry point into the property.\n\nNo competing agents. No third-party clutter. Just your listing, your brand, your client.\n\nThis is the kind of detail that:\n• Signals a higher level of service to sellers\n• Positions you above other agents in listing presentations\n• Creates a more curated, "luxury" buying experience\n• Keeps all inquiries and attention centered on you\n\nWe've already built everything — full-screen gallery, lead capture, and print-ready materials.\n\nTo keep it live on its own domain, it's $49/month (and it cancels automatically when the home sells).\n\nActivate it here: ${params.activateUrl}\n\nEven if you don't, feel free to use the preview while it's live.\n\nBut if you do — this becomes more than a listing. It becomes part of your brand.\n\n— PropSite Team\n\nUnsubscribe: ${params.unsubscribeUrl}`,
   };
 }
 
@@ -521,7 +521,7 @@ export function coldOutreachDigestEmail(params: {
       <p style="margin:0 0 16px;color:#374151;">Even if you don't, feel free to use the ${activateUrl ? "preview" : "previews"} while ${activateUrl ? "it's" : "they're"} live.</p>
       <p style="margin:0 0 8px;color:#374151;">But if you do — this becomes more than a listing.</p>
       <p style="margin:0 0 20px;color:#374151;">It becomes part of your brand.</p>
-      <p style="margin:20px 0 0;">— PropSite</p>`;
+      <p style="margin:20px 0 0;">— PropSite Team</p>`;
   }
 
   let html: string;
@@ -615,12 +615,12 @@ export function coldOutreachDigestEmail(params: {
 
   const text =
     count === 1
-      ? `Hi ${params.agentFirstName},\n\nI saw your listing at ${firstListing.address} just hit the market — so we quietly built something for you.\n\nA dedicated property website that presents the home the way high-end buyers expect: clean, focused, and distraction-free.\n\nTake a look: ${firstListing.previewUrl}\n\nNow imagine pairing it with this: ${firstDomain}\n\nA custom domain you can place on your sign rider, brochures, and ads — creating a direct, branded entry point into the property.\n\nNo competing agents. No third-party clutter. Just your listing, your brand, your client.\n\nThis is the kind of detail that:\n• Signals a higher level of service to sellers\n• Positions you above other agents in listing presentations\n• Creates a more curated, "luxury" buying experience\n• Keeps all inquiries and attention centered on you\n\nWe've already built everything — full-screen gallery, lead capture, and print-ready materials.\n\nTo keep it live on its own domain, it's $49/month (and it cancels automatically when the home sells).\n\nActivate it here: ${firstListing.activateUrl}\n\nEven if you don't, feel free to use the preview while it's live.\n\nBut if you do — this becomes more than a listing. It becomes part of your brand.\n\n— PropSite\n\nUnsubscribe: ${params.unsubscribeUrl}`
+      ? `Hi ${params.agentFirstName},\n\nI saw your listing at ${firstListing.address} just hit the market — so we quietly built something for you.\n\nA dedicated property website that presents the home the way high-end buyers expect: clean, focused, and distraction-free.\n\nTake a look: ${firstListing.previewUrl}\n\nNow imagine pairing it with this: ${firstDomain}\n\nA custom domain you can place on your sign rider, brochures, and ads — creating a direct, branded entry point into the property.\n\nNo competing agents. No third-party clutter. Just your listing, your brand, your client.\n\nThis is the kind of detail that:\n• Signals a higher level of service to sellers\n• Positions you above other agents in listing presentations\n• Creates a more curated, "luxury" buying experience\n• Keeps all inquiries and attention centered on you\n\nWe've already built everything — full-screen gallery, lead capture, and print-ready materials.\n\nTo keep it live on its own domain, it's $49/month (and it cancels automatically when the home sells).\n\nActivate it here: ${firstListing.activateUrl}\n\nEven if you don't, feel free to use the preview while it's live.\n\nBut if you do — this becomes more than a listing. It becomes part of your brand.\n\n— PropSite Team\n\nUnsubscribe: ${params.unsubscribeUrl}`
       : `Hi ${params.agentFirstName},\n\nI saw ${count} new listings from you just hit the market — so we quietly built something for each one.\n\n` +
         params.listings
           .map((l) => `• ${l.address}\n  Preview: ${l.previewUrl}\n  Domain: ${suggestDomain(l.address)}\n  Activate ($49/month, cancels when sold): ${l.activateUrl}`)
           .join("\n\n") +
-        `\n\nA custom domain you can place on your sign rider, brochures, and ads — creating a direct, branded entry point into each property.\n\nNo competing agents. No third-party clutter. Just your listing, your brand, your client.\n\nThis is the kind of detail that:\n• Signals a higher level of service to sellers\n• Positions you above other agents in listing presentations\n• Creates a more curated, "luxury" buying experience\n• Keeps all inquiries and attention centered on you\n\nWe've already built everything — full-screen gallery, lead capture, and print-ready materials.\n\nTo keep them live on their own domains, it's $49/month (and it cancels automatically when the home sells).\n\nEven if you don't, feel free to use the previews while they're live.\n\nBut if you do — this becomes more than a listing.\n\nIt becomes part of your brand.\n\n— PropSite\n\nUnsubscribe: ${params.unsubscribeUrl}`;
+        `\n\nA custom domain you can place on your sign rider, brochures, and ads — creating a direct, branded entry point into each property.\n\nNo competing agents. No third-party clutter. Just your listing, your brand, your client.\n\nThis is the kind of detail that:\n• Signals a higher level of service to sellers\n• Positions you above other agents in listing presentations\n• Creates a more curated, "luxury" buying experience\n• Keeps all inquiries and attention centered on you\n\nWe've already built everything — full-screen gallery, lead capture, and print-ready materials.\n\nTo keep them live on their own domains, it's $49/month (and it cancels automatically when the home sells).\n\nEven if you don't, feel free to use the previews while they're live.\n\nBut if you do — this becomes more than a listing.\n\nIt becomes part of your brand.\n\n— PropSite Team\n\nUnsubscribe: ${params.unsubscribeUrl}`;
 
   return {
     to: params.agentEmail,
@@ -653,7 +653,7 @@ export function previewViewedEmail(params: {
     </p>
     <p style="margin:0 0 20px;">Ready to make it official? We can put it on <strong>${escape(domain)}</strong> today. It's <strong>$49/mo, or until sold</strong> — billing cancels automatically the day it closes.</p>
     <p style="margin:0 0 20px;"><a href="${escapeAttr(params.activateUrl)}" style="color:#0d1b2a;font-weight:600;">Activate &amp; claim your domain →</a></p>
-    <p style="margin:0;">— PropSite</p>
+    <p style="margin:0;">— PropSite Team</p>
   `;
   return {
     to: params.agentEmail,
@@ -683,7 +683,7 @@ export function coldOutreachFollowupEmail(params: {
       </p>
       <p>Activating takes about 60 seconds and runs $49/mo per active listing — billing stops automatically the day the listing closes.</p>
       <p>If this isn't for you, no worries — I won't email about this listing again.</p>
-      <p>— PropSite</p>
+      <p>— PropSite Team</p>
     `;
   return {
     to: params.agentEmail,
@@ -728,7 +728,7 @@ export function siteDisabledEmail(params: {
       <p>Your property site for <strong>${params.address}</strong> has been paused due to a failed payment.</p>
       <p><a href="${params.portalUrl}">Update your payment method to restore your site →</a></p>
       <p>Your site will come back online automatically as soon as payment succeeds.</p>
-      <p>— The PropSite Team</p>
+      <p>— PropSite Team</p>
     `,
     text: `Your site for ${params.address} is paused. Update your card to restore it: ${params.portalUrl}`,
   };

@@ -46,6 +46,7 @@ export const emailOutboxTable = pgTable(
       table.sendAfter,
     ),
     dedupeIdx: index("email_outbox_dedupe_key_idx").on(table.dedupeKey),
+    kindStatusIdx: index("email_outbox_kind_status_idx").on(table.kind, table.status),
   }),
 );
 

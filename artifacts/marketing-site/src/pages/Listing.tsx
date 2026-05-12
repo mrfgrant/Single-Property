@@ -144,7 +144,7 @@ function MenuRail({
         >
           {open ? "Close" : "Menu"}
         </span>
-        <span className="block w-1 h-1 rounded-full bg-gold" />
+        <img src="/propsite-logo-light.svg" alt="PropSite" className="w-8 h-auto opacity-80" />
       </button>
 
       {/* Drawer */}

@@ -1,7 +1,17 @@
+import { useEffect } from "react";
 import { Nav } from "@/components/sections/Nav";
 import { Footer } from "@/components/sections/Footer";
+import { setPageSeo } from "@/lib/seo";
 
 export default function Terms() {
+  useEffect(() => {
+    setPageSeo({
+      title: "Terms of Service — PropSite",
+      description: "Review PropSite's terms of service for CSRA real estate agents using the platform.",
+      path: "/terms",
+    });
+  }, []);
+
   return (
     <div className="min-h-[100dvh] bg-warm-white flex flex-col font-sans">
       <Nav />

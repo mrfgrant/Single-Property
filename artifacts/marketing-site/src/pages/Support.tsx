@@ -1,8 +1,18 @@
+import { useEffect } from "react";
 import { Nav } from "@/components/sections/Nav";
 import { Footer } from "@/components/sections/Footer";
 import { Mail, Clock, BookOpen } from "lucide-react";
+import { setPageSeo } from "@/lib/seo";
 
 export default function Support() {
+  useEffect(() => {
+    setPageSeo({
+      title: "Support — PropSite",
+      description: "Get help with PropSite. Contact our team or find answers to common questions about listings, MLS sync, and billing.",
+      path: "/support",
+    });
+  }, []);
+
   return (
     <div className="min-h-[100dvh] bg-warm-white flex flex-col font-sans">
       <Nav />

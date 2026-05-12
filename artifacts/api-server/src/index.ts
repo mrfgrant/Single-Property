@@ -8,6 +8,7 @@ import { startSmsOutboxWorker } from "./lib/outbox/sms";
 import { startWeeklyReportCron } from "./lib/analytics/cron";
 import { startColdOutreachFollowupCron } from "./lib/outreach/followupCron";
 import { startPurgeUnclaimedCron } from "./lib/mls/purgeCron";
+import { startDailyOutreachReportCron } from "./lib/outreach/dailyReportCron";
 
 const rawPort = process.env["PORT"];
 
@@ -37,5 +38,6 @@ app.listen(port, (err) => {
   startWeeklyReportCron();
   startColdOutreachFollowupCron();
   startPurgeUnclaimedCron();
+  startDailyOutreachReportCron();
   startMlsIngestion();
 });

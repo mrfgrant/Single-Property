@@ -1,7 +1,17 @@
+import { useEffect } from "react";
 import { Nav } from "@/components/sections/Nav";
 import { Footer } from "@/components/sections/Footer";
+import { setPageSeo } from "@/lib/seo";
 
 export default function Privacy() {
+  useEffect(() => {
+    setPageSeo({
+      title: "Privacy Policy — PropSite",
+      description: "Learn how PropSite collects, uses, and protects your personal information as a CSRA real estate agent.",
+      path: "/privacy",
+    });
+  }, []);
+
   return (
     <div className="min-h-[100dvh] bg-warm-white flex flex-col font-sans">
       <Nav />
