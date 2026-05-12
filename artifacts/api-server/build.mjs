@@ -121,15 +121,17 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
 }
 
 buildAll()
-  .then(() =>
-    // Copy the click-events seed JSON so it's available at runtime from dist/
-    copyFile(
+  .then(async () => {
+    // Copy seed JSON files so they're available at runtime from dist/
+    await copyFile(
       path.resolve(artifactDir, "src/lib/seeds/clickEventsSeed.json"),
       path.resolve(artifactDir, "dist/clickEventsSeed.json"),
-    ).catch(() => {
-      // Seed file is optional — no-op if it doesn't exist
-    })
-  )
+    ).catch(() => {});
+    await copyFile(
+      path.resolve(artifactDir, "src/lib/seeds/missingListingsSeed.json"),
+      path.resolve(artifactDir, "dist/missingListingsSeed.json"),
+    ).catch(() => {});
+  })
   .catch((err) => {
     console.error(err);
     process.exit(1);

@@ -10,6 +10,7 @@ import { startColdOutreachFollowupCron } from "./lib/outreach/followupCron";
 import { startPurgeUnclaimedCron } from "./lib/mls/purgeCron";
 import { startDailyOutreachReportCron } from "./lib/outreach/dailyReportCron";
 import { seedClickEvents } from "./lib/seeds/seedClickEvents.js";
+import { seedMissingListings } from "./lib/seeds/seedMissingListings.js";
 
 const rawPort = process.env["PORT"];
 
@@ -46,6 +47,7 @@ app.listen(port, async (err) => {
 
   // Seed missing click events on every boot so that tracking links from
   // previously dev-drained emails resolve correctly in production.
+  await seedMissingListings();
   await seedClickEvents();
 
   initBillingLifecycleBridge();
