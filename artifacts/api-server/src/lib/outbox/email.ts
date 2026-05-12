@@ -183,36 +183,16 @@ async function isAddressSuppressed(email: string): Promise<boolean> {
  * then mark sent or failed-with-backoff.
  */
 export async function drainEmailOutbox(limit = 25): Promise<{ processed: number }> {
-  // Count cold outreach sent today (ET calendar day) to enforce the
-  // hard daily cap.  Two separate atomic claims follow — one for every
-  // non-cold_outreach kind (always up to `limit`) and one exclusively
-  // for cold_outreach (up to `remaining` slots left in today's quota).
-  // Using separate claims lets us set a precise ceiling without the
-  // batch-overflow bug of a single `limit`-sized claim.
-  const capResult = await db.execute<{ count: string }>(sql`
-    SELECT count(*) AS count
-      FROM ${emailOutboxTable}
-     WHERE kind = 'cold_outreach'
-       AND status = 'sent'
-       AND DATE(sent_at AT TIME ZONE 'America/New_York') =
-           (CURRENT_TIMESTAMP AT TIME ZONE 'America/New_York')::date
-  `);
-  const capRows =
-    (capResult as unknown as { rows: Array<{ count: string }> }).rows ??
-    (capResult as unknown as Array<{ count: string }>);
-  const sentToday = parseInt(capRows[0]?.count ?? "0", 10);
-  const remaining = Math.max(0, COLD_OUTREACH_DAILY_CAP - sentToday);
-  if (remaining === 0) {
-    log.info(
-      { sentToday, cap: COLD_OUTREACH_DAILY_CAP },
-      "Cold outreach daily cap reached — skipping cold_outreach rows this tick",
-    );
-  }
+  // Helper to normalize the two result shapes Drizzle can return from
+  // db.execute (driver-dependent: either `.rows` array or bare array).
+  const extractRows = (
+    r: unknown,
+  ): Array<typeof emailOutboxTable.$inferSelect> =>
+    (r as { rows?: Array<typeof emailOutboxTable.$inferSelect> }).rows ??
+    (r as Array<typeof emailOutboxTable.$inferSelect>);
 
-  // ATOMIC CLAIM — two passes.
-  //
-  // Pass 1: non-cold_outreach. Transactional, lead-alert, weekly reports
-  // etc. are never rate-limited — claim up to `limit`.
+  // Pass 1 — non-cold_outreach: transactional, lead-alert, weekly reports
+  // etc. are never rate-limited. Claim up to `limit` rows unconditionally.
   const claimedOther = await db.execute<typeof emailOutboxTable.$inferSelect>(sql`
     UPDATE ${emailOutboxTable}
        SET status = 'sending', updated_at = NOW()
@@ -227,29 +207,65 @@ export async function drainEmailOutbox(limit = 25): Promise<{ processed: number 
      RETURNING *
   `);
 
-  // Pass 2: cold_outreach only, capped to the exact quota remaining for
-  // today. If remaining is 0, this UPDATE matches no rows.
-  const claimedCold = await db.execute<typeof emailOutboxTable.$inferSelect>(sql`
-    UPDATE ${emailOutboxTable}
-       SET status = 'sending', updated_at = NOW()
-     WHERE id IN (
-       SELECT id FROM ${emailOutboxTable}
-        WHERE status = 'pending' AND send_after <= NOW()
-          AND kind = 'cold_outreach'
-        ORDER BY send_after ASC
-        LIMIT ${remaining}
-        FOR UPDATE SKIP LOCKED
-     )
-     RETURNING *
-  `);
+  // Pass 2 — cold_outreach: hard daily cap enforced atomically.
+  //
+  // The cap check (count sent today) and the row claim run inside a
+  // single transaction guarded by a session-level advisory lock.  This
+  // serialises concurrent drain workers so that each one sees an accurate
+  // `sentToday` count *after* previous workers have already claimed their
+  // rows, preventing the race where two workers each observe remaining=5
+  // and together send 10 instead of 5.
+  //
+  // `pg_advisory_xact_lock` is transaction-scoped: it is released
+  // automatically when the transaction commits or rolls back.
+  const claimedCold = await db.transaction(async (tx) => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtext('cold_outreach_daily_cap'))`,
+    );
 
-  const extractRows = (
-    r: unknown,
-  ): Array<typeof emailOutboxTable.$inferSelect> =>
-    (r as { rows?: Array<typeof emailOutboxTable.$inferSelect> }).rows ??
-    (r as Array<typeof emailOutboxTable.$inferSelect>);
+    const capResult = await tx.execute<{ count: string }>(sql`
+      SELECT count(*) AS count
+        FROM ${emailOutboxTable}
+       WHERE kind = 'cold_outreach'
+         AND status IN ('sent', 'sending')
+         AND DATE(COALESCE(sent_at, updated_at) AT TIME ZONE 'America/New_York') =
+             (CURRENT_TIMESTAMP AT TIME ZONE 'America/New_York')::date
+    `);
+    const capRows =
+      (capResult as unknown as { rows: Array<{ count: string }> }).rows ??
+      (capResult as unknown as Array<{ count: string }>);
+    const sentToday = parseInt(capRows[0]?.count ?? "0", 10);
+    const remaining = Math.max(0, COLD_OUTREACH_DAILY_CAP - sentToday);
 
-  const due = [...extractRows(claimedOther), ...extractRows(claimedCold)];
+    if (remaining === 0) {
+      log.info(
+        { sentToday, cap: COLD_OUTREACH_DAILY_CAP },
+        "Cold outreach daily cap reached — skipping cold_outreach rows this tick",
+      );
+      return [];
+    }
+
+    const claimed = await tx.execute<typeof emailOutboxTable.$inferSelect>(sql`
+      UPDATE ${emailOutboxTable}
+         SET status = 'sending', updated_at = NOW()
+       WHERE id IN (
+         SELECT id FROM ${emailOutboxTable}
+          WHERE status = 'pending' AND send_after <= NOW()
+            AND kind = 'cold_outreach'
+          ORDER BY send_after ASC
+          LIMIT ${remaining}
+          FOR UPDATE SKIP LOCKED
+       )
+       RETURNING *
+    `);
+    log.info(
+      { sentToday, remaining, cap: COLD_OUTREACH_DAILY_CAP },
+      "Cold outreach daily cap check",
+    );
+    return extractRows(claimed);
+  });
+
+  const due = [...extractRows(claimedOther), ...claimedCold];
 
   let processed = 0;
   for (const row of due) {
