@@ -32,14 +32,14 @@ function mapResoToListing(p: ResoProperty): Partial<Listing> & { mlsListingId: s
     city: p.City ?? "Unknown",
     state: p.StateOrProvince ?? "GA",
     zip: p.PostalCode ?? null,
-    priceUsd: p.ListPrice ?? null,
+    priceUsd: p.ListPrice != null ? Math.round(p.ListPrice) : null,
     beds: p.BedroomsTotal != null ? Math.round(p.BedroomsTotal) : null,
     baths: p.BathroomsTotalDecimal != null ? Math.round(p.BathroomsTotalDecimal) : p.BathroomsTotalInteger != null ? Math.round(p.BathroomsTotalInteger) : null,
     // SourceRE populates BuildingAreaTotal; LivingArea is almost always null.
     // Round to integer — the DB column is integer and SourceRE can return floats.
     sqft: Math.round(p.BuildingAreaTotal ?? p.LivingArea ?? p.AboveGradeFinishedArea ?? 0) || null,
     lotAcres: p.LotSizeAcres ?? null,
-    yearBuilt: p.YearBuilt ?? null,
+    yearBuilt: p.YearBuilt != null ? Math.round(p.YearBuilt) : null,
     description: p.PublicRemarks ?? null,
     status,
     mlsStatus: p.StandardStatus ?? p.MlsStatus ?? null,
@@ -356,8 +356,12 @@ export async function runSync(kind: "full" | "delta"): Promise<SyncResult> {
   try {
     let filter: string | undefined;
     if (kind === "delta" && state.lastDeltaWatermark) {
+      // Subsequent delta: fetch anything modified since the last watermark,
+      // regardless of status (catches listings that went off-market too).
       filter = `ModificationTimestamp gt ${state.lastDeltaWatermark.toISOString()}`;
-    } else if (kind === "full") {
+    } else {
+      // First-ever delta (no watermark yet) OR full sync: restrict to Active
+      // listings only so we don't ingest the entire MLS history on boot.
       filter = `StandardStatus eq 'Active'`;
     }
 
