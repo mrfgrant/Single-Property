@@ -33,8 +33,8 @@ function mapResoToListing(p: ResoProperty): Partial<Listing> & { mlsListingId: s
     state: p.StateOrProvince ?? "GA",
     zip: p.PostalCode ?? null,
     priceUsd: p.ListPrice ?? null,
-    beds: p.BedroomsTotal ?? null,
-    baths: p.BathroomsTotalDecimal ?? p.BathroomsTotalInteger ?? null,
+    beds: p.BedroomsTotal != null ? Math.round(p.BedroomsTotal) : null,
+    baths: p.BathroomsTotalDecimal != null ? Math.round(p.BathroomsTotalDecimal) : p.BathroomsTotalInteger != null ? Math.round(p.BathroomsTotalInteger) : null,
     // SourceRE populates BuildingAreaTotal; LivingArea is almost always null.
     // Round to integer — the DB column is integer and SourceRE can return floats.
     sqft: Math.round(p.BuildingAreaTotal ?? p.LivingArea ?? p.AboveGradeFinishedArea ?? 0) || null,
