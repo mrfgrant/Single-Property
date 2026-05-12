@@ -53,17 +53,18 @@ function ClaimBanner({ address, slug }: BaseProps) {
     <div
       data-testid="preview-banner"
       data-variant="claim"
-      className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-[calc(100vw-2rem)]"
+      className="fixed bottom-[4.5rem] md:bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-[calc(100vw-2rem)]"
       role="region"
       aria-label="Claim this property site"
     >
       <div className="flex items-center gap-3 md:gap-5 bg-ink text-warm-white pl-4 pr-2 py-2 md:pl-6 md:pr-3 md:py-3 rounded-full shadow-2xl border border-warm-white/10">
         <span className="hidden sm:inline-block w-1.5 h-1.5 rounded-full bg-gold animate-pulse" aria-hidden />
-        <p className="text-[11px] md:text-xs leading-snug">
+        <p className="text-[11px] md:text-xs leading-snug whitespace-nowrap">
           <span className="hidden md:inline text-warm-white/70 uppercase tracking-[0.25em] mr-2">
             Free preview
           </span>
-          <span className="font-medium">Like this site for {shortAddress(address)}?</span>
+          <span className="font-medium hidden sm:inline">Like this site for {shortAddress(address)}?</span>
+          <span className="font-medium sm:hidden">Like this site?</span>
         </p>
         <Link
           href={`${ONBOARDING_URL}?listing=${encodeURIComponent(slug)}`}

@@ -695,8 +695,8 @@ export default function Listing() {
           </a>
         </div>
 
-        {/* Bottom overlay */}
-        <div className="absolute bottom-0 inset-x-0 pl-24 md:pl-32 px-6 md:px-12 pb-8 md:pb-14 flex flex-col md:flex-row md:items-end justify-between gap-6 text-warm-white">
+        {/* Bottom overlay — extra bottom padding on mobile clears the sticky CTA bar + preview banner */}
+        <div className="absolute bottom-0 inset-x-0 pl-24 md:pl-32 px-6 md:px-12 pb-40 md:pb-14 flex flex-col md:flex-row md:items-end justify-between gap-6 text-warm-white">
           <div>
             <p className="font-serif text-4xl md:text-6xl lg:text-7xl leading-none drop-shadow-lg">
               {formatPrice(listing.price)}
@@ -712,7 +712,7 @@ export default function Listing() {
             </p>
           </div>
 
-          <div className="text-left md:text-right">
+          <div className="hidden md:block text-right">
             <p className="font-serif text-xl md:text-2xl drop-shadow-md">Open House</p>
             <p className="text-[10px] md:text-xs uppercase tracking-[0.3em] mt-1 text-warm-white/80">
               By appointment · Schedule below
