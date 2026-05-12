@@ -15,6 +15,18 @@ import { getMlsConfig, normalizeStatus } from "./config.js";
 import { downloadAndStorePhoto } from "./photoUtils.js";
 import { refreshColdOutreachPhoto } from "../outreach/coldOutreach.js";
 
+/**
+ * Returns true for URLs that are actual image files.
+ * R2 paths (/objects/...) are always images.
+ * External URLs must have a recognised image extension.
+ */
+function isImageUrl(url: string | null | undefined): url is string {
+  if (!url) return false;
+  if (url.startsWith("/objects/")) return true;
+  const IMAGE_EXT = /\.(jpe?g|png|webp|gif|avif|tiff?|bmp|svg)(\?.*)?$/i;
+  return IMAGE_EXT.test(url);
+}
+
 function buildAddress(p: ResoProperty): string {
   if (p.UnparsedAddress?.trim()) return p.UnparsedAddress.trim();
   return [p.StreetNumber, p.StreetName, p.StreetSuffix].filter(Boolean).join(" ").trim() || "Unknown";
@@ -288,7 +300,9 @@ async function syncPhotos(listingId: string, listingKey: string): Promise<void> 
     await db
       .update(listingsTable)
       .set({
-        photoUrls: photos.map((p) => p.storedUrl ?? p.sourceUrl),
+        photoUrls: photos
+          .map((p) => p.storedUrl ?? p.sourceUrl)
+          .filter(isImageUrl),
         updatedAt: new Date(),
       })
       .where(eq(listingsTable.id, listingId));

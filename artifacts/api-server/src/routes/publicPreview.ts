@@ -8,6 +8,18 @@ import { logger } from "../lib/logger.js";
 
 const router = Router();
 
+/**
+ * Returns true for URLs that represent actual image files.
+ * R2 paths (/objects/...) are always images.
+ * External URLs must end with a recognised image extension.
+ */
+function isImageUrl(url: string | null | undefined): url is string {
+  if (!url) return false;
+  if (url.startsWith("/objects/")) return true;
+  const IMAGE_EXT = /\.(jpe?g|png|webp|gif|avif|tiff?|bmp|svg)(\?.*)?$/i;
+  return IMAGE_EXT.test(url);
+}
+
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -102,7 +114,7 @@ router.get("/listings/preview/:id", async (req, res) => {
       lotAcres: listing.lotAcres,
       yearBuilt: listing.yearBuilt,
       description: listing.description,
-      photoUrls: listing.photoUrls,
+      photoUrls: (listing.photoUrls ?? []).filter(isImageUrl),
       domainName: listing.domainName,
       mode: listing.mode,
       status: listing.status,
