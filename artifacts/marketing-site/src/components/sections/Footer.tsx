@@ -13,7 +13,7 @@ export function Footer() {
       <div className="max-w-[1200px] mx-auto">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-6">
           <div className="flex flex-col leading-none">
-            <img src="/propsite-logo.png" alt="PropSite" className="h-6 w-auto" />
+            <img src="/propsite-logo.png" alt="PropSite" className="h-5 w-auto max-w-[100px]" />
             <span className="font-mono text-[0.6rem] tracking-[0.12em] text-gold mt-1">
               CSRA's Property Site Engine · Est. 2026
             </span>

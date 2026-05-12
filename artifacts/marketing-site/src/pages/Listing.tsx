@@ -181,7 +181,7 @@ function MenuRail({
           <div className="mt-auto pt-8 border-t border-border">
             <p className="text-[10px] tracking-[0.3em] uppercase text-muted mb-2">Auto-built by</p>
             <Link href="/">
-              <img src="/propsite-logo.png" alt="PropSite" className="h-5 w-auto" />
+              <img src="/propsite-logo.png" alt="PropSite" className="h-4 w-auto max-w-[80px]" />
             </Link>
           </div>
         </nav>

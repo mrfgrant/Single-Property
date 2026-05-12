@@ -29,7 +29,7 @@ function NavBar({
   return (
     <header className="bg-white border-b border-gray-200 px-6 py-0 flex items-center justify-between sticky top-0 z-10 h-14">
       <div className="flex items-center gap-6 h-full">
-        <img src="/propsite-logo.png" alt="PropSite" className="h-6 w-auto shrink-0" />
+        <img src="/propsite-logo.png" alt="PropSite" className="h-5 w-auto max-w-[100px] shrink-0" />
         <nav className="flex items-center h-full">
           {navItems.map((item) => (
             <button

@@ -50,7 +50,7 @@ export default function OnboardingSuccess() {
     <div className="min-h-[100dvh] bg-warm-white text-ink font-sans flex flex-col">
       <header className="px-6 md:px-10 py-6 flex items-center justify-between border-b border-ink/10">
         <Link href="/">
-          <img src="/propsite-logo.png" alt="PropSite" className="h-6 w-auto" />
+          <img src="/propsite-logo.png" alt="PropSite" className="h-5 w-auto max-w-[100px]" />
         </Link>
       </header>
 

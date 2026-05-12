@@ -46,7 +46,7 @@ export function Nav() {
       >
         <div className="max-w-[1200px] mx-auto px-6 lg:px-12 h-20 flex items-center justify-between">
           <Link href="/" className="flex flex-col leading-none">
-            <img src="/propsite-logo.png" alt="PropSite" className="h-7 w-auto" />
+            <img src="/propsite-logo.png" alt="PropSite" className="h-6 w-auto max-w-[110px]" />
             <span className="hidden sm:block font-mono text-[0.6rem] tracking-[0.12em] text-gold mt-1">
               CSRA's Property Site Engine · Est. 2026
             </span>

@@ -132,7 +132,7 @@ export default function Onboarding() {
       {/* Top bar */}
       <header className="px-6 md:px-10 py-6 flex items-center justify-between border-b border-ink/10">
         <Link href="/">
-          <img src="/propsite-logo.png" alt="PropSite" className="h-6 w-auto" />
+          <img src="/propsite-logo.png" alt="PropSite" className="h-5 w-auto max-w-[100px]" />
         </Link>
         <p className="text-[10px] uppercase tracking-[0.3em] text-muted">
           90 seconds · {REGION.marketName}
