@@ -1,8 +1,9 @@
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import { sql } from "drizzle-orm";
 import { db, listingsTable } from "@workspace/db";
-import { inArray } from "drizzle-orm";
+import { inArray, isNull, eq } from "drizzle-orm";
 import { logger } from "../logger.js";
 
 const log = logger.child({ component: "seed-missing-listings" });
@@ -33,6 +34,8 @@ interface ListingSeedRow {
   mode: string;
   created_at: string;
   updated_at: string;
+  photo_urls: string[] | null;
+  description: string | null;
 }
 
 const safeDate = (s: string | null | undefined): Date | undefined => {
@@ -62,7 +65,8 @@ const safeFloat = (v: number | string | null | undefined): number | undefined =>
  * tokens (which already reference those UUIDs) resolve correctly.
  *
  * Skips any listing whose mls_listing_id is already present locally (under any
- * UUID) to avoid violating the unique constraint.
+ * UUID) to avoid violating the unique constraint, but still backfills photo_urls
+ * for listings that were inserted on a previous boot without photos.
  *
  * Runs idempotently — safe to call on every boot.
  */
@@ -83,9 +87,10 @@ export async function seedMissingListings(): Promise<void> {
   if (!rows.length) return;
 
   // Find which mls_listing_ids already exist locally (under any UUID).
-  // These must be skipped to avoid the unique constraint on mls_listing_id.
+  // These must be skipped for INSERT to avoid the unique constraint on mls_listing_id.
   const rowsWithMlsId = rows.filter((r) => r.mls_listing_id);
   const allMlsIds = rowsWithMlsId.map((r) => r.mls_listing_id!);
+  const allIds = rows.map((r) => r.id);
 
   const LOOKUP_BATCH = 200;
   const existingMlsIds = new Set<string>();
@@ -104,56 +109,98 @@ export async function seedMissingListings(): Promise<void> {
     (r) => !r.mls_listing_id || !existingMlsIds.has(r.mls_listing_id),
   );
 
-  if (!toInsert.length) {
-    log.info("All seed listings already present — skipping");
-    return;
-  }
-
-  log.info({ total: rows.length, toInsert: toInsert.length, skipped: rows.length - toInsert.length },
-    "Seeding missing MLS listings into DB");
-
-  const BATCH = 50;
-  let inserted = 0;
   const now = new Date();
 
-  for (let i = 0; i < toInsert.length; i += BATCH) {
-    const batch = toInsert.slice(i, i + BATCH);
-    const values = batch.map((r) => ({
-      id: r.id,
-      mlsListingId: r.mls_listing_id ?? undefined,
-      listAgentMlsId: r.list_agent_mls_id ?? undefined,
-      listAgentName: r.list_agent_name ?? undefined,
-      listAgentEmail: r.list_agent_email ?? undefined,
-      listAgentPhone: r.list_agent_phone ?? undefined,
-      address: r.address ?? "Unknown",
-      city: r.city ?? "Unknown",
-      state: r.state ?? "GA",
-      zip: r.zip ?? undefined,
-      priceUsd: safeInt(r.price_usd),
-      beds: safeInt(r.beds),
-      baths: safeInt(r.baths),
-      sqft: safeInt(r.sqft),
-      lotAcres: safeFloat(r.lot_acres),
-      yearBuilt: safeInt(r.year_built),
-      status: (r.status as "active" | "pending" | "closed" | "archived") ?? "active",
-      mlsStatus: r.mls_status ?? undefined,
-      mlsModificationTimestamp: safeDate(r.mls_modification_timestamp),
-      mlsListDate: r.mls_list_date ?? undefined,
-      mlsHumanId: r.mls_human_id ?? undefined,
-      mlsBrokerageName: r.mls_brokerage_name ?? undefined,
-      mode: (r.mode as "preview" | "active" | "disabled") ?? "preview",
-      mlsLastSyncedAt: now,
-      createdAt: safeDate(r.created_at) ?? now,
-      updatedAt: safeDate(r.updated_at) ?? now,
-    }));
+  if (toInsert.length > 0) {
+    log.info(
+      { total: rows.length, toInsert: toInsert.length, skipped: rows.length - toInsert.length },
+      "Seeding missing MLS listings into DB",
+    );
 
-    await db
-      .insert(listingsTable)
-      .values(values)
-      .onConflictDoNothing();
+    const BATCH = 50;
+    let inserted = 0;
 
-    inserted += batch.length;
+    for (let i = 0; i < toInsert.length; i += BATCH) {
+      const batch = toInsert.slice(i, i + BATCH);
+      const values = batch.map((r) => ({
+        id: r.id,
+        mlsListingId: r.mls_listing_id ?? undefined,
+        listAgentMlsId: r.list_agent_mls_id ?? undefined,
+        listAgentName: r.list_agent_name ?? undefined,
+        listAgentEmail: r.list_agent_email ?? undefined,
+        listAgentPhone: r.list_agent_phone ?? undefined,
+        address: r.address ?? "Unknown",
+        city: r.city ?? "Unknown",
+        state: r.state ?? "GA",
+        zip: r.zip ?? undefined,
+        priceUsd: safeInt(r.price_usd),
+        beds: safeInt(r.beds),
+        baths: safeInt(r.baths),
+        sqft: safeInt(r.sqft),
+        lotAcres: safeFloat(r.lot_acres),
+        yearBuilt: safeInt(r.year_built),
+        description: r.description ?? undefined,
+        status: (r.status as "active" | "pending" | "closed" | "archived") ?? "active",
+        mlsStatus: r.mls_status ?? undefined,
+        mlsModificationTimestamp: safeDate(r.mls_modification_timestamp),
+        mlsListDate: r.mls_list_date ?? undefined,
+        mlsHumanId: r.mls_human_id ?? undefined,
+        mlsBrokerageName: r.mls_brokerage_name ?? undefined,
+        mode: (r.mode as "preview" | "active" | "disabled") ?? "preview",
+        photoUrls: r.photo_urls?.length ? r.photo_urls : undefined,
+        mlsLastSyncedAt: now,
+        createdAt: safeDate(r.created_at) ?? now,
+        updatedAt: safeDate(r.updated_at) ?? now,
+      }));
+
+      await db.insert(listingsTable).values(values).onConflictDoNothing();
+      inserted += batch.length;
+    }
+
+    log.info({ inserted }, "Missing listings seed complete");
+  } else {
+    log.info("All seed listings already present — checking photo backfill");
   }
 
-  log.info({ inserted }, "Missing listings seed complete");
+  // Backfill photo_urls for listings inserted on a previous boot without photos.
+  // Only update rows that (a) we seeded (id in our list) and (b) have no photos yet.
+  const rowsWithPhotos = rows.filter((r) => r.photo_urls?.length);
+  if (!rowsWithPhotos.length) return;
+
+  // Build VALUES clause for a single batched UPDATE
+  const PHOTO_BATCH = 100;
+  let photoUpdated = 0;
+
+  for (let i = 0; i < rowsWithPhotos.length; i += PHOTO_BATCH) {
+    const batch = rowsWithPhotos.slice(i, i + PHOTO_BATCH);
+
+    // Check which of these ids actually exist locally with no photos
+    const ids = batch.map((r) => r.id);
+    const existing = await db
+      .select({ id: listingsTable.id, photoUrls: listingsTable.photoUrls })
+      .from(listingsTable)
+      .where(inArray(listingsTable.id, ids));
+
+    const needsPhoto = existing.filter(
+      (e) => !e.photoUrls || (e.photoUrls as string[]).length === 0,
+    );
+    if (!needsPhoto.length) continue;
+
+    const needsPhotoIds = new Set(needsPhoto.map((e) => e.id));
+    const toUpdate = batch.filter((r) => needsPhotoIds.has(r.id));
+
+    for (const r of toUpdate) {
+      await db
+        .update(listingsTable)
+        .set({ photoUrls: r.photo_urls!, updatedAt: now })
+        .where(eq(listingsTable.id, r.id));
+      photoUpdated++;
+    }
+  }
+
+  if (photoUpdated > 0) {
+    log.info({ photoUpdated }, "Backfilled photo_urls for seeded listings");
+  } else {
+    log.info("No photo backfill needed");
+  }
 }
