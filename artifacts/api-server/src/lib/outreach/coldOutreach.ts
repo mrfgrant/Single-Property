@@ -22,13 +22,14 @@ const LISTING_MAX_AGE_DAYS = 45;
 const LISTING_MAX_AGE_MS = LISTING_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
 
 /**
- * Return the effective "on-market" date for age-gating purposes.
- * Prefers the MLS contract date when available; falls back to when we
- * first ingested the row.
+ * Return the MLS on-market date for age-gating purposes.
+ * Returns null when the date is absent — callers must treat null as
+ * "ineligible" and skip cold outreach rather than falling back to
+ * createdAt (ingest timestamp), which is not a reliable market date.
  */
-function listingOnMarketDate(listing: { mlsListDate?: string | null; createdAt: Date }): Date {
+function listingOnMarketDate(listing: { mlsListDate?: string | null }): Date | null {
   if (listing.mlsListDate) return new Date(listing.mlsListDate);
-  return listing.createdAt;
+  return null;
 }
 
 const MARKETING_SITE_URL =
@@ -107,10 +108,19 @@ async function onListingUpserted(event: ListingUpsertedEvent): Promise<void> {
     return;
   }
 
-  // 45-day recency gate: never queue outreach for a listing that has been
-  // on the market for more than 45 days. Use MLS contract date when
-  // available; fall back to when we first ingested the row.
+  // 45-day recency gate: only queue outreach when the listing has a
+  // verified MLS contract date AND it is within 45 days. If mlsListDate
+  // is null we have no reliable on-market date — skip rather than
+  // falling back to createdAt (which is our ingest timestamp, not the
+  // real market date, and would incorrectly pass every freshly-synced row).
   const onMarketDate = listingOnMarketDate(listing);
+  if (!onMarketDate) {
+    log.debug(
+      { listingId: listing.id },
+      "Listing has no mls_list_date — skipping cold outreach",
+    );
+    return;
+  }
   const ageMs = Date.now() - onMarketDate.getTime();
   if (ageMs > LISTING_MAX_AGE_MS) {
     log.info(

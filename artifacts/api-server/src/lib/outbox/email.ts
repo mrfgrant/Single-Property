@@ -18,9 +18,14 @@ const LISTING_MAX_AGE_MS = 45 * 24 * 60 * 60 * 1000;
 /** Maximum number of cold_outreach emails sent per ET calendar day. */
 export const COLD_OUTREACH_DAILY_CAP = 100;
 
-function listingEffectiveDate(r: { mlsListDate: string | null; createdAt: Date }): Date {
+/**
+ * Returns the MLS on-market date, or null when absent.
+ * Null means the listing has no verified market date and must be
+ * treated as ineligible rather than falling back to createdAt.
+ */
+function listingOnMarketDate(r: { mlsListDate: string | null }): Date | null {
   if (r.mlsListDate) return new Date(r.mlsListDate);
-  return r.createdAt;
+  return null;
 }
 
 async function shouldCancelColdOutreach(
@@ -59,19 +64,28 @@ async function shouldCancelColdOutreach(
   // still a viable preview AND is within the 45-day recency window.
   // Only cancel when every listing has been activated, gone off-market,
   // been purged, vanished, or is too old.
-  const stillEligible = rows.filter(
-    (r) =>
-      !r.purgedAt &&
-      !r.agentId &&
-      r.mode === "preview" &&
-      r.status === "active" &&
-      now - listingEffectiveDate(r).getTime() <= LISTING_MAX_AGE_MS,
-  );
+  const stillEligible = rows.filter((r) => {
+    if (r.purgedAt || r.agentId || r.mode !== "preview" || r.status !== "active") return false;
+    const onMarket = listingOnMarketDate(r);
+    // No verified MLS date → ineligible (would otherwise fall back to
+    // createdAt which is the ingest timestamp, not the real market date).
+    if (!onMarket) return false;
+    return now - onMarket.getTime() <= LISTING_MAX_AGE_MS;
+  });
   if (stillEligible.length > 0) return { cancel: false };
 
   if (rows.length === 0) return { cancel: true, reason: "listing_deleted" };
+  // No listing has a verified date — most specific reason.
+  if (rows.every((r) => !listingOnMarketDate(r))) {
+    return { cancel: true, reason: "listing_no_date" };
+  }
   // Check if every listing is simply too old — most useful log reason.
-  if (rows.every((r) => now - listingEffectiveDate(r).getTime() > LISTING_MAX_AGE_MS)) {
+  if (
+    rows.every((r) => {
+      const d = listingOnMarketDate(r);
+      return !d || now - d.getTime() > LISTING_MAX_AGE_MS;
+    })
+  ) {
     return { cancel: true, reason: "listing_too_old" };
   }
   // Pick a representative reason from the first row for the log.
