@@ -356,92 +356,114 @@ export async function refreshColdOutreachPhoto(listingId: string): Promise<void>
   const firstName = firstNameOf(listing.listAgentName);
   const unsubscribeUrl = buildUnsubscribeUrl(MARKETING_SITE_URL, recipient);
 
-  await db.transaction(async (tx) => {
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${dedupeKey}))`);
+  // The `listing.upserted` event handler that creates the outbox row is async —
+  // it may still be in-flight when this function runs immediately after
+  // `syncPhotos()` completes. Retry up to 3 times with a short back-off before
+  // giving up so we don't silently no-op in that narrow race.
+  const MAX_ATTEMPTS = 3;
+  const RETRY_DELAY_MS = 500;
 
-    const lockRows = await tx.execute<{ id: string; metadata: Record<string, unknown> | null }>(sql`
-      SELECT id, metadata
-        FROM ${emailOutboxTable}
-       WHERE dedupe_key = ${dedupeKey}
-         AND status = 'pending'
-       LIMIT 1
-       FOR UPDATE
-    `);
-    const lockedRows =
-      (lockRows as unknown as { rows: Array<{ id: string; metadata: Record<string, unknown> | null }> })
-        .rows ??
-      (lockRows as unknown as Array<{ id: string; metadata: Record<string, unknown> | null }>);
-    const existing = lockedRows[0];
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    let foundRow = false;
 
-    if (!existing) {
-      log.debug({ listingId, recipient }, "No pending digest to refresh photo for — skipping");
-      return;
-    }
+    await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${dedupeKey}))`);
 
-    const meta = (existing.metadata ?? {}) as Record<string, unknown>;
-    const ids = Array.isArray(meta.listingIds)
-      ? (meta.listingIds.filter((x) => typeof x === "string") as string[])
-      : [];
+      const lockRows = await tx.execute<{ id: string; metadata: Record<string, unknown> | null }>(sql`
+        SELECT id, metadata
+          FROM ${emailOutboxTable}
+         WHERE dedupe_key = ${dedupeKey}
+           AND status = 'pending'
+         LIMIT 1
+         FOR UPDATE
+      `);
+      const lockedRows =
+        (lockRows as unknown as { rows: Array<{ id: string; metadata: Record<string, unknown> | null }> })
+          .rows ??
+        (lockRows as unknown as Array<{ id: string; metadata: Record<string, unknown> | null }>);
+      const existing = lockedRows[0];
 
-    const allListings = await tx
-      .select()
-      .from(listingsTable)
-      .where(inArray(listingsTable.id, ids.length ? ids : [listingId]));
-    const eligibleListings = allListings.filter(
-      (l) => !l.purgedAt && !l.agentId && l.mode === "preview" && l.status === "active",
-    );
-    if (eligibleListings.length === 0) return;
+      if (!existing) {
+        if (attempt < MAX_ATTEMPTS) {
+          log.debug({ listingId, recipient, attempt }, "No pending digest yet — will retry after delay");
+        } else {
+          log.debug({ listingId, recipient }, "No pending digest to refresh photo for — skipping");
+        }
+        return;
+      }
 
-    const items = await Promise.all(
-      eligibleListings.map(async (l) => {
-        const { previewUrl, activateUrl } = await createListingTrackingUrls(
-          {
-            agentEmail: recipient,
-            listingId: l.id,
-            rawPreviewUrl: `${MARKETING_SITE_URL}/listing/${l.id}`,
-            rawActivateUrl: `${MARKETING_SITE_URL}/onboarding?listing=${l.id}`,
-          },
-          tx,
-        );
-        return {
-          address: l.address,
-          previewUrl,
-          activateUrl,
-          photoUrl: resolvePhotoUrl(l.photoUrls?.[0]),
-          beds: l.beds,
-          baths: l.baths,
-          sqft: l.sqft,
-          price: l.priceUsd,
-          yearBuilt: l.yearBuilt,
-          lotAcres: l.lotAcres,
-          garage: null,
-          description: l.description,
-        };
-      }),
-    );
+      foundRow = true;
 
-    const rendered = coldOutreachDigestEmail({
-      agentEmail: recipient,
-      agentFirstName: firstName,
-      listings: items,
-      unsubscribeUrl,
+      const meta = (existing.metadata ?? {}) as Record<string, unknown>;
+      const ids = Array.isArray(meta.listingIds)
+        ? (meta.listingIds.filter((x) => typeof x === "string") as string[])
+        : [];
+
+      const allListings = await tx
+        .select()
+        .from(listingsTable)
+        .where(inArray(listingsTable.id, ids.length ? ids : [listingId]));
+      const eligibleListings = allListings.filter(
+        (l) => !l.purgedAt && !l.agentId && l.mode === "preview" && l.status === "active",
+      );
+      if (eligibleListings.length === 0) return;
+
+      const items = await Promise.all(
+        eligibleListings.map(async (l) => {
+          const { previewUrl, activateUrl } = await createListingTrackingUrls(
+            {
+              agentEmail: recipient,
+              listingId: l.id,
+              rawPreviewUrl: `${MARKETING_SITE_URL}/listing/${l.id}`,
+              rawActivateUrl: `${MARKETING_SITE_URL}/onboarding?listing=${l.id}`,
+            },
+            tx,
+          );
+          return {
+            address: l.address,
+            previewUrl,
+            activateUrl,
+            photoUrl: resolvePhotoUrl(l.photoUrls?.[0]),
+            beds: l.beds,
+            baths: l.baths,
+            sqft: l.sqft,
+            price: l.priceUsd,
+            yearBuilt: l.yearBuilt,
+            lotAcres: l.lotAcres,
+            garage: null,
+            description: l.description,
+          };
+        }),
+      );
+
+      const rendered = coldOutreachDigestEmail({
+        agentEmail: recipient,
+        agentFirstName: firstName,
+        listings: items,
+        unsubscribeUrl,
+      });
+
+      await tx
+        .update(emailOutboxTable)
+        .set({
+          subject: rendered.subject,
+          html: rendered.html,
+          textBody: rendered.text,
+          updatedAt: new Date(),
+        })
+        .where(eq(emailOutboxTable.id, existing.id));
+
+      log.info(
+        { outboxId: existing.id, recipient, listingId },
+        "Patched cold-outreach digest with listing photo after sync",
+      );
     });
 
-    await tx
-      .update(emailOutboxTable)
-      .set({
-        subject: rendered.subject,
-        html: rendered.html,
-        textBody: rendered.text,
-        updatedAt: new Date(),
-      })
-      .where(eq(emailOutboxTable.id, existing.id));
-
-    log.info(
-      { outboxId: existing.id, recipient, listingId },
-      "Patched cold-outreach digest with listing photo after sync",
-    );
-  });
+    if (foundRow) break;
+    if (attempt < MAX_ATTEMPTS) {
+      await new Promise<void>((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+    }
+  }
 }
 
 let initialized = false;
