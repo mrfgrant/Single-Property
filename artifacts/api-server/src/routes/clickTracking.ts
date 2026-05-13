@@ -19,9 +19,18 @@ const FALLBACK =
  * - Stamps clicked_at on the first click only.
  * - 302-redirects to the destination URL.
  * - Falls back to the marketing homepage if the token is unknown.
+ *
+ * Admin spot-check bypass:
+ * - Append ?notrack=<ADMIN_PASSWORD> to skip recording the click.
+ *   The redirect still works but clicked_at is never stamped, so
+ *   dashboard metrics are unaffected.
  */
 router.get("/t/:token", async (req, res) => {
   const token = String(req.params.token);
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  const notrack =
+    adminPassword &&
+    String(req.query.notrack ?? "") === adminPassword;
 
   try {
     const rows = await db
@@ -35,6 +44,15 @@ router.get("/t/:token", async (req, res) => {
     if (!row) {
       log.warn({ token }, "Unknown click tracking token — redirecting to fallback");
       res.redirect(302, FALLBACK);
+      return;
+    }
+
+    if (notrack) {
+      log.info(
+        { token, agentEmail: row.agentEmail, listingId: row.listingId, linkType: row.linkType },
+        "Admin spot-check — click not recorded",
+      );
+      res.redirect(302, row.destinationUrl);
       return;
     }
 
