@@ -71,7 +71,7 @@ const TRACKED_FIELDS: (keyof Listing)[] = [
   "listAgentMlsId", "listAgentName", "listAgentEmail", "listAgentPhone",
   "mlsStatus", "status",
   "mlsModificationTimestamp",
-  // MLS contract date drives the 45-day cold-outreach age gate. Tracking
+  // MLS contract date drives the 15-day cold-outreach age gate. Tracking
   // it ensures existing rows get backfilled when the MLS feed starts
   // supplying ListingContractDate on a subsequent delta sync.
   "mlsListDate",
@@ -105,7 +105,7 @@ function diffFields(prev: Listing, next: Partial<Listing>): string[] {
  * first time — the initial cold-outreach email is rendered before photos
  * are available, so we patch it immediately after syncPhotos() completes.
  */
-async function upsertProperty(p: ResoProperty): Promise<{ id: string; isNew: boolean } | null> {
+async function upsertProperty(p: ResoProperty, syncKind: "full" | "delta"): Promise<{ id: string; isNew: boolean } | null> {
   const mapped = mapResoToListing(p);
   const [existing] = await db
     .select()
@@ -161,7 +161,7 @@ async function upsertProperty(p: ResoProperty): Promise<{ id: string; isNew: boo
     mlsEventBus.emit("listing.upserted", {
       listingId: inserted.id,
       mlsListingId: inserted.mlsListingId,
-      isNew: true,
+      isNew: syncKind === "delta",
       changedFields: TRACKED_FIELDS.map(String),
     });
 
@@ -395,7 +395,7 @@ export async function runSync(kind: "full" | "delta"): Promise<SyncResult> {
 
     for await (const page of mlsClient.iterateProperties({ filter })) {
       for (const p of page) {
-        const result = await upsertProperty(p);
+        const result = await upsertProperty(p, kind);
         if (result) touched.set(result.id, { listingKey: p.ListingKey, isNew: result.isNew });
         processed += 1;
         if (p.ModificationTimestamp) {

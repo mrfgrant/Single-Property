@@ -7,10 +7,8 @@ import {
 } from "@workspace/db";
 import { eq, inArray, sql } from "drizzle-orm";
 import { mlsEventBus, type ListingUpsertedEvent } from "../mls/eventBus.js";
-import { enqueueSms } from "../outbox/sms.js";
-import { coldOutreachDigestEmail, coldOutreachSms } from "../email.js";
+import { coldOutreachDigestEmail } from "../email.js";
 import { createListingTrackingUrls } from "../tracking.js";
-import { pickAgentMobile } from "./phone.js";
 import { buildUnsubscribeUrl } from "./unsubscribe.js";
 import { nextSendWindow7to9amET } from "./sendWindow.js";
 import { logger } from "../logger.js";
@@ -18,7 +16,7 @@ import { logger } from "../logger.js";
 const log = logger.child({ component: "cold-outreach" });
 
 /** Listings older than this will never receive a cold-outreach email. */
-const LISTING_MAX_AGE_DAYS = 45;
+const LISTING_MAX_AGE_DAYS = 15;
 const LISTING_MAX_AGE_MS = LISTING_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
 
 /**
@@ -88,8 +86,6 @@ async function onListingUpserted(event: ListingUpsertedEvent): Promise<void> {
   }
   if (!listing.listAgentEmail) {
     log.debug({ listingId: listing.id }, "Listing has no listAgentEmail — skipping email outreach");
-    // Still consider SMS path below if we have a mobile.
-    await maybeSendColdSms(listing);
     return;
   }
 
@@ -108,8 +104,8 @@ async function onListingUpserted(event: ListingUpsertedEvent): Promise<void> {
     return;
   }
 
-  // 45-day recency gate: only queue outreach when the listing has a
-  // verified MLS contract date AND it is within 45 days. If mlsListDate
+  // 15-day recency gate: only queue outreach when the listing has a
+  // verified MLS contract date AND it is within 15 days. If mlsListDate
   // is null we have no reliable on-market date — skip rather than
   // falling back to createdAt (which is our ingest timestamp, not the
   // real market date, and would incorrectly pass every freshly-synced row).
@@ -125,7 +121,7 @@ async function onListingUpserted(event: ListingUpsertedEvent): Promise<void> {
   if (ageMs > LISTING_MAX_AGE_MS) {
     log.info(
       { listingId: listing.id, onMarketDate, ageDays: Math.floor(ageMs / 86_400_000) },
-      "Listing older than 45 days — skipping cold outreach",
+      "Listing older than 15 days — skipping cold outreach",
     );
     return;
   }
@@ -146,11 +142,6 @@ async function onListingUpserted(event: ListingUpsertedEvent): Promise<void> {
   }
 
   await upsertDigestForAgent(recipient, listing);
-
-  // SMS channel runs as before (one per listing). Out of scope for the
-  // digest batching work; explicitly preserved so existing per-listing
-  // SMS behavior is unchanged.
-  await maybeSendColdSms(listing);
 }
 
 /**
@@ -327,35 +318,6 @@ async function upsertDigestForAgent(recipient: string, listing: ListingRow): Pro
       "Queued cold-outreach digest for next 7–9 AM ET window",
     );
   });
-}
-
-async function maybeSendColdSms(listing: ListingRow): Promise<void> {
-  const phones = pickAgentMobile({
-    mobilePhone: listing.listAgentMobilePhone,
-    directPhone: listing.listAgentDirectPhone ?? listing.listAgentPhone,
-    officePhone: listing.listAgentOfficePhone,
-  });
-  const phone = phones?.phone ?? null;
-  if (!phone) return;
-  const previewUrl = `${MARKETING_SITE_URL}/listing/${listing.id}`;
-  const sendAfter = nextSendWindow7to9amET();
-  const dedupeKey = `cold_outreach:${listing.id}:sms`;
-  try {
-    await enqueueSms({
-      toPhone: phone,
-      body: coldOutreachSms({
-        agentFirstName: firstNameOf(listing.listAgentName),
-        address: listing.address,
-        previewUrl,
-      }),
-      kind: "cold_outreach",
-      dedupeKey,
-      sendAfter,
-      metadata: { listingId: listing.id, mlsAgentId: listing.listAgentMlsId },
-    });
-  } catch (err) {
-    log.error({ err, listingId: listing.id }, "Failed to enqueue cold outreach SMS");
-  }
 }
 
 function firstNameOf(full: string | null | undefined): string {

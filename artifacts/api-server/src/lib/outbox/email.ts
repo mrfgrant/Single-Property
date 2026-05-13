@@ -13,7 +13,7 @@ import { logger } from "../logger.js";
  * Returns true if the row should be SUPPRESSED (do not send).
  */
 /** Listings older than this are ineligible for cold outreach at send time. */
-const LISTING_MAX_AGE_MS = 45 * 24 * 60 * 60 * 1000;
+const LISTING_MAX_AGE_MS = 15 * 24 * 60 * 60 * 1000;
 
 
 /**
@@ -59,7 +59,7 @@ async function shouldCancelColdOutreach(
   const now = Date.now();
 
   // For the digest case, send if AT LEAST ONE referenced listing is
-  // still a viable preview AND is within the 45-day recency window.
+  // still a viable preview AND is within the 15-day recency window.
   // Only cancel when every listing has been activated, gone off-market,
   // been purged, vanished, or is too old.
   const stillEligible = rows.filter((r) => {
