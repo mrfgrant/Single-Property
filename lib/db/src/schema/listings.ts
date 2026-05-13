@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, timestamp, integer, real, date, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, timestamp, integer, bigint, real, date, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -26,7 +26,7 @@ export const listingsTable = pgTable(
     city: text("city").notNull(),
     state: text("state").notNull().default("GA"),
     zip: text("zip"),
-    priceUsd: integer("price_usd"),
+    priceUsd: bigint("price_usd", { mode: "number" }),
     beds: integer("beds"),
     baths: real("baths"),
     sqft: integer("sqft"),
