@@ -46,5 +46,8 @@ EMAIL_FROM_NAME = "PropSite"
 MARKETING_SITE_URL = "https://app.propsite.io"
 ONBOARDING_URL = "https://app.propsite.io/onboarding"
 
+[userenv.production]
+IS_PRODUCTION = "true"
+
 [nix]
 channel = "stable-25_05"

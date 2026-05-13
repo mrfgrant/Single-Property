@@ -32,10 +32,14 @@ if (Number.isNaN(port) || port <= 0) {
  * tracking tokens stored in the dev database — those tokens are unknown to
  * the production server, so every recipient sees a broken tracking link.
  *
- * Replit sets REPL_DEPLOYMENT to a non-empty string in all autoscale
- * deployments; it is absent (undefined) in the development workspace.
+ * Detection uses two signals so either one is sufficient:
+ *   IS_PRODUCTION=true  — explicit production-only env var we set ourselves
+ *   REPL_DEPLOYMENT     — Replit autoscale sets this automatically (kept as
+ *                         a fallback in case the env var is ever removed)
  */
-const isProduction = Boolean(process.env["REPL_DEPLOYMENT"]);
+const isProduction =
+  process.env["IS_PRODUCTION"] === "true" ||
+  Boolean(process.env["REPL_DEPLOYMENT"]);
 
 app.listen(port, async (err) => {
   if (err) {
@@ -65,7 +69,7 @@ app.listen(port, async (err) => {
     logger.info("Outbox drain and outreach crons started (production)");
   } else {
     logger.warn(
-      "Outbox drain disabled in dev — REPL_DEPLOYMENT not set",
+      "Outbox drain disabled in dev — IS_PRODUCTION and REPL_DEPLOYMENT not set",
     );
   }
 });
