@@ -342,7 +342,21 @@ async function recordSuccess(boardId: string, kind: "full" | "delta", watermark:
 }
 
 async function recordError(boardId: string, err: unknown) {
-  const message = err instanceof Error ? err.message : String(err);
+  let message: string;
+  if (err instanceof Error) {
+    // Drizzle wraps the pg error in err.cause — prefer that as the summary.
+    const cause = (err as any).cause;
+    const rootMsg = cause instanceof Error ? cause.message : null;
+    if (rootMsg) {
+      // e.g. "integer out of range — insert into listings (…)"
+      const sqlSnippet = err.message.split("\n")[0].replace(/^Failed query:\s*/i, "").slice(0, 100);
+      message = sqlSnippet ? `${rootMsg} — ${sqlSnippet}` : rootMsg;
+    } else {
+      message = err.message;
+    }
+  } else {
+    message = String(err);
+  }
   await db
     .update(mlsSyncStateTable)
     .set({ lastError: message, lastErrorAt: new Date(), runId: null, updatedAt: new Date() })

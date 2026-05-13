@@ -64,7 +64,8 @@ router.get("/admin/dashboard", adminAuth, async (_req, res) => {
           COUNT(*) FILTER (WHERE agent_id IS NOT NULL AND mode = 'preview')             AS claimed_trial,
           COUNT(*) FILTER (WHERE mls_listing_id IS NOT NULL AND purged_at IS NULL)      AS total_mls_listings,
           COUNT(*) FILTER (WHERE mls_listing_id IS NOT NULL AND purged_at IS NULL
-            AND created_at >= NOW() - INTERVAL '7 days')                                AS new_listings_7d,
+            AND mls_list_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'America/New_York')::date - 6)
+            AS new_listings_7d,
           (SELECT COUNT(*) FROM ${agentsTable})::text                                   AS total_agents
         FROM ${listingsTable}
       `),
@@ -104,6 +105,29 @@ router.get("/admin/dashboard", adminAuth, async (_req, res) => {
 
     const n = (v: string | undefined) => parseInt(v ?? "0", 10);
 
+    // Extract the root-cause message from a stored error string.
+    // Handles three formats:
+    //   1. New format (post-fix): "integer out of range — insert into listings (…)"  → pass through
+    //   2. "caused by: <msg>"  → extract after "caused by:"
+    //   3. Legacy Drizzle verbose: "Failed query: <SQL>\nparams: <values>"  → extract operation
+    function trimError(raw: string | null): string | null {
+      if (!raw) return null;
+      // Format 2: caused-by suffix from stack traces
+      const causedBy = raw.indexOf("caused by:");
+      if (causedBy !== -1) return raw.slice(causedBy + "caused by:".length).trim();
+      // Format 3: legacy "Failed query: <SQL>\nparams: <values>" — no root cause stored
+      if (/^Failed query:/i.test(raw)) {
+        const sqlLine = raw.replace(/^Failed query:\s*/i, "").split("\n")[0].trim();
+        const opMatch = sqlLine.match(/^(insert\s+into|select\s+.*?\s+from|update|delete\s+from)\s+["']?(\w+)/i);
+        if (opMatch) {
+          return `Query failed on ${opMatch[2]} — see server logs for details`;
+        }
+        return "Query failed — see server logs for details";
+      }
+      // Format 1 or any other short message: pass through, truncate if huge
+      return raw.length > 300 ? raw.slice(0, 297) + "…" : raw;
+    }
+
     // MLS health: healthy if last successful sync was within 30 minutes
     const lastSuccess = mlsRow?.last_success_at ? new Date(mlsRow.last_success_at) : null;
     const minutesSinceSync = lastSuccess ? (Date.now() - lastSuccess.getTime()) / 60_000 : null;
@@ -138,7 +162,7 @@ router.get("/admin/dashboard", adminAuth, async (_req, res) => {
         lastSuccessAt:     mlsRow.last_success_at ?? null,
         lastDeltaSyncAt:   mlsRow.last_delta_sync_at ?? null,
         lastFullSyncAt:    mlsRow.last_full_sync_at ?? null,
-        lastError:         mlsRow.last_error ?? null,
+        lastError:         trimError(mlsRow.last_error ?? null),
         lastErrorAt:       mlsRow.last_error_at ?? null,
         totalListings:     n(mlsRow.total_listings),
       } : null,
