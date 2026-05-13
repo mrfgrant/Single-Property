@@ -32,6 +32,8 @@ export type ListingUpsertedEvent = {
   mlsListingId: string | null;
   isNew: boolean;
   changedFields: string[];
+  /** Whether this event came from a full or delta MLS sync. Absent for non-MLS sources. */
+  syncKind?: "full" | "delta";
 };
 
 export type EventMap = {

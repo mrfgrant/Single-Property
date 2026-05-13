@@ -163,6 +163,7 @@ async function upsertProperty(p: ResoProperty, syncKind: "full" | "delta"): Prom
       mlsListingId: inserted.mlsListingId,
       isNew: syncKind === "delta",
       changedFields: TRACKED_FIELDS.map(String),
+      syncKind,
     });
 
     if (inserted.status !== "pending") {
@@ -230,6 +231,7 @@ async function upsertProperty(p: ResoProperty, syncKind: "full" | "delta"): Prom
     mlsListingId: updated.mlsListingId,
     isNew: false,
     changedFields: changed,
+    syncKind,
   });
   return { id: updated.id, isNew: false };
 }

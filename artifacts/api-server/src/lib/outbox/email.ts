@@ -353,28 +353,6 @@ async function recoverStuckSends(): Promise<void> {
   `);
 }
 
-/**
- * Cancel all pending cold_outreach emails in the outbox.
- * Used on boot to drain an over-queued outbox before the worker starts.
- */
-export async function cancelAllPendingColdOutreach(): Promise<number> {
-  const result = await db.execute<{ count: string }>(sql`
-    UPDATE ${emailOutboxTable}
-       SET status = 'cancelled', updated_at = NOW()
-     WHERE status = 'pending'
-       AND kind = 'cold_outreach'
-    RETURNING id
-  `);
-  const rows =
-    (result as unknown as { rows: unknown[] }).rows ??
-    (result as unknown as unknown[]);
-  const count = rows.length;
-  if (count > 0) {
-    log.warn({ count }, "Boot-time cancel: wiped pending cold_outreach emails from outbox");
-  }
-  return count;
-}
-
 let timer: NodeJS.Timeout | null = null;
 
 /**
