@@ -193,8 +193,13 @@ async function runOneTick(): Promise<{ purged: number }> {
 
   // Second pass: purge closed/expired listings that were never claimed.
   const { purged: closedPurged } = await purgeClosedListings();
+  const unclaimedPurged = purged;
   purged += closedPurged;
 
+  log.warn(
+    { purged, unclaimedPurged, closedPurged },
+    "Purge tick complete",
+  );
   return { purged };
 }
 
