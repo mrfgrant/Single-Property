@@ -209,6 +209,30 @@ export const api = {
       }),
   },
 
+  dashboard: {
+    get: () => request<{
+      outreach: {
+        sentToday: number; sent7d: number; sent30d: number;
+        pendingQueue: number; failed: number; cancelled: number; suppressed: number;
+      };
+      clicks: {
+        clicksToday: number; clicks7d: number;
+        uniqueAgents7d: number; activateClicks7d: number;
+      };
+      revenue: {
+        paidActive: number; claimedTrial: number;
+        totalMlsListings: number; newListings7d: number; totalAgents: number;
+      };
+      mlsSync: {
+        healthy: boolean; minutesSinceSync: number | null;
+        lastSuccessAt: string | null; lastDeltaSyncAt: string | null;
+        lastFullSyncAt: string | null; lastError: string | null;
+        lastErrorAt: string | null; totalListings: number;
+      } | null;
+      dailySent: { day: string; count: number }[];
+    }>("/api/admin/dashboard"),
+  },
+
   verifyPassword: (password: string) =>
     request<{ listings: ExampleListing[] }>("/api/admin/listings", {
       headers: { Authorization: `Bearer ${password}` },

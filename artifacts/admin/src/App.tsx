@@ -7,9 +7,10 @@ import ListingForm from "@/pages/ListingForm";
 import DomainSearch from "@/pages/DomainSearch";
 import DomainsManager from "@/pages/DomainsManager";
 import type { ExampleListing } from "@/lib/api";
-import { LayoutList, Globe, Search, LogOut } from "lucide-react";
+import Dashboard from "@/pages/Dashboard";
+import { LayoutList, Globe, Search, LogOut, LayoutDashboard } from "lucide-react";
 
-type Screen = "login" | "listings" | "form" | "domain-search" | "domains";
+type Screen = "login" | "listings" | "form" | "domain-search" | "domains" | "dashboard";
 
 function NavBar({
   screen,
@@ -21,6 +22,7 @@ function NavBar({
   onLogout: () => void;
 }) {
   const navItems: { label: string; id: Screen; icon: React.ReactNode }[] = [
+    { label: "Dashboard", id: "dashboard", icon: <LayoutDashboard size={15} /> },
     { label: "Listings", id: "listings", icon: <LayoutList size={15} /> },
     { label: "Domain Search", id: "domain-search", icon: <Search size={15} /> },
     { label: "Domains", id: "domains", icon: <Globe size={15} /> },
@@ -59,12 +61,12 @@ function NavBar({
 }
 
 function App() {
-  const [screen, setScreen] = useState<Screen>(isAuthenticated() ? "listings" : "login");
+  const [screen, setScreen] = useState<Screen>(isAuthenticated() ? "dashboard" : "login");
   const [editingListing, setEditingListing] = useState<ExampleListing | null>(null);
   const [preselectedListingId, setPreselectedListingId] = useState<string | null>(null);
   const [listings, setListings] = useState<ExampleListing[]>([]);
 
-  const handleLoginSuccess = () => setScreen("listings");
+  const handleLoginSuccess = () => setScreen("dashboard");
 
   const handleLogout = () => {
     clearToken();
@@ -109,6 +111,7 @@ function App() {
       <div className="min-h-screen bg-gray-50">
         <NavBar screen={screen} onNav={setScreen} onLogout={handleLogout} />
         <main>
+          {screen === "dashboard" && <Dashboard />}
           {screen === "listings" && (
             <Listings
               onEdit={handleEdit}
