@@ -409,17 +409,34 @@ export async function runSync(kind: "full" | "delta"): Promise<SyncResult> {
     // photos are available.
     const touched = new Map<string, { listingKey: string; isNew: boolean }>();
 
+    let skipped = 0;
     for await (const page of mlsClient.iterateProperties({ filter })) {
       for (const p of page) {
-        const result = await upsertProperty(p, kind);
-        if (result) touched.set(result.id, { listingKey: p.ListingKey, isNew: result.isNew });
-        processed += 1;
-        if (p.ModificationTimestamp) {
-          const ts = new Date(p.ModificationTimestamp);
-          if (!maxWatermark || ts > maxWatermark) maxWatermark = ts;
+        try {
+          const result = await upsertProperty(p, kind);
+          if (result) touched.set(result.id, { listingKey: p.ListingKey, isNew: result.isNew });
+          processed += 1;
+          if (p.ModificationTimestamp) {
+            const ts = new Date(p.ModificationTimestamp);
+            if (!maxWatermark || ts > maxWatermark) maxWatermark = ts;
+          }
+        } catch (err: any) {
+          // Skip individual listings that fail (e.g. integer overflow on malformed
+          // MLS data) so one bad record cannot abort the entire sync run.
+          skipped += 1;
+          logger.warn(
+            { err: err?.message ?? String(err), listingKey: p.ListingKey, listingId: p.ListingId },
+            "Skipping listing due to upsert error — bad MLS data",
+          );
+          // Still advance the watermark past this record so we don't
+          // re-process it on every subsequent delta run.
+          if (p.ModificationTimestamp) {
+            const ts = new Date(p.ModificationTimestamp);
+            if (!maxWatermark || ts > maxWatermark) maxWatermark = ts;
+          }
         }
       }
-      logger.info({ runId, kind, processed }, "MLS sync progress");
+      logger.info({ runId, kind, processed, skipped }, "MLS sync progress");
     }
 
     // Photo sync: full sync covers every MLS listing in the DB; delta sync
