@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 
 import { ONBOARDING_URL } from "@/lib/config";
 import { track } from "@/lib/analytics";
+import { NAV } from "@/lib/copy";
 import { Menu, X } from "lucide-react";
 
 interface NavProps {
@@ -98,7 +99,7 @@ export function Nav({ embedded = false, fixedHeaderHeight = 80 }: NavProps = {})
               onClick={handleGetStarted}
               className="h-11 px-6 bg-gold text-white font-semibold text-sm rounded-full flex items-center hover:bg-gold-light transition-colors shadow-sm"
             >
-              Get started →
+              {NAV.cta}
             </a>
           </div>
 
