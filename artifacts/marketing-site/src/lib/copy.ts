@@ -116,6 +116,37 @@ export const SOCIAL_PROOF = {
   ],
 };
 
+export const FAQ = {
+  eyebrow: "COMMON QUESTIONS",
+  headline: "Everything you'd want to know before signing up.",
+  items: [
+    {
+      q: "How does PropSite get access to my MLS listings?",
+      a: "You connect your MLS agent ID during the 90-second onboarding. PropSite monitors the CSRA MLS feed for new listings under your name — we never touch your MLS login credentials or act on your behalf outside of reading listing data.",
+    },
+    {
+      q: "Is this IDX-compliant?",
+      a: "Yes. Every listing site includes the required IDX attribution, brokerage disclosure, and MLS disclaimer. We follow CSRA MLS IDX display rules so you don't have to think about it.",
+    },
+    {
+      q: "Who owns the leads captured on my listing site?",
+      a: "You do, entirely. Lead contact details — name, phone, email, and showing request notes — are delivered straight to you via email alert. PropSite does not sell, share, or remarket to your leads.",
+    },
+    {
+      q: "Who owns the domain? What happens to it when the listing closes?",
+      a: "The domain is registered in your listing's name (e.g. 2918arrowheaddrive.com) and operated by PropSite for the life of the listing. When the listing closes or is withdrawn, the site archives automatically and the domain is retired — no action needed from you.",
+    },
+    {
+      q: "Can I edit the site if the MLS data is wrong?",
+      a: "The fastest fix is always to correct the data in the MLS — PropSite syncs changes within minutes. If you need an immediate adjustment outside the MLS, contact support and we'll update it manually.",
+    },
+    {
+      q: "What if I have multiple active listings at once?",
+      a: "Each active listing is $49/month with its own site, domain, and seller report. Billing is per listing and stops automatically when each one closes — so three listings is $147/month total, and it drops as they sell.",
+    },
+  ],
+};
+
 export const CTA_BANNER = {
   headline: ["Your next listing deserves a", "proper website."],
   subhead: "Set up once in 90 seconds. Every listing after that is automatic.",

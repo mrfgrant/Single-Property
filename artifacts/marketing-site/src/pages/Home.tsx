@@ -4,6 +4,7 @@ import { Hero } from "@/components/sections/Hero";
 import { HowItWorks } from "@/components/sections/HowItWorks";
 import { Pricing } from "@/components/sections/Pricing";
 import { ComparisonTable } from "@/components/sections/ComparisonTable";
+import { FAQSection } from "@/components/sections/FAQ";
 import { SocialProof } from "@/components/sections/SocialProof";
 import { DemoListings } from "@/components/sections/DemoListings";
 import { CTABanner } from "@/components/sections/CTABanner";
@@ -47,6 +48,7 @@ export default function Home() {
         <HowItWorks />
         <Pricing />
         <ComparisonTable />
+        <FAQSection />
         <SocialProof />
         <DemoListings />
         <CTABanner />
