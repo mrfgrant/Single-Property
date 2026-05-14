@@ -94,17 +94,17 @@ export const SOCIAL_PROOF = {
   testimonials: [
     {
       quote:
-        "I got an email saying my new listing's site was live. I hadn't even finished writing the MLS description yet. That's when I realized this thing actually works.",
-      initials: "SR",
-      name: "Sarah R.",
-      brokerage: "Keller Williams · Augusta, GA",
+        "I got back from a showing and my seller had already texted me asking for the website link. PropSite had it live before I even got home. That's when I stopped questioning it.",
+      initials: "PH",
+      name: "Purvis Huggins",
+      brokerage: "Purvis Huggins Realty · Augusta, GA",
     },
     {
       quote:
-        "My sellers ask me every single listing 'how are people finding out about the house?' Now I just forward them the Monday report. They're always impressed.",
-      initials: "DM",
-      name: "David M.",
-      brokerage: "RE/MAX · Columbia, SC",
+        "My sellers used to ask me every week what kind of marketing I was doing. Now I just forward them the Monday report. They love it and I didn't do a thing.",
+      initials: "FG",
+      name: "Forrest G",
+      brokerage: "Forrest G Realty · CSRA",
     },
     {
       quote:
