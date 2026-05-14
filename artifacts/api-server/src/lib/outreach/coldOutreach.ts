@@ -25,9 +25,12 @@ const LISTING_MAX_AGE_MS = LISTING_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
  * "ineligible" and skip cold outreach rather than falling back to
  * createdAt (ingest timestamp), which is not a reliable market date.
  */
-function listingOnMarketDate(listing: { mlsListDate?: string | null }): Date | null {
-  if (listing.mlsListDate) return new Date(listing.mlsListDate);
-  return null;
+function listingOnMarketDate(listing: {
+  mlsListDate?: string | null;
+  createdAt: Date | string;
+}): { date: Date; verified: boolean } {
+  if (listing.mlsListDate) return { date: new Date(listing.mlsListDate), verified: true };
+  return { date: new Date(listing.createdAt), verified: false };
 }
 
 const MARKETING_SITE_URL =
@@ -104,24 +107,17 @@ async function onListingUpserted(event: ListingUpsertedEvent): Promise<void> {
     return;
   }
 
-  // 15-day recency gate: only queue outreach when the listing has a
-  // verified MLS contract date AND it is within 15 days. If mlsListDate
-  // is null we have no reliable on-market date — skip rather than
-  // falling back to createdAt (which is our ingest timestamp, not the
-  // real market date, and would incorrectly pass every freshly-synced row).
-  const onMarketDate = listingOnMarketDate(listing);
-  if (!onMarketDate) {
-    log.debug(
-      { listingId: listing.id },
-      "Listing has no mls_list_date — skipping cold outreach",
-    );
-    return;
-  }
+  // Recency gate: listings with a verified mlsListDate must be within 15 days;
+  // listings without one fall back to createdAt (ingest timestamp) with a
+  // tighter 7-day window so recently-synced listings still get reached.
+  const FALLBACK_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+  const { date: onMarketDate, verified } = listingOnMarketDate(listing);
+  const maxAgeMs = verified ? LISTING_MAX_AGE_MS : FALLBACK_MAX_AGE_MS;
   const ageMs = Date.now() - onMarketDate.getTime();
-  if (ageMs > LISTING_MAX_AGE_MS) {
+  if (ageMs > maxAgeMs) {
     log.info(
-      { listingId: listing.id, onMarketDate, ageDays: Math.floor(ageMs / 86_400_000) },
-      "Listing older than 15 days — skipping cold outreach",
+      { listingId: listing.id, onMarketDate, ageDays: Math.floor(ageMs / 86_400_000), verified },
+      "Listing outside recency window — skipping cold outreach",
     );
     return;
   }

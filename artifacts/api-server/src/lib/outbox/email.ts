@@ -17,13 +17,18 @@ const LISTING_MAX_AGE_MS = 15 * 24 * 60 * 60 * 1000;
 
 
 /**
- * Returns the MLS on-market date, or null when absent.
- * Null means the listing has no verified market date and must be
- * treated as ineligible rather than falling back to createdAt.
+ * Returns the best available on-market date for a listing.
+ * Prefers mlsListDate (the real MLS list date). Falls back to createdAt
+ * (the ingest timestamp) when mlsListDate is absent — callers must use a
+ * tighter recency window in that case since createdAt lags the real date
+ * by at most a few hours.
  */
-function listingOnMarketDate(r: { mlsListDate: string | null }): Date | null {
-  if (r.mlsListDate) return new Date(r.mlsListDate);
-  return null;
+function listingOnMarketDate(r: {
+  mlsListDate: string | null;
+  createdAt: Date | string;
+}): { date: Date; verified: boolean } {
+  if (r.mlsListDate) return { date: new Date(r.mlsListDate), verified: true };
+  return { date: new Date(r.createdAt), verified: false };
 }
 
 async function shouldCancelColdOutreach(
@@ -62,26 +67,25 @@ async function shouldCancelColdOutreach(
   // still a viable preview AND is within the 15-day recency window.
   // Only cancel when every listing has been activated, gone off-market,
   // been purged, vanished, or is too old.
+  // Tighter recency window when falling back to createdAt (ingest timestamp).
+  // mlsListDate is the real on-market date; createdAt may lag by hours at most.
+  const FALLBACK_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
   const stillEligible = rows.filter((r) => {
     if (r.purgedAt || r.agentId || r.mode !== "preview" || r.status !== "active") return false;
-    const onMarket = listingOnMarketDate(r);
-    // No verified MLS date → ineligible (would otherwise fall back to
-    // createdAt which is the ingest timestamp, not the real market date).
-    if (!onMarket) return false;
-    return now - onMarket.getTime() <= LISTING_MAX_AGE_MS;
+    const { date, verified } = listingOnMarketDate(r);
+    const maxAge = verified ? LISTING_MAX_AGE_MS : FALLBACK_MAX_AGE_MS;
+    return now - date.getTime() <= maxAge;
   });
   if (stillEligible.length > 0) return { cancel: false };
 
   if (rows.length === 0) return { cancel: true, reason: "listing_deleted" };
-  // No listing has a verified date — most specific reason.
-  if (rows.every((r) => !listingOnMarketDate(r))) {
-    return { cancel: true, reason: "listing_no_date" };
-  }
   // Check if every listing is simply too old — most useful log reason.
   if (
     rows.every((r) => {
-      const d = listingOnMarketDate(r);
-      return !d || now - d.getTime() > LISTING_MAX_AGE_MS;
+      const { date, verified } = listingOnMarketDate(r);
+      const maxAge = verified ? LISTING_MAX_AGE_MS : FALLBACK_MAX_AGE_MS;
+      return now - date.getTime() > maxAge;
     })
   ) {
     return { cancel: true, reason: "listing_too_old" };
@@ -384,11 +388,17 @@ export function startEmailOutboxWorker(intervalMs = 15_000): void {
   if (timer) return;
   log.info({ intervalMs }, "Email outbox worker started");
   const tick = async () => {
+    // recoverStuckSends has its own try/catch so a transient DB timeout
+    // cannot prevent drainEmailOutbox from running in the same tick.
     try {
       await recoverStuckSends();
+    } catch (err) {
+      log.warn({ err }, "recoverStuckSends failed — skipping this cycle");
+    }
+    try {
       await drainEmailOutbox();
     } catch (err) {
-      log.error({ err }, "Email outbox tick threw");
+      log.error({ err }, "drainEmailOutbox tick threw");
     }
   };
   timer = setInterval(tick, intervalMs);
