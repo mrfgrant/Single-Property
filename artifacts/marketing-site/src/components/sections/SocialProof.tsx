@@ -25,6 +25,14 @@ export function SocialProof() {
               transition={{ duration: 0.6, delay: index * 0.1 }}
               className="p-8 rounded bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.08)] flex flex-col"
             >
+              <div className="flex gap-0.5 mb-5" aria-label="5 stars">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <svg key={i} width="13" height="13" viewBox="0 0 24 24" fill="currentColor" className="text-gold" aria-hidden>
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                  </svg>
+                ))}
+              </div>
+
               <p className="font-serif italic text-[0.9rem] text-warm-white/80 leading-relaxed mb-8 flex-1">
                 "{t.quote}"
               </p>

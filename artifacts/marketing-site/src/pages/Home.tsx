@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Nav } from "@/components/sections/Nav";
 import { Hero } from "@/components/sections/Hero";
 import { HowItWorks } from "@/components/sections/HowItWorks";
+import { AgentControl } from "@/components/sections/AgentControl";
 import { Pricing } from "@/components/sections/Pricing";
 import { ComparisonTable } from "@/components/sections/ComparisonTable";
 import { FAQSection } from "@/components/sections/FAQ";
@@ -46,6 +47,7 @@ export default function Home() {
       <main className="flex-1" style={{ paddingTop: headerHeight }}>
         <Hero />
         <HowItWorks />
+        <AgentControl />
         <Pricing />
         <ComparisonTable />
         <FAQSection />

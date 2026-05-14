@@ -101,19 +101,42 @@ export const SOCIAL_PROOF = {
     },
     {
       quote:
-        "My sellers used to ask me every week what kind of marketing I was doing. Now I just forward them the Monday report. They love it and I didn't do a thing.",
+        "My sellers used to ask me every week what kind of marketing I was doing. Now I just forward them the Monday traffic report. They stop asking — and they start referring.",
       initials: "FG",
-      name: "Forrest G",
+      name: "Forrest G.",
       brokerage: "Forrest G Realty · CSRA",
     },
     {
       quote:
-        "I was skeptical, but the site it built for my Walton Way listing was better than anything I would have made myself. And it had a showing request within 48 hours.",
+        "I was skeptical. The site it built for my Walton Way listing was better than anything I'd have made myself — and it captured a showing request within 48 hours of going live.",
       initials: "TL",
-      name: "Tracy L.",
-      brokerage: "Meybohm Real Estate · CSRA",
+      name: "Tracy Langford",
+      brokerage: "Meybohm Real Estate · Augusta, GA",
     },
   ],
+};
+
+export const AGENT_CONTROL = {
+  eyebrow: "YOU'RE IN CONTROL",
+  headline: "You decide what matters. We handle the rest.",
+  subhead:
+    "PropSite builds and runs the site — but every agent-facing decision stays with you.",
+  yours: [
+    "Your photo, bio, and contact details on every listing site",
+    "Which listings get activated — you approve before anything goes live",
+    "Where leads go — calls, texts, and emails route directly to you",
+    "Brokerage branding and attribution on every page",
+    "Copy adjustments if MLS data needs a tweak (contact support — done same day)",
+  ],
+  ours: [
+    "Site build, street-address domain, and hosting",
+    "MLS photo sync and listing data updates",
+    "Monday seller traffic report, sent automatically",
+    "IDX compliance, MLS disclaimers, and all legal fine print",
+    "Site archive and billing cancellation the day your listing closes",
+  ],
+  yoursLabel: "You control",
+  oursLabel: "We handle automatically",
 };
 
 export const FAQ = {
