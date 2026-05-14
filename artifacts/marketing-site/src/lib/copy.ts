@@ -10,7 +10,7 @@ export const HERO = {
   eyebrow: "FOR REAL ESTATE AGENTS",
   headline: ["Your listing gets a site.", "Without you lifting", "a finger."],
   subhead: PAGE_DESCRIPTION,
-  primaryCta: "Start for $49 / listing",
+  primaryCta: "Set up automation — $49 / listing",
   secondaryCta: "See a live example",
   stats: [
     { value: "< 5 min", label: "MLS to live site" },
@@ -150,7 +150,7 @@ export const FAQ = {
 export const CTA_BANNER = {
   headline: ["Your next listing deserves a", "proper website."],
   subhead: "Set up once in 90 seconds. Every listing after that is automatic.",
-  primaryCta: "Get started — $49 / listing",
+  primaryCta: "Set up automation — $49 / listing",
   secondaryCta: "See a live example",
   footnote: "No setup fees · No contracts · Billing stops automatically when your listing closes",
 };

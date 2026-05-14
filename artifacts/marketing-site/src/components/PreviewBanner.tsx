@@ -63,8 +63,8 @@ function ClaimBanner({ address, slug }: BaseProps) {
           <span className="hidden md:inline text-warm-white/70 uppercase tracking-[0.25em] mr-2">
             Free preview
           </span>
-          <span className="font-medium hidden sm:inline">Like this site for {shortAddress(address)}?</span>
-          <span className="font-medium sm:hidden">Like this site?</span>
+          <span className="font-medium hidden sm:inline">Is this your listing? Activate the site, domain, and seller reports.</span>
+          <span className="font-medium sm:hidden">Is this your listing?</span>
         </p>
         <Link
           href={`${ONBOARDING_URL}?listing=${encodeURIComponent(slug)}`}
