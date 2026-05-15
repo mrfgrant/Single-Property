@@ -302,8 +302,10 @@ export async function drainEmailOutbox(limit = 25): Promise<{ processed: number 
         continue;
       }
 
-      // Pre-send photo check: alert operator if the listing has no photos
-      // so they can investigate before the agent clicks a blank site.
+      // Pre-send photo check: hold the email for 1 hour after the listing's
+      // last MLS sync to give photos time to arrive and render. If photos
+      // still haven't arrived after a 4-hour hard cap from the original enqueue
+      // time, allow the email through and alert the operator.
       const meta = row.metadata as Record<string, unknown> | null;
       const listingIds: string[] = [];
       if (meta) {
@@ -313,12 +315,67 @@ export async function drainEmailOutbox(limit = 25): Promise<{ processed: number 
         if (typeof single === "string") listingIds.push(single);
       }
       if (listingIds.length > 0) {
-        const photos = await db
-          .select({ listingId: listingPhotosTable.listingId })
-          .from(listingPhotosTable)
-          .where(inArray(listingPhotosTable.listingId, listingIds))
-          .limit(1);
+        const [photos, listingRows] = await Promise.all([
+          db
+            .select({ listingId: listingPhotosTable.listingId })
+            .from(listingPhotosTable)
+            .where(inArray(listingPhotosTable.listingId, listingIds))
+            .limit(1),
+          db
+            .select({
+              id: listingsTable.id,
+              mlsLastSyncedAt: listingsTable.mlsLastSyncedAt,
+              updatedAt: listingsTable.updatedAt,
+            })
+            .from(listingsTable)
+            .where(inArray(listingsTable.id, listingIds))
+            .limit(1),
+        ]);
+
         if (photos.length === 0) {
+          const PHOTO_WAIT_MS = 60 * 60 * 1000; // 1 hour after last MLS sync
+          const HARD_CAP_MS  = 4 * 60 * 60 * 1000; // 4 hours from original enqueue
+          const now = Date.now();
+          const rowCreatedAt =
+            row.createdAt instanceof Date
+              ? row.createdAt.getTime()
+              : new Date(row.createdAt as string).getTime();
+          const pastHardCap = now > rowCreatedAt + HARD_CAP_MS;
+
+          if (!pastHardCap) {
+            // Anchor wait on the last MLS sync timestamp, falling back to
+            // the listing's updatedAt and finally to now if neither is set.
+            const listing = listingRows[0];
+            const syncedAt = listing?.mlsLastSyncedAt ?? listing?.updatedAt ?? null;
+            const baseTime =
+              syncedAt instanceof Date
+                ? syncedAt.getTime()
+                : syncedAt
+                ? new Date(syncedAt as string).getTime()
+                : now;
+            const holdUntil = new Date(baseTime + PHOTO_WAIT_MS);
+
+            if (holdUntil.getTime() > now) {
+              const holdStr = holdUntil.toISOString();
+              await db
+                .update(emailOutboxTable)
+                .set({
+                  status: "pending",
+                  sendAfter: holdUntil,
+                  lastError: `waiting_for_photos — next attempt at ${holdStr}`,
+                  updatedAt: new Date(),
+                })
+                .where(eq(emailOutboxTable.id, row.id));
+              log.info(
+                { outboxId: row.id, holdUntil: holdStr, toEmail: row.toEmail },
+                "Cold outreach held — waiting 1 hour after MLS sync for photos",
+              );
+              continue;
+            }
+          }
+
+          // Hard cap exceeded or hold window already in the past — alert and
+          // let the email through so the agent isn't silently never contacted.
           void sendOperatorAlert(
             "cold_outreach_no_photos",
             "Cold outreach email sending to a listing with no photos",
@@ -327,6 +384,10 @@ export async function drainEmailOutbox(limit = 25): Promise<{ processed: number 
               `To:          ${row.toEmail}`,
               `Subject:     ${row.subject}`,
               `Listing IDs: ${listingIds.join(", ")}`,
+              ``,
+              pastHardCap
+                ? `4-hour hold cap exceeded — sending anyway.`
+                : `Hold window has passed — sending anyway.`,
               ``,
               `This agent will receive a cold outreach email linking to a`,
               `property site with no photos. The MLS photo sync may be`,
