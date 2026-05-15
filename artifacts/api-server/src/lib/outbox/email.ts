@@ -328,8 +328,7 @@ export async function drainEmailOutbox(limit = 25): Promise<{ processed: number 
               updatedAt: listingsTable.updatedAt,
             })
             .from(listingsTable)
-            .where(inArray(listingsTable.id, listingIds))
-            .limit(1),
+            .where(inArray(listingsTable.id, listingIds)),
         ]);
 
         if (photos.length === 0) {
@@ -343,16 +342,16 @@ export async function drainEmailOutbox(limit = 25): Promise<{ processed: number 
           const pastHardCap = now > rowCreatedAt + HARD_CAP_MS;
 
           if (!pastHardCap) {
-            // Anchor wait on the last MLS sync timestamp, falling back to
-            // the listing's updatedAt and finally to now if neither is set.
-            const listing = listingRows[0];
-            const syncedAt = listing?.mlsLastSyncedAt ?? listing?.updatedAt ?? null;
-            const baseTime =
-              syncedAt instanceof Date
-                ? syncedAt.getTime()
-                : syncedAt
-                ? new Date(syncedAt as string).getTime()
-                : now;
+            // For digest emails (multiple listing IDs), anchor on the MOST
+            // recently-synced listing so we always wait relative to the latest
+            // sync tick, not an arbitrary row. Fall back to updatedAt, then now.
+            const toMs = (v: Date | string | null | undefined): number =>
+              v instanceof Date ? v.getTime() : v ? new Date(v).getTime() : 0;
+            const latestSyncMs = listingRows.reduce((best, r) => {
+              const t = toMs(r.mlsLastSyncedAt) || toMs(r.updatedAt);
+              return t > best ? t : best;
+            }, 0);
+            const baseTime = latestSyncMs || now;
             const holdUntil = new Date(baseTime + PHOTO_WAIT_MS);
 
             if (holdUntil.getTime() > now) {
