@@ -213,7 +213,7 @@ router.post("/listings/preview-viewed", async (req, res) => {
 
     const previewUrl = `${MARKETING_SITE_URL}/listing/${listingIdOrSlug}`;
     const activateUrl = `${MARKETING_SITE_URL}/onboarding?listing=${listingIdOrSlug}`;
-    const unsubscribeUrl = buildUnsubscribeUrl(agentEmail);
+    const unsubscribeUrl = buildUnsubscribeUrl(MARKETING_SITE_URL, agentEmail);
 
     const payload = previewViewedEmail({
       agentEmail,
