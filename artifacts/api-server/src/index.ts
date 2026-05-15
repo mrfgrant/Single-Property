@@ -1,6 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
-import { startMlsIngestion } from "./lib/mls/cron";
+import { startMlsIngestion, startStaleSyncWatchdog } from "./lib/mls/cron";
 import { initBillingLifecycleBridge } from "./lib/billing/lifecycleBridge";
 import { initColdOutreachBridge } from "./lib/outreach/coldOutreach";
 import { startEmailOutboxWorker } from "./lib/outbox/email";
@@ -58,6 +58,7 @@ app.listen(port, async (err) => {
   startWeeklyReportCron();
   startPurgeUnclaimedCron();
   startMlsIngestion();
+  startStaleSyncWatchdog();
 
   if (isProduction) {
     startEmailOutboxWorker();

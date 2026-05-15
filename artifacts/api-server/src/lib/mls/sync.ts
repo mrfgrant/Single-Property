@@ -14,6 +14,7 @@ import { mlsEventBus } from "./eventBus.js";
 import { getMlsConfig, normalizeStatus } from "./config.js";
 import { downloadAndStorePhoto } from "./photoUtils.js";
 import { refreshColdOutreachPhoto } from "../outreach/coldOutreach.js";
+import { sendOperatorAlert } from "../operatorAlert.js";
 
 /**
  * Returns true for URLs that are actual image files.
@@ -361,6 +362,21 @@ async function recordError(boardId: string, err: unknown) {
     .update(mlsSyncStateTable)
     .set({ lastError: message, lastErrorAt: new Date(), runId: null, updatedAt: new Date() })
     .where(eq(mlsSyncStateTable.boardId, boardId));
+
+  void sendOperatorAlert(
+    `mls_sync_error:${boardId}`,
+    `MLS sync error — ${boardId} board`,
+    [
+      `Board:     ${boardId}`,
+      `Error:     ${message}`,
+      `Time:      ${new Date().toISOString()}`,
+      ``,
+      `The MLS delta sync is failing. No listing updates or photo syncs`,
+      `will come through until this is resolved.`,
+      ``,
+      `Action: Check the MLS provider status and review server logs.`,
+    ],
+  );
 }
 
 export type SyncResult = {

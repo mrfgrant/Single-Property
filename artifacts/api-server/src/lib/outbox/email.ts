@@ -1,7 +1,8 @@
-import { db, emailOutboxTable, emailSuppressionsTable, listingsTable } from "@workspace/db";
+import { db, emailOutboxTable, emailSuppressionsTable, listingsTable, listingPhotosTable } from "@workspace/db";
 import { eq, inArray, sql } from "drizzle-orm";
 import { sendEmail } from "../email.js";
 import { logger } from "../logger.js";
+import { sendOperatorAlert } from "../operatorAlert.js";
 
 /**
  * Cold outreach is queued with a 15-minute delay; before actually
@@ -299,6 +300,43 @@ export async function drainEmailOutbox(limit = 25): Promise<{ processed: number 
           "Cold outreach email cancelled — listing no longer eligible",
         );
         continue;
+      }
+
+      // Pre-send photo check: alert operator if the listing has no photos
+      // so they can investigate before the agent clicks a blank site.
+      const meta = row.metadata as Record<string, unknown> | null;
+      const listingIds: string[] = [];
+      if (meta) {
+        const arr = meta.listingIds;
+        if (Array.isArray(arr)) for (const id of arr) if (typeof id === "string") listingIds.push(id);
+        const single = meta.listingId;
+        if (typeof single === "string") listingIds.push(single);
+      }
+      if (listingIds.length > 0) {
+        const photos = await db
+          .select({ listingId: listingPhotosTable.listingId })
+          .from(listingPhotosTable)
+          .where(inArray(listingPhotosTable.listingId, listingIds))
+          .limit(1);
+        if (photos.length === 0) {
+          void sendOperatorAlert(
+            "cold_outreach_no_photos",
+            "Cold outreach email sending to a listing with no photos",
+            [
+              `Outbox ID:   ${row.id}`,
+              `To:          ${row.toEmail}`,
+              `Subject:     ${row.subject}`,
+              `Listing IDs: ${listingIds.join(", ")}`,
+              ``,
+              `This agent will receive a cold outreach email linking to a`,
+              `property site with no photos. The MLS photo sync may be`,
+              `behind or the listing has no media in the MLS.`,
+              ``,
+              `Action: Check MLS sync status and run a photo backfill`,
+              `if needed before more emails drain.`,
+            ],
+          );
+        }
       }
     }
     try {
