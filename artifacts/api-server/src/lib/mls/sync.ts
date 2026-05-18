@@ -250,28 +250,35 @@ async function upsertProperty(p: ResoProperty, syncKind: "full" | "delta"): Prom
  */
 async function syncPhotos(listingId: string, listingKey: string): Promise<boolean> {
   try {
-    const media = await mlsClient.fetchMediaForListing(listingKey);
+    // Fetch prior state and MLS media in parallel.
+    // - existingMedia: which mediaKeys we already stored so we don't re-download
+    // - listingRow: the current photoUrls array (includes both R2-stored and
+    //   source-URL fallbacks) — used to accurately detect "photos newly arrived"
+    const [media, existingMedia, listingRow] = await Promise.all([
+      mlsClient.fetchMediaForListing(listingKey),
+      db
+        .select({ mlsMediaKey: listingPhotosTable.mlsMediaKey, storedUrl: listingPhotosTable.storedUrl })
+        .from(listingPhotosTable)
+        .where(eq(listingPhotosTable.listingId, listingId)),
+      db
+        .select({ photoUrls: listingsTable.photoUrls })
+        .from(listingsTable)
+        .where(eq(listingsTable.id, listingId))
+        .limit(1),
+    ]);
+
     if (media.length === 0) return false;
+
+    // True when the listing already had at least one resolved photo URL
+    // (stored or source-URL fallback) before this sync run.
+    const prevHadPhotos = (listingRow[0]?.photoUrls?.length ?? 0) > 0;
 
     // Look up which mediaKeys we already have a stored copy for, so we
     // don't re-download photos that haven't changed.
-    const existing = await db
-      .select({
-        mlsMediaKey: listingPhotosTable.mlsMediaKey,
-        storedUrl: listingPhotosTable.storedUrl,
-      })
-      .from(listingPhotosTable)
-      .where(eq(listingPhotosTable.listingId, listingId));
     const storedByKey = new Map<string, string | null>();
-    for (const row of existing) {
+    for (const row of existingMedia) {
       if (row.mlsMediaKey) storedByKey.set(row.mlsMediaKey, row.storedUrl);
     }
-
-    // Count how many confirmed image URLs existed BEFORE this sync run.
-    // Used at the end to detect "photos newly arrived" vs "already had photos".
-    const prevImageCount = Array.from(storedByKey.values()).filter(
-      (u) => u !== null,
-    ).length;
 
     for (const m of media) {
       if (!m.MediaURL) continue;
@@ -326,7 +333,10 @@ async function syncPhotos(listingId: string, listingKey: string): Promise<boolea
       .where(eq(listingsTable.id, listingId));
 
     // Photos are "newly added" when there were none before but there are now.
-    return prevImageCount === 0 && imageUrls.length > 0;
+    // We use the listing-level photoUrls (which includes source-URL fallbacks)
+    // as the "before" state to avoid false positives when photos existed via
+    // fallback but lacked a confirmed stored_url in listing_photos.
+    return !prevHadPhotos && imageUrls.length > 0;
   } catch (err) {
     logger.warn({ err, listingId, listingKey }, "Failed to sync photos for listing");
     return false;
@@ -554,6 +564,7 @@ export async function runPhotoBackfill(): Promise<{ synced: number; total: numbe
     .where(
       sql`${listingsTable.mlsListingId} IS NOT NULL
         AND ${listingsTable.purgedAt} IS NULL
+        AND ${listingsTable.status} = 'active'
         AND (${listingsTable.photoUrls} IS NULL OR array_length(${listingsTable.photoUrls}, 1) IS NULL)`,
     );
 
