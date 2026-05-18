@@ -70,14 +70,12 @@ type ListingRow = typeof listingsTable.$inferSelect;
 
 async function onListingUpserted(event: ListingUpsertedEvent): Promise<void> {
   if (!event.isNew) return;
-  // Photos are required before queuing outreach. The listing was just
-  // ingested — photos arrive a moment later via syncPhotos(). When photos
-  // land, queueColdOutreachIfEligible() is called from sync.ts. We do
-  // nothing here so that emails are never sent to photo-less listings.
-  log.debug(
-    { listingId: event.listingId },
-    "New listing ingested — outreach will fire after photo sync confirms media",
-  );
+  // Route through the standard eligibility gate. At ingest time the listing
+  // has no photos yet, so the media gate inside queueColdOutreachIfEligible
+  // will no-op. When photos land later (syncPhotos → queueColdOutreachIfEligible),
+  // outreach fires then. This call is future-safe: once virtual tours are
+  // available (task #66), the gate gains one line and no other code changes.
+  await queueColdOutreachIfEligible(event.listingId);
 }
 
 /**
@@ -100,6 +98,16 @@ export async function queueColdOutreachIfEligible(listingId: string): Promise<vo
   if (listing.purgedAt) return;
   if (listing.agentId) {
     log.debug({ listingId: listing.id }, "Listing has owner agent — skipping cold outreach");
+    return;
+  }
+  // Only preview-mode listings that are still active on the market are
+  // eligible for cold outreach. Activated (paid) listings and off-market
+  // listings must not receive outreach.
+  if (listing.mode !== "preview" || listing.status !== "active") {
+    log.debug(
+      { listingId: listing.id, mode: listing.mode, status: listing.status },
+      "Listing not in preview/active state — skipping cold outreach",
+    );
     return;
   }
   if (!listing.listAgentMlsId) {

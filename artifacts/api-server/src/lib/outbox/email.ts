@@ -1,5 +1,5 @@
-import { db, emailOutboxTable, emailSuppressionsTable, listingsTable, listingPhotosTable } from "@workspace/db";
-import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { db, emailOutboxTable, emailSuppressionsTable, listingsTable } from "@workspace/db";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { sendEmail } from "../email.js";
 import { logger } from "../logger.js";
 import { sendOperatorAlert } from "../operatorAlert.js";
@@ -288,6 +288,12 @@ export async function drainEmailOutbox(limit = 25): Promise<{ processed: number 
       // outreach without touching the database.
       if ((process.env.PAUSE_COLD_OUTREACH ?? "").toLowerCase() === "true") {
         const holdUntil = new Date(Date.now() + 60 * 60 * 1000);
+        // Bug 4 guard: ensure holdUntil is a valid Date before writing it to
+        // sendAfter. new Date(NaN) would silently store an invalid timestamp.
+        if (!(holdUntil instanceof Date) || isNaN(holdUntil.getTime())) {
+          log.error({ outboxId: row.id }, "Computed holdUntil is invalid — skipping pause hold");
+          continue;
+        }
         await db
           .update(emailOutboxTable)
           .set({ status: "pending", sendAfter: holdUntil, updatedAt: new Date() })
@@ -316,8 +322,12 @@ export async function drainEmailOutbox(limit = 25): Promise<{ processed: number 
 
       // Pre-send photo guard: cold outreach is only queued after photos are
       // confirmed by the photo sync or backfill cron. If an email somehow
-      // reaches the drain with no stored photos it is a data integrity issue —
+      // reaches the drain with no photos it is a data integrity issue —
       // cancel the row rather than sending a photo-less email.
+      //
+      // We check listings.photo_urls (the denormalized array) rather than
+      // listing_photos.stored_url so that listings whose photos fell back
+      // to the MLS source URL (R2 upload failed) are not incorrectly cancelled.
       const meta = row.metadata as Record<string, unknown> | null;
       const listingIds: string[] = [];
       if (meta) {
@@ -328,12 +338,12 @@ export async function drainEmailOutbox(limit = 25): Promise<{ processed: number 
       }
       if (listingIds.length > 0) {
         const photos = await db
-          .select({ listingId: listingPhotosTable.listingId })
-          .from(listingPhotosTable)
+          .select({ id: listingsTable.id })
+          .from(listingsTable)
           .where(
             and(
-              inArray(listingPhotosTable.listingId, listingIds),
-              isNotNull(listingPhotosTable.storedUrl),
+              inArray(listingsTable.id, listingIds),
+              sql`array_length(${listingsTable.photoUrls}, 1) > 0`,
             ),
           )
           .limit(1);
