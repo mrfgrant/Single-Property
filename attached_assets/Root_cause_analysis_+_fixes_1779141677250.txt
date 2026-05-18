@@ -1,0 +1,188 @@
+Root cause analysis + fixes
+I've read every file. The bug summary in the document is accurate but incomplete — there are 5 distinct failure modes combining to produce the 86% no-photo rate. Here they are with exact code locations and the specific patch for each.
+
+Bug 1 — syncPhotos() only fires for listings in touched (delta path)
+Location: sync.ts lines 484–494
+The delta path only calls syncPhotos() for listings where upsertProperty() found changed fields. If a listing's data is unchanged but the agent uploads photos to the MLS later, those photos never get pulled. This is the largest single cause of the backlog.
+Fix — add a nightly photo-backfill cron for listings with no photos:
+typescript// sync.ts — add after the existing runSync export
+
+export async function runPhotoBackfill(): Promise<{ synced: number }> {
+  const cfg = getMlsConfig();
+  if (!cfg.configured) return { synced: 0 };
+
+  // Find all MLS listings that have no photos at all yet
+  const noPhotoListings = await db
+    .select({ id: listingsTable.id, mlsListingId: listingsTable.mlsListingId })
+    .from(listingsTable)
+    .where(
+      sql`${listingsTable.mlsListingId} IS NOT NULL
+        AND ${listingsTable.purgedAt} IS NULL
+        AND (${listingsTable.photoUrls} IS NULL OR array_length(${listingsTable.photoUrls}, 1) IS NULL)`,
+    );
+
+  let synced = 0;
+  for (const row of noPhotoListings) {
+    if (!row.mlsListingId) continue;
+    try {
+      await syncPhotos(row.id, row.mlsListingId);
+      // Also patch any still-pending cold-outreach email for this listing
+      await refreshColdOutreachPhoto(row.id).catch(() => {});
+      synced++;
+    } catch (err) {
+      logger.warn({ err, listingId: row.id }, "Photo backfill failed for listing");
+    }
+  }
+  logger.info({ synced, total: noPhotoListings.length }, "Photo backfill complete");
+  return { synced };
+}
+Wire it into cron.ts:
+typescript// cron.ts — add alongside startMlsIngestion
+
+import { runPhotoBackfill } from "./sync.js";
+
+const PHOTO_BACKFILL_INTERVAL_MS = 60 * 60 * 1000; // every hour
+let backfillTimer: NodeJS.Timeout | null = null;
+
+export function startPhotoBackfillCron(): void {
+  if (backfillTimer) return;
+  backfillTimer = setInterval(() => {
+    runPhotoBackfill().catch((err) =>
+      logger.error({ err }, "Photo backfill cron threw"),
+    );
+  }, PHOTO_BACKFILL_INTERVAL_MS);
+  if (typeof backfillTimer.unref === "function") backfillTimer.unref();
+  // Run once immediately to clear the existing 24k backlog
+  void runPhotoBackfill();
+}
+
+export function stopPhotoBackfillCron(): void {
+  if (backfillTimer) { clearInterval(backfillTimer); backfillTimer = null; }
+}
+Call startPhotoBackfillCron() in your server startup alongside startMlsIngestion(). This alone clears the 24,988 backlog on the next boot.
+
+Bug 2 — refreshColdOutreachPhoto is gated on isNew === true only
+Location: sync.ts lines 484–494 (delta path), 474–482 (full path)
+Both paths call refreshColdOutreachPhoto only when isNew is true. But the photo backfill above downloads photos for existing (not-new) listings. After photo download, their pending outbox emails are never patched.
+Fix — call refreshColdOutreachPhoto whenever photos were actually written, not just on new listings:
+syncPhotos() currently returns void. Change it to return a boolean indicating whether any photos were actually stored:
+typescript// sync.ts — modify syncPhotos signature and return type
+async function syncPhotos(listingId: string, listingKey: string): Promise<boolean> {
+  try {
+    // ... existing logic unchanged ...
+
+    // After updating listings.photoUrls, check if we stored anything
+    const photos = await db
+      .select({ storedUrl: listingPhotosTable.storedUrl })
+      .from(listingPhotosTable)
+      .where(eq(listingPhotosTable.listingId, listingId))
+      .limit(1);
+
+    return photos.length > 0 && photos.some(p => p.storedUrl !== null);
+  } catch (err) {
+    logger.warn({ err, listingId, listingKey }, "Failed to sync photos for listing");
+    return false;
+  }
+}
+Then in both the delta and full-sync paths, use the return value:
+typescript// Delta path (sync.ts ~line 485)
+for (const [listingId, { listingKey, isNew }] of touched) {
+  const hadPhotos = await syncPhotos(listingId, listingKey);
+  if (isNew || hadPhotos) {  // <-- was: if (isNew)
+    try {
+      await refreshColdOutreachPhoto(listingId);
+    } catch (err) {
+      logger.warn({ err, listingId }, "Cold-outreach photo refresh failed — non-fatal");
+    }
+  }
+}
+And same change in the full-sync path inside runPhotoBackfill.
+
+Bug 3 — The drain's photo hold re-anchors on mlsLastSyncedAt, but delta sync never re-syncs photos for unchanged listings
+Location: email.ts lines 360–384
+The hold logic does:
+typescriptconst holdUntil = new Date(baseTime + PHOTO_WAIT_MS); // 1hr after last sync
+But mlsLastSyncedAt is updated on every upsert (even no-field-change upserts — see sync.ts line 195). So the hold window keeps advancing every 15 minutes as the delta runs... but syncPhotos() is never called for unchanged listings. The email holds forever, then hits the 4-hour cap and sends without photos.
+Fix — when the drain holds an email for no photos, enqueue a targeted photo sync for that specific listing:
+Add a lightweight exported function to sync.ts:
+typescript// sync.ts — add export
+export async function syncPhotosForListingIds(listingIds: string[]): Promise<void> {
+  if (listingIds.length === 0) return;
+  const rows = await db
+    .select({ id: listingsTable.id, mlsListingId: listingsTable.mlsListingId })
+    .from(listingsTable)
+    .where(inArray(listingsTable.id, listingIds));
+
+  for (const row of rows) {
+    if (!row.mlsListingId) continue;
+    const hadPhotos = await syncPhotos(row.id, row.mlsListingId);
+    if (hadPhotos) {
+      await refreshColdOutreachPhoto(row.id).catch(() => {});
+    }
+  }
+}
+Then in email.ts, after the hold update:
+typescript// email.ts — after the db.update holdUntil block (~line 379)
+if (holdUntil.getTime() > now) {
+  const holdStr = holdUntil.toISOString();
+  await db
+    .update(emailOutboxTable)
+    .set({ status: "pending", sendAfter: holdUntil, lastError: `waiting_for_photos — next attempt at ${holdStr}`, updatedAt: new Date() })
+    .where(eq(emailOutboxTable.id, row.id));
+  log.info({ outboxId: row.id, holdUntil: holdStr, toEmail: row.toEmail }, "Cold outreach held — waiting 1 hour after MLS sync for photos");
+
+  // *** NEW: actively retry the photo fetch rather than waiting passively ***
+  void syncPhotosForListingIds(listingIds).catch((err) =>
+    log.warn({ err, listingIds }, "On-hold photo retry failed — non-fatal"),
+  );
+
+  continue;
+}
+This closes the loop: instead of the drain passively waiting for photos that delta sync will never fetch, it actively triggers the fetch.
+
+Bug 4 — value.toISOString is not a function crash in drainEmailOutbox
+Location: email.ts line 367 area — the holdUntil computation
+The crash happens when latestSyncMs ends up as 0 (all mlsLastSyncedAt and updatedAt are null/unparseable), making baseTime = now, and holdUntil = new Date(now + PHOTO_WAIT_MS) — that should be fine. But look at this:
+typescriptconst latestSyncMs = listingRows.reduce((best, r) => {
+  const t = toMs(r.mlsLastSyncedAt) || toMs(r.updatedAt);  // ← toMs can return 0
+  return t > best ? t : best;
+}, 0);
+const baseTime = latestSyncMs || now;  // ← 0 falls through to now — correct
+const holdUntil = new Date(baseTime + PHOTO_WAIT_MS);  // ← this is fine
+The actual crash is almost certainly the sendAfter: holdUntil in the db.update().set() call when Drizzle's ORM layer receives a Date that Postgres rejects. The most likely cause: normalizeRow returns sendAfter as the raw snake_case value from db.execute — a string, not a Date. Then the row.createdAt on line 351 parses fine because it has the new Date() guard, but somewhere holdUntil gets passed through a code path expecting something else.
+Fix — add a defensive guard regardless of where the crash originated:
+typescript// email.ts — replace the holdUntil line
+const rawHoldUntil = new Date(baseTime + PHOTO_WAIT_MS);
+const holdUntil = rawHoldUntil instanceof Date && !isNaN(rawHoldUntil.getTime())
+  ? rawHoldUntil
+  : new Date(Date.now() + PHOTO_WAIT_MS);
+
+Bug 5 — SourceRE media pre-filtering (performance + false-empty diagnosis)
+Location: client.ts / client_(1).ts — fetchMediaForListing
+Right now every media entry — PDFs, 3D tours, videos — gets fetched over HTTP just to have its Content-Type inspected and discarded. For listings that have only non-image media this produces the silent "0 photos" result that looks identical to a genuine no-photo listing.
+Fix — pre-filter SourceRE URLs before downloading:
+typescript// client.ts — add inside MlsClient, used before downloadAndStorePhoto
+private isLikelyImageUrl(url: string): boolean {
+  // SourceRE puts real photos under /media/hive/photos/ paths
+  // and documents under /media/hive/documents/ — skip the latter
+  if (/\/media\/hive\/documents\//i.test(url)) return false;
+  // Known non-image hostnames
+  if (/matterport\.com|zillow\.com\/view/i.test(url)) return false;
+  // Positive signal: image extension in path
+  if (/\.(jpe?g|png|webp|gif|avif)(\?|$)/i.test(url)) return true;
+  // Assume maybe-image if we can't tell — let Content-Type check decide
+  return true;
+}
+Then in syncPhotos before calling downloadAndStorePhoto:
+typescript// sync.ts inside the for (const m of media) loop
+if (!m.MediaURL) continue;
+// Pre-filter obvious non-images to avoid unnecessary HTTP round-trips
+if (!mlsClient.isLikelyImageUrl(m.MediaURL)) {
+  logger.info({ sourceUrl: m.MediaURL }, "Photo pre-filtered — known non-image path");
+  continue;
+}
+Make isLikelyImageUrl public on MlsClient.
+
+Priority order for deploys
+#FixImpactRisk1Bug 1 — startPhotoBackfillCron()Clears 24k backlog immediatelyLow — read-only query + existing syncPhotos path2Bug 2 — syncPhotos returns bool, refresh on photo writeNew listings get photos in emailLow3Bug 3 — active photo retry when drain holdsCloses the hold/delta gapLow — fire-and-forget4Bug 4 — holdUntil guardStops the crashZero risk5Bug 5 — SourceRE URL pre-filterReduces wasted HTTP callsLow
+Fix 4 is one line — ship it immediately. Fix 1 + the backfill cron is the highest-leverage change for your 86% no-photo rate.
