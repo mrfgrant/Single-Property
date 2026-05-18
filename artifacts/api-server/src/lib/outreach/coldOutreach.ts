@@ -70,11 +70,30 @@ type ListingRow = typeof listingsTable.$inferSelect;
 
 async function onListingUpserted(event: ListingUpsertedEvent): Promise<void> {
   if (!event.isNew) return;
+  // Photos are required before queuing outreach. The listing was just
+  // ingested — photos arrive a moment later via syncPhotos(). When photos
+  // land, queueColdOutreachIfEligible() is called from sync.ts. We do
+  // nothing here so that emails are never sent to photo-less listings.
+  log.debug(
+    { listingId: event.listingId },
+    "New listing ingested — outreach will fire after photo sync confirms media",
+  );
+}
 
+/**
+ * Run all cold-outreach eligibility checks for a listing and queue the
+ * outreach email if the listing qualifies. Called from sync.ts after
+ * syncPhotos() confirms photos were newly stored, and from the hourly
+ * photo backfill cron.
+ *
+ * This is the single trigger point for cold outreach — outreach is
+ * NEVER queued at ingest time; only after confirmed media exists.
+ */
+export async function queueColdOutreachIfEligible(listingId: string): Promise<void> {
   const rows = await db
     .select()
     .from(listingsTable)
-    .where(eq(listingsTable.id, event.listingId))
+    .where(eq(listingsTable.id, listingId))
     .limit(1);
   const listing = rows[0];
   if (!listing) return;
@@ -89,6 +108,17 @@ async function onListingUpserted(event: ListingUpsertedEvent): Promise<void> {
   }
   if (!listing.listAgentEmail) {
     log.debug({ listingId: listing.id }, "Listing has no listAgentEmail — skipping email outreach");
+    return;
+  }
+
+  // Media gate: require at least one photo. Listings with only PDFs or
+  // virtual tours in the MLS will have an empty photoUrls array and must
+  // wait until an actual image is confirmed before outreach fires.
+  if (!listing.photoUrls?.length) {
+    log.debug(
+      { listingId: listing.id },
+      "Listing has no photos — skipping cold outreach (will retry when photos arrive)",
+    );
     return;
   }
 
@@ -319,146 +349,6 @@ async function upsertDigestForAgent(recipient: string, listing: ListingRow): Pro
 function firstNameOf(full: string | null | undefined): string {
   if (!full) return "there";
   return full.trim().split(/\s+/)[0] || "there";
-}
-
-/**
- * After `syncPhotos()` stores the first photo for a brand-new listing, call
- * this to patch the pending cold-outreach outbox entry for that agent so the
- * email hero block includes the real listing photo.
- *
- * Context: the initial email HTML is rendered inside `upsertDigestForAgent()`
- * which fires synchronously on the `listing.upserted` event — before the MLS
- * sync has had a chance to download photos. This function re-renders and
- * overwrites the stored HTML now that `listing.photo_urls` is populated.
- *
- * No-ops silently when:
- *  - The listing has no agent email
- *  - The listing still has no photos (MLS had none, or download failed)
- *  - No pending outbox entry exists (already sent, or never created)
- */
-export async function refreshColdOutreachPhoto(listingId: string): Promise<void> {
-  const rows = await db
-    .select()
-    .from(listingsTable)
-    .where(eq(listingsTable.id, listingId))
-    .limit(1);
-  const listing = rows[0];
-  if (!listing?.listAgentEmail) return;
-  if (!listing.photoUrls?.length) return;
-
-  const recipient = listing.listAgentEmail.toLowerCase();
-  const dedupeKey = `cold_outreach:agent:${recipient}`;
-  const firstName = firstNameOf(listing.listAgentName);
-  const unsubscribeUrl = buildUnsubscribeUrl(MARKETING_SITE_URL, recipient);
-
-  // The `listing.upserted` event handler that creates the outbox row is async —
-  // it may still be in-flight when this function runs immediately after
-  // `syncPhotos()` completes. Retry up to 3 times with a short back-off before
-  // giving up so we don't silently no-op in that narrow race.
-  const MAX_ATTEMPTS = 3;
-  const RETRY_DELAY_MS = 500;
-
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    let foundRow = false;
-
-    await db.transaction(async (tx) => {
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${dedupeKey}))`);
-
-      const lockRows = await tx.execute<{ id: string; metadata: Record<string, unknown> | null }>(sql`
-        SELECT id, metadata
-          FROM ${emailOutboxTable}
-         WHERE dedupe_key = ${dedupeKey}
-           AND status = 'pending'
-         LIMIT 1
-         FOR UPDATE
-      `);
-      const lockedRows =
-        (lockRows as unknown as { rows: Array<{ id: string; metadata: Record<string, unknown> | null }> })
-          .rows ??
-        (lockRows as unknown as Array<{ id: string; metadata: Record<string, unknown> | null }>);
-      const existing = lockedRows[0];
-
-      if (!existing) {
-        if (attempt < MAX_ATTEMPTS) {
-          log.debug({ listingId, recipient, attempt }, "No pending digest yet — will retry after delay");
-        } else {
-          log.debug({ listingId, recipient }, "No pending digest to refresh photo for — skipping");
-        }
-        return;
-      }
-
-      foundRow = true;
-
-      const meta = (existing.metadata ?? {}) as Record<string, unknown>;
-      const ids = Array.isArray(meta.listingIds)
-        ? (meta.listingIds.filter((x) => typeof x === "string") as string[])
-        : [];
-
-      const allListings = await tx
-        .select()
-        .from(listingsTable)
-        .where(inArray(listingsTable.id, ids.length ? ids : [listingId]));
-      const eligibleListings = allListings.filter(
-        (l) => !l.purgedAt && !l.agentId && l.mode === "preview" && l.status === "active",
-      );
-      if (eligibleListings.length === 0) return;
-
-      const items = await Promise.all(
-        eligibleListings.map(async (l) => {
-          const { previewUrl, activateUrl } = await createListingTrackingUrls(
-            {
-              agentEmail: recipient,
-              listingId: l.id,
-              rawPreviewUrl: `${MARKETING_SITE_URL}/listing/${l.id}`,
-              rawActivateUrl: `${MARKETING_SITE_URL}/onboarding?listing=${l.id}`,
-            },
-            tx,
-          );
-          return {
-            address: l.address,
-            previewUrl,
-            activateUrl,
-            photoUrl: resolvePhotoUrl(l.photoUrls?.[0]),
-            beds: l.beds,
-            baths: l.baths,
-            sqft: l.sqft,
-            price: l.priceUsd,
-            yearBuilt: l.yearBuilt,
-            lotAcres: l.lotAcres,
-            garage: null,
-            description: l.description,
-          };
-        }),
-      );
-
-      const rendered = coldOutreachDigestEmail({
-        agentEmail: recipient,
-        agentFirstName: firstName,
-        listings: items,
-        unsubscribeUrl,
-      });
-
-      await tx
-        .update(emailOutboxTable)
-        .set({
-          subject: rendered.subject,
-          html: rendered.html,
-          textBody: rendered.text,
-          updatedAt: new Date(),
-        })
-        .where(eq(emailOutboxTable.id, existing.id));
-
-      log.info(
-        { outboxId: existing.id, recipient, listingId },
-        "Patched cold-outreach digest with listing photo after sync",
-      );
-    });
-
-    if (foundRow) break;
-    if (attempt < MAX_ATTEMPTS) {
-      await new Promise<void>((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
-    }
-  }
 }
 
 let initialized = false;

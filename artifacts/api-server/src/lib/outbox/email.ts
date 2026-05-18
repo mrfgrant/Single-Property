@@ -1,5 +1,5 @@
 import { db, emailOutboxTable, emailSuppressionsTable, listingsTable, listingPhotosTable } from "@workspace/db";
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { sendEmail } from "../email.js";
 import { logger } from "../logger.js";
 import { sendOperatorAlert } from "../operatorAlert.js";
@@ -314,10 +314,10 @@ export async function drainEmailOutbox(limit = 25): Promise<{ processed: number 
         continue;
       }
 
-      // Pre-send photo check: hold the email for 1 hour after the listing's
-      // last MLS sync to give photos time to arrive and render. If photos
-      // still haven't arrived after a 4-hour hard cap from the original enqueue
-      // time, allow the email through and alert the operator.
+      // Pre-send photo guard: cold outreach is only queued after photos are
+      // confirmed by the photo sync or backfill cron. If an email somehow
+      // reaches the drain with no stored photos it is a data integrity issue —
+      // cancel the row rather than sending a photo-less email.
       const meta = row.metadata as Record<string, unknown> | null;
       const listingIds: string[] = [];
       if (meta) {
@@ -327,87 +327,42 @@ export async function drainEmailOutbox(limit = 25): Promise<{ processed: number 
         if (typeof single === "string") listingIds.push(single);
       }
       if (listingIds.length > 0) {
-        const [photos, listingRows] = await Promise.all([
-          db
-            .select({ listingId: listingPhotosTable.listingId })
-            .from(listingPhotosTable)
-            .where(inArray(listingPhotosTable.listingId, listingIds))
-            .limit(1),
-          db
-            .select({
-              id: listingsTable.id,
-              mlsLastSyncedAt: listingsTable.mlsLastSyncedAt,
-              updatedAt: listingsTable.updatedAt,
-            })
-            .from(listingsTable)
-            .where(inArray(listingsTable.id, listingIds)),
-        ]);
+        const photos = await db
+          .select({ listingId: listingPhotosTable.listingId })
+          .from(listingPhotosTable)
+          .where(
+            and(
+              inArray(listingPhotosTable.listingId, listingIds),
+              isNotNull(listingPhotosTable.storedUrl),
+            ),
+          )
+          .limit(1);
 
         if (photos.length === 0) {
-          const PHOTO_WAIT_MS = 60 * 60 * 1000; // 1 hour after last MLS sync
-          const HARD_CAP_MS  = 4 * 60 * 60 * 1000; // 4 hours from original enqueue
-          const now = Date.now();
-          const rowCreatedAt =
-            row.createdAt instanceof Date
-              ? row.createdAt.getTime()
-              : new Date(row.createdAt as string).getTime();
-          const pastHardCap = now > rowCreatedAt + HARD_CAP_MS;
-
-          if (!pastHardCap) {
-            // For digest emails (multiple listing IDs), anchor on the MOST
-            // recently-synced listing so we always wait relative to the latest
-            // sync tick, not an arbitrary row. Fall back to updatedAt, then now.
-            const toMs = (v: Date | string | null | undefined): number =>
-              v instanceof Date ? v.getTime() : v ? new Date(v).getTime() : 0;
-            const latestSyncMs = listingRows.reduce((best, r) => {
-              const t = toMs(r.mlsLastSyncedAt) || toMs(r.updatedAt);
-              return t > best ? t : best;
-            }, 0);
-            const baseTime = latestSyncMs || now;
-            const holdUntil = new Date(baseTime + PHOTO_WAIT_MS);
-
-            if (holdUntil.getTime() > now) {
-              const holdStr = holdUntil.toISOString();
-              await db
-                .update(emailOutboxTable)
-                .set({
-                  status: "pending",
-                  sendAfter: holdUntil,
-                  lastError: `waiting_for_photos — next attempt at ${holdStr}`,
-                  updatedAt: new Date(),
-                })
-                .where(eq(emailOutboxTable.id, row.id));
-              log.info(
-                { outboxId: row.id, holdUntil: holdStr, toEmail: row.toEmail },
-                "Cold outreach held — waiting 1 hour after MLS sync for photos",
-              );
-              continue;
-            }
-          }
-
-          // Hard cap exceeded or hold window already in the past — alert and
-          // let the email through so the agent isn't silently never contacted.
+          await db
+            .update(emailOutboxTable)
+            .set({ status: "cancelled", lastError: "no_photos_at_send_time", updatedAt: new Date() })
+            .where(eq(emailOutboxTable.id, row.id));
+          log.warn(
+            { outboxId: row.id, listingIds, toEmail: row.toEmail },
+            "Cold outreach cancelled — no photos at drain time (data integrity issue)",
+          );
           void sendOperatorAlert(
-            "cold_outreach_no_photos",
-            "Cold outreach email sending to a listing with no photos",
+            "cold_outreach_no_media_at_send_time",
+            "Cold outreach cancelled — no photos at drain time",
             [
               `Outbox ID:   ${row.id}`,
               `To:          ${row.toEmail}`,
               `Subject:     ${row.subject}`,
               `Listing IDs: ${listingIds.join(", ")}`,
               ``,
-              pastHardCap
-                ? `4-hour hold cap exceeded — sending anyway.`
-                : `Hold window has passed — sending anyway.`,
+              `This email reached the drain with no confirmed photos in the`,
+              `database. The outreach queue gate should have blocked it.`,
               ``,
-              `This agent will receive a cold outreach email linking to a`,
-              `property site with no photos. The MLS photo sync may be`,
-              `behind or the listing has no media in the MLS.`,
-              ``,
-              `Action: Check MLS sync status and run a photo backfill`,
-              `if needed before more emails drain.`,
+              `Action: Check photo backfill cron status and MLS media feed.`,
             ],
           );
+          continue;
         }
       }
     }

@@ -6,14 +6,14 @@ import {
   mlsSyncStateTable,
   type Listing,
 } from "@workspace/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { logger } from "../logger.js";
 import { mlsClient, MlsNotConfiguredError, type ResoProperty } from "./client.js";
 import { mlsEventBus } from "./eventBus.js";
 import { getMlsConfig, normalizeStatus } from "./config.js";
 import { downloadAndStorePhoto } from "./photoUtils.js";
-import { refreshColdOutreachPhoto } from "../outreach/coldOutreach.js";
+import { queueColdOutreachIfEligible } from "../outreach/coldOutreach.js";
 import { sendOperatorAlert } from "../operatorAlert.js";
 
 /**
@@ -237,10 +237,21 @@ async function upsertProperty(p: ResoProperty, syncKind: "full" | "delta"): Prom
   return { id: updated.id, isNew: false };
 }
 
-async function syncPhotos(listingId: string, listingKey: string): Promise<void> {
+/**
+ * Fetch and store photos for a listing from the MLS media feed.
+ *
+ * Returns true when photos were **newly** stored in this call — i.e. the
+ * listing had zero confirmed image URLs before this sync and now has at
+ * least one. Returns false when the listing already had photos, when no
+ * images were found, or when the sync fails.
+ *
+ * Callers use the return value to decide whether to trigger cold-outreach
+ * queueing for the first time (rather than patching existing HTML).
+ */
+async function syncPhotos(listingId: string, listingKey: string): Promise<boolean> {
   try {
     const media = await mlsClient.fetchMediaForListing(listingKey);
-    if (media.length === 0) return;
+    if (media.length === 0) return false;
 
     // Look up which mediaKeys we already have a stored copy for, so we
     // don't re-download photos that haven't changed.
@@ -255,6 +266,12 @@ async function syncPhotos(listingId: string, listingKey: string): Promise<void> 
     for (const row of existing) {
       if (row.mlsMediaKey) storedByKey.set(row.mlsMediaKey, row.storedUrl);
     }
+
+    // Count how many confirmed image URLs existed BEFORE this sync run.
+    // Used at the end to detect "photos newly arrived" vs "already had photos".
+    const prevImageCount = Array.from(storedByKey.values()).filter(
+      (u) => u !== null,
+    ).length;
 
     for (const m of media) {
       if (!m.MediaURL) continue;
@@ -300,17 +317,19 @@ async function syncPhotos(listingId: string, listingKey: string): Promise<void> 
       .from(listingPhotosTable)
       .where(eq(listingPhotosTable.listingId, listingId))
       .orderBy(listingPhotosTable.order);
+
+    const imageUrls = photos.map((p) => p.storedUrl ?? p.sourceUrl).filter(isImageUrl);
+
     await db
       .update(listingsTable)
-      .set({
-        photoUrls: photos
-          .map((p) => p.storedUrl ?? p.sourceUrl)
-          .filter(isImageUrl),
-        updatedAt: new Date(),
-      })
+      .set({ photoUrls: imageUrls, updatedAt: new Date() })
       .where(eq(listingsTable.id, listingId));
+
+    // Photos are "newly added" when there were none before but there are now.
+    return prevImageCount === 0 && imageUrls.length > 0;
   } catch (err) {
     logger.warn({ err, listingId, listingKey }, "Failed to sync photos for listing");
+    return false;
   }
 }
 
@@ -459,10 +478,9 @@ export async function runSync(kind: "full" | "delta"): Promise<SyncResult> {
     // only refreshes media for listings touched in this run. Both use the
     // same dedup path (unique on listing_id + mls_media_key).
     //
-    // For brand-new listings (isNew), after photos are stored we patch the
-    // pending cold-outreach outbox entry so the email includes the photo.
-    // The initial email was rendered before photos were available — this
-    // closes that race.
+    // When syncPhotos() returns true (photos newly stored for the first time),
+    // we trigger cold-outreach queueing for that listing. Outreach is ONLY
+    // queued once confirmed media exists — never at ingest time.
     if (kind === "full") {
       const allWithKeys = await db
         .select({ id: listingsTable.id, mlsListingId: listingsTable.mlsListingId })
@@ -470,25 +488,24 @@ export async function runSync(kind: "full" | "delta"): Promise<SyncResult> {
         .where(sql`${listingsTable.mlsListingId} is not null`);
       for (const row of allWithKeys) {
         if (row.mlsListingId) {
-          await syncPhotos(row.id, row.mlsListingId);
-          const meta = touched.get(row.id);
-          if (meta?.isNew) {
+          const photosNewlyAdded = await syncPhotos(row.id, row.mlsListingId);
+          if (photosNewlyAdded) {
             try {
-              await refreshColdOutreachPhoto(row.id);
+              await queueColdOutreachIfEligible(row.id);
             } catch (err) {
-              logger.warn({ err, listingId: row.id }, "Cold-outreach photo refresh failed — non-fatal");
+              logger.warn({ err, listingId: row.id }, "Cold-outreach queue after photo sync failed — non-fatal");
             }
           }
         }
       }
     } else {
-      for (const [listingId, { listingKey, isNew }] of touched) {
-        await syncPhotos(listingId, listingKey);
-        if (isNew) {
+      for (const [listingId, { listingKey }] of touched) {
+        const photosNewlyAdded = await syncPhotos(listingId, listingKey);
+        if (photosNewlyAdded) {
           try {
-            await refreshColdOutreachPhoto(listingId);
+            await queueColdOutreachIfEligible(listingId);
           } catch (err) {
-            logger.warn({ err, listingId }, "Cold-outreach photo refresh failed — non-fatal");
+            logger.warn({ err, listingId }, "Cold-outreach queue after photo sync failed — non-fatal");
           }
         }
       }
@@ -516,6 +533,52 @@ export async function runSync(kind: "full" | "delta"): Promise<SyncResult> {
     await recordError(cfg.boardId, err);
     throw err;
   }
+}
+
+/**
+ * Re-fetch MLS media for all active listings that currently have no photos.
+ * Called by the hourly backfill cron. Rate-limited to 50ms between listings
+ * to avoid hammering the MLS CDN.
+ *
+ * When a listing that previously had no photos now gets images stored,
+ * queueColdOutreachIfEligible() is called so outreach fires immediately
+ * (subject to age-gate and suppression checks).
+ */
+export async function runPhotoBackfill(): Promise<{ synced: number; total: number }> {
+  const cfg = getMlsConfig();
+  if (!cfg.configured) return { synced: 0, total: 0 };
+
+  const noPhotoListings = await db
+    .select({ id: listingsTable.id, mlsListingId: listingsTable.mlsListingId })
+    .from(listingsTable)
+    .where(
+      sql`${listingsTable.mlsListingId} IS NOT NULL
+        AND ${listingsTable.purgedAt} IS NULL
+        AND (${listingsTable.photoUrls} IS NULL OR array_length(${listingsTable.photoUrls}, 1) IS NULL)`,
+    );
+
+  const total = noPhotoListings.length;
+  let synced = 0;
+
+  for (const row of noPhotoListings) {
+    if (!row.mlsListingId) continue;
+    try {
+      const photosNewlyAdded = await syncPhotos(row.id, row.mlsListingId);
+      if (photosNewlyAdded) {
+        synced++;
+        await queueColdOutreachIfEligible(row.id).catch((err) =>
+          logger.warn({ err, listingId: row.id }, "Cold-outreach queue after backfill failed — non-fatal"),
+        );
+      }
+    } catch (err) {
+      logger.warn({ err, listingId: row.id }, "Photo backfill failed for listing — skipping");
+    }
+    // Rate-limit: 50ms between listings to avoid hammering the MLS CDN.
+    await new Promise<void>((resolve) => setTimeout(resolve, 50));
+  }
+
+  logger.info({ synced, total }, "Photo backfill complete");
+  return { synced, total };
 }
 
 export async function getSyncStatus() {

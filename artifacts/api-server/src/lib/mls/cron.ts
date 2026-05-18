@@ -1,6 +1,6 @@
 import { logger } from "../logger.js";
 import { getMlsConfig } from "./config.js";
-import { runSync } from "./sync.js";
+import { runSync, runPhotoBackfill } from "./sync.js";
 import { logMlsStatus } from "./client.js";
 import { db, mlsSyncStateTable } from "@workspace/db";
 import { sendOperatorAlert } from "../operatorAlert.js";
@@ -95,4 +95,41 @@ export function startStaleSyncWatchdog(): void {
   watchdogTimer = setInterval(() => void checkStaleSyncs(), WATCHDOG_INTERVAL_MS);
   if (typeof watchdogTimer.unref === "function") watchdogTimer.unref();
   void checkStaleSyncs();
+}
+
+const PHOTO_BACKFILL_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+let backfillTimer: NodeJS.Timeout | null = null;
+let backfillRunning = false;
+
+/**
+ * Start the hourly photo backfill cron. Re-fetches MLS media for all
+ * listings that currently have no photos and queues cold outreach when
+ * photos are found for the first time.
+ *
+ * Deliberately does NOT fire immediately on boot — the MLS delta sync
+ * handles the first-run case and we want the server to stabilize first.
+ * The cron fires after the first full interval (1 hour).
+ */
+export function startPhotoBackfillCron(): void {
+  if (backfillTimer) return;
+  backfillTimer = setInterval(() => {
+    if (backfillRunning) {
+      logger.info("Photo backfill already running — skipping tick");
+      return;
+    }
+    backfillRunning = true;
+    runPhotoBackfill()
+      .then((result) => logger.info(result, "Photo backfill cron complete"))
+      .catch((err) => logger.error({ err }, "Photo backfill cron threw"))
+      .finally(() => { backfillRunning = false; });
+  }, PHOTO_BACKFILL_INTERVAL_MS);
+  if (typeof backfillTimer.unref === "function") backfillTimer.unref();
+  logger.info({ intervalMs: PHOTO_BACKFILL_INTERVAL_MS }, "Photo backfill cron started");
+}
+
+export function stopPhotoBackfillCron(): void {
+  if (backfillTimer) {
+    clearInterval(backfillTimer);
+    backfillTimer = null;
+  }
 }
