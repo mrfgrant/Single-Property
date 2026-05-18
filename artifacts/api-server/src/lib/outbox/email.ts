@@ -283,6 +283,18 @@ export async function drainEmailOutbox(limit = 25): Promise<{ processed: number 
       }
     }
     if (row.kind === "cold_outreach" || row.kind === "cold_outreach_followup") {
+      // Kill switch: PAUSE_COLD_OUTREACH=true holds all cold outreach emails
+      // for 1 hour and skips the send. Flip the env var + redeploy to pause
+      // outreach without touching the database.
+      if ((process.env.PAUSE_COLD_OUTREACH ?? "").toLowerCase() === "true") {
+        const holdUntil = new Date(Date.now() + 60 * 60 * 1000);
+        await db
+          .update(emailOutboxTable)
+          .set({ status: "pending", sendAfter: holdUntil, updatedAt: new Date() })
+          .where(eq(emailOutboxTable.id, row.id));
+        continue;
+      }
+
       // Pre-send listing-state guard for cold outreach: if the listing
       // has since been activated, gone off-market, or been deleted, do
       // not blast the agent — they may have already paid us, or the

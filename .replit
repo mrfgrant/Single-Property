@@ -48,6 +48,7 @@ ONBOARDING_URL = "https://app.propsite.io/onboarding"
 
 [userenv.production]
 IS_PRODUCTION = "true"
+PAUSE_COLD_OUTREACH = "true"
 
 [nix]
 channel = "stable-25_05"
