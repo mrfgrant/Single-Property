@@ -3,13 +3,13 @@ import { api } from "@/lib/api";
 import {
   Mail, MousePointerClick, DollarSign, Radio,
   TrendingUp, Clock, AlertTriangle, CheckCircle2,
-  RefreshCw, Users, Home, Send
+  RefreshCw, Users, Home, Send, ImageOff
 } from "lucide-react";
 
 interface DashboardData {
   outreach: {
     sentToday: number; sent7d: number; sent30d: number;
-    pendingQueue: number; failed: number; cancelled: number; suppressed: number;
+    pendingQueue: number; failed: number; cancelled: number; suppressed: number; pendingNoPhoto: number;
   };
   clicks: {
     clicksToday: number; clicks7d: number;
@@ -165,6 +165,21 @@ export default function Dashboard() {
             sub="pending emails" />
           <StatCard label="Suppressed"  value={outreach.suppressed}    icon={<Users size={16} />} accent="green"
             sub="opted out" />
+          {outreach.pendingNoPhoto > 0 && (
+            <div className="col-span-2 md:col-span-4 flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
+              <ImageOff size={18} className="text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-amber-800">
+                  {outreach.pendingNoPhoto} pending cold-outreach email{outreach.pendingNoPhoto !== 1 ? 's have' : ' has'} no listing photo
+                </p>
+                <p className="text-xs text-amber-700 mt-0.5">
+                  These emails are queued to send but contain no property image. Check server logs for{' '}
+                  <code className="font-mono bg-amber-100 px-1 rounded">cold_outreach_no_photo_after_sync</code>{' '}
+                  to find affected listings. The send window may close before photos arrive.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 p-5">

@@ -213,7 +213,7 @@ export const api = {
     get: () => request<{
       outreach: {
         sentToday: number; sent7d: number; sent30d: number;
-        pendingQueue: number; failed: number; cancelled: number; suppressed: number;
+        pendingQueue: number; failed: number; cancelled: number; suppressed: number; pendingNoPhoto: number;
       };
       clicks: {
         clicksToday: number; clicks7d: number;

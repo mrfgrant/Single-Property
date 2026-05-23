@@ -14,6 +14,7 @@ router.get("/admin/dashboard", adminAuth, async (_req, res) => {
       db.execute<{
         sent_today: string; sent_7d: string; sent_30d: string;
         pending: string; failed: string; cancelled: string; suppressed: string;
+        pending_no_photo: string;
       }>(sql`
         SELECT
           COUNT(*) FILTER (WHERE kind = 'cold_outreach' AND status = 'sent'
@@ -28,7 +29,9 @@ router.get("/admin/dashboard", adminAuth, async (_req, res) => {
           COUNT(*) FILTER (WHERE kind = 'cold_outreach' AND status = 'pending') AS pending,
           COUNT(*) FILTER (WHERE kind = 'cold_outreach' AND status = 'failed')  AS failed,
           COUNT(*) FILTER (WHERE kind = 'cold_outreach' AND status = 'cancelled') AS cancelled,
-          COUNT(*) FILTER (WHERE kind = 'cold_outreach' AND status = 'suppressed') AS suppressed
+          COUNT(*) FILTER (WHERE kind = 'cold_outreach' AND status = 'suppressed') AS suppressed,
+          COUNT(*) FILTER (WHERE kind = 'cold_outreach' AND status = 'pending'
+            AND html NOT LIKE '%<img%') AS pending_no_photo
         FROM ${emailOutboxTable}
       `),
 
@@ -142,6 +145,7 @@ router.get("/admin/dashboard", adminAuth, async (_req, res) => {
         failed:       n(outreachRow.failed),
         cancelled:    n(outreachRow.cancelled),
         suppressed:   n(outreachRow.suppressed),
+        pendingNoPhoto: n(outreachRow.pending_no_photo),
       },
       clicks: {
         clicksToday:       n(clickRow.clicks_today),

@@ -86,8 +86,17 @@ async function onListingUpserted(event: ListingUpsertedEvent): Promise<void> {
  *
  * This is the single trigger point for cold outreach — outreach is
  * NEVER queued at ingest time; only after confirmed media exists.
+ *
+ * @param calledAfterPhotoSync - Pass true when this is called immediately
+ *   after syncPhotos() returned true. If the listing still has no photos
+ *   at that point (race condition or all downloads failed), a structured
+ *   warning is emitted so the issue can be investigated before the email
+ *   window closes.
  */
-export async function queueColdOutreachIfEligible(listingId: string): Promise<void> {
+export async function queueColdOutreachIfEligible(
+  listingId: string,
+  { calledAfterPhotoSync = false }: { calledAfterPhotoSync?: boolean } = {},
+): Promise<void> {
   const rows = await db
     .select()
     .from(listingsTable)
@@ -123,10 +132,28 @@ export async function queueColdOutreachIfEligible(listingId: string): Promise<vo
   // virtual tours in the MLS will have an empty photoUrls array and must
   // wait until an actual image is confirmed before outreach fires.
   if (!listing.photoUrls?.length) {
-    log.debug(
-      { listingId: listing.id },
-      "Listing has no photos — skipping cold outreach (will retry when photos arrive)",
-    );
+    if (calledAfterPhotoSync) {
+      // syncPhotos() just ran and reported photos were newly stored, but the
+      // listing still has none. This means all photo downloads silently failed
+      // (R2 upload errors, CDN 404s, etc.) after syncPhotos set photoUrls.
+      // Emit a structured warning so the outbox gap is visible before the
+      // send window closes — this listing will get no cold-outreach email.
+      log.warn(
+        {
+          listingId: listing.id,
+          agentEmail: listing.listAgentEmail ?? null,
+          agentMlsId: listing.listAgentMlsId ?? null,
+          address: listing.address,
+          mlsListingId: listing.mlsListingId ?? null,
+        },
+        "cold_outreach_no_photo_after_sync: listing still has no photos after syncPhotos() — outreach email will not be sent",
+      );
+    } else {
+      log.debug(
+        { listingId: listing.id },
+        "Listing has no photos — skipping cold outreach (will retry when photos arrive)",
+      );
+    }
     return;
   }
 

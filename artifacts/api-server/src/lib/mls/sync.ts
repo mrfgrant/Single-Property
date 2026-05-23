@@ -501,7 +501,7 @@ export async function runSync(kind: "full" | "delta"): Promise<SyncResult> {
           const photosNewlyAdded = await syncPhotos(row.id, row.mlsListingId);
           if (photosNewlyAdded) {
             try {
-              await queueColdOutreachIfEligible(row.id);
+              await queueColdOutreachIfEligible(row.id, { calledAfterPhotoSync: true });
             } catch (err) {
               logger.warn({ err, listingId: row.id }, "Cold-outreach queue after photo sync failed — non-fatal");
             }
@@ -513,7 +513,7 @@ export async function runSync(kind: "full" | "delta"): Promise<SyncResult> {
         const photosNewlyAdded = await syncPhotos(listingId, listingKey);
         if (photosNewlyAdded) {
           try {
-            await queueColdOutreachIfEligible(listingId);
+            await queueColdOutreachIfEligible(listingId, { calledAfterPhotoSync: true });
           } catch (err) {
             logger.warn({ err, listingId }, "Cold-outreach queue after photo sync failed — non-fatal");
           }
@@ -577,7 +577,7 @@ export async function runPhotoBackfill(): Promise<{ synced: number; total: numbe
       const photosNewlyAdded = await syncPhotos(row.id, row.mlsListingId);
       if (photosNewlyAdded) {
         synced++;
-        await queueColdOutreachIfEligible(row.id).catch((err) =>
+        await queueColdOutreachIfEligible(row.id, { calledAfterPhotoSync: true }).catch((err) =>
           logger.warn({ err, listingId: row.id }, "Cold-outreach queue after backfill failed — non-fatal"),
         );
       }
