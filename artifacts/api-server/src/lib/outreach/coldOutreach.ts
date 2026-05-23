@@ -58,6 +58,15 @@ function resolvePhotoUrl(raw: string | null | undefined): string | null {
   return null;
 }
 
+/** Extract the embed URL from the first virtual tour or video on a listing, if any. */
+function resolveTourEmbedUrl(listing: ListingRow): { embedUrl: string; kind: "tour" | "video" } | null {
+  const tours = listing.virtualTourUrls as Array<{ url: string; provider: string; embedUrl: string; kind: "tour" | "video" }> | null;
+  if (!Array.isArray(tours) || tours.length === 0) return null;
+  const entry = tours[0];
+  if (!entry?.embedUrl) return null;
+  return { embedUrl: entry.embedUrl, kind: entry.kind };
+}
+
 /**
  * Per-agent batching window: while the agent's digest email is still
  * pending in the outbox (i.e. send_after has not yet been reached), any
@@ -128,16 +137,15 @@ export async function queueColdOutreachIfEligible(
     return;
   }
 
-  // Media gate: require at least one photo. Listings with only PDFs or
-  // virtual tours in the MLS will have an empty photoUrls array and must
-  // wait until an actual image is confirmed before outreach fires.
-  if (!listing.photoUrls?.length) {
+  // Media gate: require at least one photo OR at least one virtual tour/video.
+  // Listings with only PDFs in the MLS remain ineligible; listings with a
+  // Matterport/iGUIDE/YouTube/Vimeo embed qualify even without any photos.
+  const hasPhotos = (listing.photoUrls?.length ?? 0) > 0;
+  const hasTourOrVideo = Array.isArray((listing as any).virtualTourUrls) &&
+    (listing as any).virtualTourUrls.length > 0;
+
+  if (!hasPhotos && !hasTourOrVideo) {
     if (calledAfterPhotoSync) {
-      // syncPhotos() just ran and reported photos were newly stored, but the
-      // listing still has none. This means all photo downloads silently failed
-      // (R2 upload errors, CDN 404s, etc.) after syncPhotos set photoUrls.
-      // Emit a structured warning so the outbox gap is visible before the
-      // send window closes — this listing will get no cold-outreach email.
       log.warn(
         {
           listingId: listing.id,
@@ -146,12 +154,12 @@ export async function queueColdOutreachIfEligible(
           address: listing.address,
           mlsListingId: listing.mlsListingId ?? null,
         },
-        "cold_outreach_no_photo_after_sync: listing still has no photos after syncPhotos() — outreach email will not be sent",
+        "cold_outreach_no_photo_after_sync: listing still has no photos or virtual tour after syncPhotos() — outreach email will not be sent",
       );
     } else {
       log.debug(
         { listingId: listing.id },
-        "Listing has no photos — skipping cold outreach (will retry when photos arrive)",
+        "Listing has no photos or virtual tour — skipping cold outreach (will retry when media arrives)",
       );
     }
     return;
@@ -220,6 +228,7 @@ async function upsertDigestForAgent(recipient: string, listing: ListingRow): Pro
   const previewUrl = `${MARKETING_SITE_URL}/listing/${listing.id}`;
   const onboardingUrl = `${MARKETING_SITE_URL}/onboarding?listing=${listing.id}`;
   const photoUrl = resolvePhotoUrl(listing.photoUrls?.[0]);
+  const tourEmbed = resolveTourEmbedUrl(listing);
   const firstName = firstNameOf(listing.listAgentName);
   const unsubscribeUrl = buildUnsubscribeUrl(MARKETING_SITE_URL, recipient);
 
@@ -278,11 +287,14 @@ async function upsertDigestForAgent(recipient: string, listing: ListingRow): Pro
             },
             tx,
           );
+          const lTourEmbed = resolveTourEmbedUrl(l);
           return {
             address: l.address,
             previewUrl,
             activateUrl,
             photoUrl: resolvePhotoUrl(l.photoUrls?.[0]),
+            tourEmbedUrl: lTourEmbed?.embedUrl ?? null,
+            tourKind: lTourEmbed?.kind ?? null,
             beds: l.beds,
             baths: l.baths,
             sqft: l.sqft,
@@ -345,6 +357,8 @@ async function upsertDigestForAgent(recipient: string, listing: ListingRow): Pro
           previewUrl: trackedPreviewUrl,
           activateUrl: trackedActivateUrl,
           photoUrl,
+          tourEmbedUrl: tourEmbed?.embedUrl ?? null,
+          tourKind: tourEmbed?.kind ?? null,
           beds: listing.beds,
           baths: listing.baths,
           sqft: listing.sqft,

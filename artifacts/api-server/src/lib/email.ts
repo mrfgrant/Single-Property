@@ -360,6 +360,8 @@ export function coldOutreachEmail(params: {
 
   const heroBlock = buildHeroBlock({
     photoUrl: params.photoUrl,
+    tourEmbedUrl: (params as any).tourEmbedUrl,
+    tourKind: (params as any).tourKind,
     address: params.address,
     previewUrl: params.previewUrl,
     price: params.price,
@@ -532,6 +534,8 @@ export function coldOutreachDigestEmail(params: {
     const l = firstListing;
     const heroBlock = buildHeroBlock({
       photoUrl: l.photoUrl,
+      tourEmbedUrl: l.tourEmbedUrl,
+      tourKind: l.tourKind,
       address: l.address,
       previewUrl: l.previewUrl,
       price: l.price,
@@ -572,6 +576,8 @@ export function coldOutreachDigestEmail(params: {
         const domain = suggestDomain(l.address);
         const cardHero = buildHeroBlock({
           photoUrl: l.photoUrl,
+          tourEmbedUrl: l.tourEmbedUrl,
+          tourKind: l.tourKind,
           address: l.address,
           previewUrl: l.previewUrl,
           price: l.price,

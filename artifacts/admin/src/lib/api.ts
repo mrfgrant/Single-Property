@@ -45,6 +45,7 @@ export interface ExampleListing {
   agentBrokerage?: string | null;
   brokerageLogoUrl?: string | null;
   photoUrls?: string[] | null;
+  virtualTourUrls?: Array<{ url: string; provider: string; embedUrl: string; kind: "tour" | "video" }> | null;
   walkScore?: number | null;
   bikeScore?: number | null;
   schoolRating?: number | null;

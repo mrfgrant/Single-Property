@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, timestamp, integer, bigint, real, date, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, timestamp, integer, bigint, real, date, index, uniqueIndex, jsonb } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -34,6 +34,18 @@ export const listingsTable = pgTable(
     yearBuilt: integer("year_built"),
     description: text("description"),
     photoUrls: text("photo_urls").array(),
+    /**
+     * Detected virtual tour and video embed entries from the MLS media feed,
+     * plus any manually-added entries from the admin panel.
+     * Shape: Array<{ url: string; provider: string; embedUrl: string; kind: "tour" | "video" }>
+     * Provider values: "matterport" | "zillow3d" | "iguide" | "kuula" | "youtube" | "vimeo" | "unknown"
+     */
+    virtualTourUrls: jsonb("virtual_tour_urls").$type<Array<{
+      url: string;
+      provider: string;
+      embedUrl: string;
+      kind: "tour" | "video";
+    }>>(),
     status: text("status").notNull().default("active"),
     mlsStatus: text("mls_status"),
     mode: text("mode").notNull().default("preview"),

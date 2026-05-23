@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, timestamp, integer, bigint, real, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, timestamp, integer, bigint, real, boolean, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -25,6 +25,9 @@ export const exampleListingsTable = pgTable("example_listings", {
   agentBrokerage: text("agent_brokerage"),
   brokerageLogoUrl: text("brokerage_logo_url"),
   photoUrls: text("photo_urls").array(),
+  virtualTourUrls: jsonb("virtual_tour_urls").$type<Array<{
+    url: string; provider: string; embedUrl: string; kind: "tour" | "video";
+  }>>(),
   walkScore: integer("walk_score"),
   bikeScore: integer("bike_score"),
   schoolRating: integer("school_rating"),

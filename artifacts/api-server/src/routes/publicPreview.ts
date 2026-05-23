@@ -115,6 +115,7 @@ router.get("/listings/preview/:id", async (req, res) => {
       yearBuilt: listing.yearBuilt,
       description: listing.description,
       photoUrls: (listing.photoUrls ?? []).filter(isImageUrl),
+      virtualTourUrls: listing.virtualTourUrls ?? [],
       domainName: listing.domainName,
       mode: listing.mode,
       status: listing.status,

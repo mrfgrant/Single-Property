@@ -35,6 +35,7 @@ interface ApiListing {
   mode?: string | null;
   /** ISO timestamp — when the api-server last refreshed this row from the MLS feed. Drives the IDX "Last updated" line. */
   mlsLastSyncedAt?: string | null;
+  virtualTourUrls?: Array<{ url: string; provider: string; embedUrl: string; kind: "tour" | "video" }> | null;
 }
 
 export interface PublicListing extends SampleListing {
@@ -53,6 +54,8 @@ export interface PublicListing extends SampleListing {
   mlsId?: string;
   /** ISO timestamp of our last MLS refresh — rendered as "Last updated …" near the IDX disclaimer. */
   mlsLastSyncedAt?: string;
+  /** Virtual tours (Matterport, iGUIDE, Kuula, Zillow 3D) and video embeds (YouTube, Vimeo) */
+  virtualTourUrls?: Array<{ url: string; provider: string; embedUrl: string; kind: "tour" | "video" }>;
 }
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
@@ -107,6 +110,7 @@ export function apiToPublicListing(row: ApiListing): PublicListing {
         : undefined,
     mlsId: row.mlsId ?? undefined,
     mlsLastSyncedAt: row.mlsLastSyncedAt ?? undefined,
+    virtualTourUrls: row.virtualTourUrls ?? undefined,
   };
 }
 

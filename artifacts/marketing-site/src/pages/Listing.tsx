@@ -46,6 +46,8 @@ const NAV_SECTIONS = [
   { id: "home", label: "Home" },
   { id: "story", label: "The Home" },
   { id: "gallery", label: "Gallery" },
+  { id: "tour", label: "Virtual Tour" },
+  { id: "video", label: "Video" },
   { id: "details", label: "Details" },
   { id: "location", label: "Location" },
   { id: "finance", label: "Finance" },
@@ -649,6 +651,15 @@ export default function Listing() {
   const galleryPhotos = photos.slice(1);
   const featurePhoto = galleryPhotos[0];
   const remainingGallery = galleryPhotos.slice(1);
+  // Virtual tours and videos from the listing (MLS-detected or admin-added)
+  type TourEntry = { url: string; provider: string; embedUrl: string; kind: "tour" | "video" };
+  const allTourEntries: TourEntry[] = Array.isArray((listing as any).virtualTourUrls)
+    ? (listing as any).virtualTourUrls as TourEntry[]
+    : [];
+  const virtualTours = allTourEntries.filter((t) => t.kind === "tour");
+  const videoEmbeds = allTourEntries.filter((t) => t.kind === "video");
+  const primaryTour = virtualTours[0] ?? null;
+  const primaryVideo = videoEmbeds[0] ?? null;
   const displayDomain = listing.domainName ?? `${listing.slug.toLowerCase()}.propsite.io`;
   const cityState = `${listing.city}, ${listing.state}`.toUpperCase();
   const addressLine = listing.address.toUpperCase();
@@ -659,9 +670,12 @@ export default function Listing() {
         open={menuOpen}
         onToggle={setMenuOpen}
         brand={displayDomain}
-        sections={NAV_SECTIONS.filter(
-          (s) => !(s.id === "gallery" && remainingGallery.length === 0),
-        )}
+        sections={NAV_SECTIONS.filter((s) => {
+          if (s.id === "gallery" && remainingGallery.length === 0) return false;
+          if (s.id === "tour" && !primaryTour) return false;
+          if (s.id === "video" && !primaryVideo) return false;
+          return true;
+        })}
       />
 
       {/* HERO — full-bleed photo, editorial overlay */}
@@ -811,6 +825,70 @@ export default function Listing() {
                 />
               </a>
             ))}
+          </div>
+        </section>
+      )}
+
+      {/* VIRTUAL TOUR */}
+      {primaryTour && (
+        <section id="tour" className="pl-24 md:pl-32 px-6 md:px-12 py-20 md:py-28 bg-cream border-t border-ink/10">
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-12">
+              <p className="text-[10px] uppercase tracking-[0.4em] text-gold mb-4">Virtual Tour</p>
+              <h2 className="font-serif text-3xl md:text-5xl text-ink">Explore every room</h2>
+            </div>
+            <div className="relative w-full aspect-[16/9] bg-ink overflow-hidden rounded-sm shadow-lg">
+              <iframe
+                src={primaryTour.embedUrl}
+                title={`Virtual tour of ${listing.address}`}
+                className="absolute inset-0 w-full h-full border-0"
+                allowFullScreen
+                allow="xr-spatial-tracking; fullscreen"
+                loading="lazy"
+              />
+            </div>
+            {primaryTour.provider !== "unknown" && (
+              <p className="text-center text-xs text-muted mt-4 capitalize">
+                Powered by {primaryTour.provider === "zillow3d" ? "Zillow 3D" : primaryTour.provider === "iguide" ? "iGUIDE" : primaryTour.provider}
+              </p>
+            )}
+            {virtualTours.length > 1 && (
+              <div className="mt-6 flex flex-wrap justify-center gap-3">
+                {virtualTours.slice(1).map((t, i) => (
+                  <a
+                    key={i}
+                    href={t.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs font-medium text-ink border border-ink/30 px-4 py-2 hover:border-gold hover:text-gold transition-colors"
+                  >
+                    View additional tour {i + 2} →
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* VIDEO WALKTHROUGH */}
+      {primaryVideo && (
+        <section id="video" className="pl-24 md:pl-32 px-6 md:px-12 py-20 md:py-28 bg-warm-white border-t border-ink/10">
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-12">
+              <p className="text-[10px] uppercase tracking-[0.4em] text-gold mb-4">Video</p>
+              <h2 className="font-serif text-3xl md:text-5xl text-ink">Watch the walkthrough</h2>
+            </div>
+            <div className="relative w-full aspect-[16/9] bg-ink overflow-hidden rounded-sm shadow-lg">
+              <iframe
+                src={primaryVideo.embedUrl}
+                title={`Video walkthrough of ${listing.address}`}
+                className="absolute inset-0 w-full h-full border-0"
+                allowFullScreen
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                loading="lazy"
+              />
+            </div>
           </div>
         </section>
       )}

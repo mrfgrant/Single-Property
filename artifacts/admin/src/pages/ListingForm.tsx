@@ -1,6 +1,6 @@
 import React, { useState, useRef } from "react";
 import { api, type ExampleListing, type ListingInput } from "@/lib/api";
-import { ArrowLeft, Upload, X, Loader2, Search, RefreshCw } from "lucide-react";
+import { ArrowLeft, Upload, X, Loader2, Search, RefreshCw, Link2, Plus, Trash2 } from "lucide-react";
 
 interface Props {
   listing: ExampleListing | null;
@@ -144,6 +144,15 @@ export default function ListingForm({ listing, onSave, onCancel }: Props) {
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoSyncing, setPhotoSyncing] = useState(false);
   const [photoSyncMsg, setPhotoSyncMsg] = useState("");
+  // Virtual tour / video URL management
+  type TourEntry = { url: string; provider: string; embedUrl: string; kind: "tour" | "video" };
+  const parseTours = (raw: unknown): TourEntry[] =>
+    Array.isArray(raw) ? (raw as TourEntry[]) : [];
+  const [tourEntries, setTourEntries] = useState<TourEntry[]>(
+    parseTours((listing as any)?.virtualTourUrls),
+  );
+  const [tourInput, setTourInput] = useState("");
+  const [tourError, setTourError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState<Partial<ListingInput>>({
@@ -274,13 +283,61 @@ export default function ListingForm({ listing, onSave, onCancel }: Props) {
     }
   };
 
+  /** Detect provider from URL and add to tourEntries. */
+  const handleAddTour = () => {
+    const raw = tourInput.trim();
+    if (!raw) return;
+    setTourError("");
+    // Simple client-side provider detection matching the server-side logic.
+    let provider = "unknown";
+    let embedUrl = raw;
+    let kind: "tour" | "video" = "tour";
+
+    if (/matterport\.com/i.test(raw)) {
+      provider = "matterport";
+      const m = raw.match(/[?&]m=([A-Za-z0-9]+)/);
+      embedUrl = m ? `https://my.matterport.com/show/?m=${m[1]}&play=1` : raw;
+    } else if (/zillow\.com/i.test(raw) && /3d|imx|3dhome/i.test(raw)) {
+      provider = "zillow3d";
+    } else if (/iguide\.tours/i.test(raw)) {
+      provider = "iguide";
+    } else if (/kuula\.co/i.test(raw)) {
+      provider = "kuula";
+      embedUrl = raw.replace(/\/(post|tour)\//i, "/share/");
+    } else if (/youtube\.com|youtu\.be/i.test(raw)) {
+      provider = "youtube"; kind = "video";
+      const m = raw.match(/youtu\.be\/([A-Za-z0-9_-]{11})/) ||
+                raw.match(/[?&]v=([A-Za-z0-9_-]{11})/) ||
+                raw.match(/\/(?:embed|shorts|v)\/([A-Za-z0-9_-]{11})/);
+      if (!m) { setTourError("Could not extract YouTube video ID from URL."); return; }
+      embedUrl = `https://www.youtube.com/embed/${m[1]}?rel=0&modestbranding=1`;
+    } else if (/vimeo\.com/i.test(raw)) {
+      provider = "vimeo"; kind = "video";
+      const m = raw.match(/player\.vimeo\.com\/video\/(\d+)/) || raw.match(/vimeo\.com\/(\d+)/);
+      if (!m) { setTourError("Could not extract Vimeo video ID from URL."); return; }
+      embedUrl = `https://player.vimeo.com/video/${m[1]}?dnt=1`;
+    }
+
+    const entry: TourEntry = { url: raw, provider, embedUrl, kind };
+    if (tourEntries.some((t) => t.url === raw)) {
+      setTourError("This URL is already added.");
+      return;
+    }
+    setTourEntries((prev) => [...prev, entry]);
+    setTourInput("");
+  };
+
+  const handleRemoveTour = (index: number) => {
+    setTourEntries((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError("");
     try {
       if (isEdit) {
-        await api.listings.update(listing!.id, form);
+        await api.listings.update(listing!.id, { ...form, virtualTourUrls: tourEntries } as any);
       } else {
         try {
           await api.listings.create(form);
@@ -622,6 +679,60 @@ export default function ListingForm({ listing, onSave, onCancel }: Props) {
               )}
             </div>
           )}
+
+          {/* Virtual Tour & Video URLs */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
+            <h3 className="text-sm font-semibold text-gray-900 mb-1 pb-3 border-b border-gray-100">Virtual Tours & Videos</h3>
+            <p className="text-xs text-gray-400 mb-5">Add Matterport, iGUIDE, Kuula, Zillow 3D, YouTube, or Vimeo URLs. Provider and embed code are detected automatically.</p>
+
+            {tourEntries.length > 0 && (
+              <ul className="space-y-2 mb-4">
+                {tourEntries.map((t, i) => (
+                  <li key={i} className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                    <Link2 size={13} className="text-gray-400 shrink-0" />
+                    <span className="flex-1 min-w-0">
+                      <span className="text-xs font-semibold text-gray-700 capitalize mr-2">
+                        {t.provider === "zillow3d" ? "Zillow 3D" : t.provider === "iguide" ? "iGUIDE" : t.provider}
+                      </span>
+                      <span className="text-xs text-gray-500 truncate">{t.url}</span>
+                    </span>
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${t.kind === "video" ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700"}`}>
+                      {t.kind}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveTour(i)}
+                      className="text-gray-400 hover:text-red-500 transition-colors shrink-0"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={tourInput}
+                onChange={(e) => { setTourInput(e.target.value); setTourError(""); }}
+                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddTour())}
+                placeholder="https://my.matterport.com/show/?m=... or YouTube / Vimeo URL"
+                className={inputClass + " flex-1 text-xs"}
+              />
+              <button
+                type="button"
+                onClick={handleAddTour}
+                disabled={!tourInput.trim()}
+                className="flex items-center gap-1.5 h-10 px-4 bg-gray-900 text-white text-xs font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 transition-colors shrink-0"
+              >
+                <Plus size={13} /> Add
+              </button>
+            </div>
+            {tourError && (
+              <p className="text-xs text-red-600 mt-2">{tourError}</p>
+            )}
+          </div>
 
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg mb-4">

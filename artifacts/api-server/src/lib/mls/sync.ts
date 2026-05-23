@@ -13,6 +13,7 @@ import { mlsClient, MlsNotConfiguredError, type ResoProperty } from "./client.js
 import { mlsEventBus } from "./eventBus.js";
 import { getMlsConfig, normalizeStatus } from "./config.js";
 import { downloadAndStorePhoto } from "./photoUtils.js";
+import { detectTourOrVideo, type DetectedMedia } from "./tourDetection.js";
 import { queueColdOutreachIfEligible } from "../outreach/coldOutreach.js";
 import { sendOperatorAlert } from "../operatorAlert.js";
 
@@ -261,7 +262,7 @@ async function syncPhotos(listingId: string, listingKey: string): Promise<boolea
         .from(listingPhotosTable)
         .where(eq(listingPhotosTable.listingId, listingId)),
       db
-        .select({ photoUrls: listingsTable.photoUrls })
+        .select({ photoUrls: listingsTable.photoUrls, virtualTourUrls: listingsTable.virtualTourUrls })
         .from(listingsTable)
         .where(eq(listingsTable.id, listingId))
         .limit(1),
@@ -280,8 +281,31 @@ async function syncPhotos(listingId: string, listingKey: string): Promise<boolea
       if (row.mlsMediaKey) storedByKey.set(row.mlsMediaKey, row.storedUrl);
     }
 
+    // Tour/video detection: collect any new entries found in this sync run.
+    // We preserve existing entries and only append newly detected ones so
+    // manually-added entries from the admin panel are not overwritten.
+    const existingTours: DetectedMedia[] =
+      Array.isArray(listingRow[0]?.virtualTourUrls) ? (listingRow[0]!.virtualTourUrls as DetectedMedia[]) : [];
+    const existingTourUrls = new Set(existingTours.map((t) => t.url));
+    const newTours: DetectedMedia[] = [];
+
     for (const m of media) {
       if (!m.MediaURL) continue;
+
+      // Try to classify as tour or video first — these are never image files.
+      const detected = detectTourOrVideo(m.MediaURL);
+      if (detected) {
+        if (!existingTourUrls.has(detected.url)) {
+          newTours.push(detected);
+          existingTourUrls.add(detected.url);
+          logger.info(
+            { listingId, provider: detected.provider, kind: detected.kind, url: detected.url },
+            "Detected virtual tour / video from MLS media feed",
+          );
+        }
+        continue; // Not an image — skip the photo download path.
+      }
+
       const previouslyStored = storedByKey.get(m.MediaKey) ?? null;
       const storedUrl = previouslyStored
         ? previouslyStored
@@ -311,6 +335,15 @@ async function syncPhotos(listingId: string, listingKey: string): Promise<boolea
         });
     }
 
+    // Persist any newly detected tours/videos.
+    if (newTours.length > 0) {
+      const merged = [...existingTours, ...newTours];
+      await db
+        .update(listingsTable)
+        .set({ virtualTourUrls: merged, updatedAt: new Date() })
+        .where(eq(listingsTable.id, listingId));
+    }
+
     // Mirror onto listings.photoUrls for easy consumption by the site
     // renderer. Prefer the Object Storage path (`/objects/...`) so the
     // site serves photos from our own domain; fall back to the MLS
@@ -336,7 +369,9 @@ async function syncPhotos(listingId: string, listingKey: string): Promise<boolea
     // We use the listing-level photoUrls (which includes source-URL fallbacks)
     // as the "before" state to avoid false positives when photos existed via
     // fallback but lacked a confirmed stored_url in listing_photos.
-    return !prevHadPhotos && imageUrls.length > 0;
+    // Media is "newly added" when photos OR tours/videos arrived for the first time.
+    const hasTours = (existingTours.length + newTours.length) > 0;
+    return (!prevHadPhotos && imageUrls.length > 0) || (newTours.length > 0 && existingTours.length === 0 && imageUrls.length === 0 && !prevHadPhotos);
   } catch (err) {
     logger.warn({ err, listingId, listingKey }, "Failed to sync photos for listing");
     return false;

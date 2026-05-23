@@ -337,37 +337,45 @@ export async function drainEmailOutbox(limit = 25): Promise<{ processed: number 
         if (typeof single === "string") listingIds.push(single);
       }
       if (listingIds.length > 0) {
-        const photos = await db
+        // A listing qualifies if it has photos OR at least one virtual tour/video.
+        // This mirrors the eligibility gate in coldOutreach.ts.
+        const mediaOk = await db
           .select({ id: listingsTable.id })
           .from(listingsTable)
           .where(
             and(
               inArray(listingsTable.id, listingIds),
-              sql`array_length(${listingsTable.photoUrls}, 1) > 0`,
+              sql`(
+                array_length(${listingsTable.photoUrls}, 1) > 0
+                OR (
+                  ${listingsTable.virtualTourUrls} IS NOT NULL
+                  AND jsonb_array_length(${listingsTable.virtualTourUrls}) > 0
+                )
+              )`,
             ),
           )
           .limit(1);
 
-        if (photos.length === 0) {
+        if (mediaOk.length === 0) {
           await db
             .update(emailOutboxTable)
-            .set({ status: "cancelled", lastError: "no_photos_at_send_time", updatedAt: new Date() })
+            .set({ status: "cancelled", lastError: "no_media_at_send_time", updatedAt: new Date() })
             .where(eq(emailOutboxTable.id, row.id));
           log.warn(
             { outboxId: row.id, listingIds, toEmail: row.toEmail },
-            "Cold outreach cancelled — no photos at drain time (data integrity issue)",
+            "Cold outreach cancelled — no photos or virtual tour at drain time (data integrity issue)",
           );
           void sendOperatorAlert(
             "cold_outreach_no_media_at_send_time",
-            "Cold outreach cancelled — no photos at drain time",
+            "Cold outreach cancelled — no media at drain time",
             [
               `Outbox ID:   ${row.id}`,
               `To:          ${row.toEmail}`,
               `Subject:     ${row.subject}`,
               `Listing IDs: ${listingIds.join(", ")}`,
               ``,
-              `This email reached the drain with no confirmed photos in the`,
-              `database. The outreach queue gate should have blocked it.`,
+              `This email reached the drain with no confirmed photos or virtual`,
+              `tour in the database. The outreach queue gate should have blocked it.`,
               ``,
               `Action: Check photo backfill cron status and MLS media feed.`,
             ],
