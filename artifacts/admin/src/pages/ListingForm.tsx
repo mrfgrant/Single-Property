@@ -1,6 +1,6 @@
 import React, { useState, useRef } from "react";
 import { api, type ExampleListing, type ListingInput } from "@/lib/api";
-import { ArrowLeft, Upload, X, Loader2, Search } from "lucide-react";
+import { ArrowLeft, Upload, X, Loader2, Search, RefreshCw } from "lucide-react";
 
 interface Props {
   listing: ExampleListing | null;
@@ -142,6 +142,8 @@ export default function ListingForm({ listing, onSave, onCancel }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoSyncing, setPhotoSyncing] = useState(false);
+  const [photoSyncMsg, setPhotoSyncMsg] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState<Partial<ListingInput>>({
@@ -248,6 +250,27 @@ export default function ListingForm({ listing, onSave, onCancel }: Props) {
       setForm((prev) => ({ ...prev, photoUrls: res.listing.photoUrls ?? [] }));
     } catch (err: any) {
       setError("Failed to remove photo: " + err.message);
+    }
+  };
+
+  const handleSyncPhotos = async () => {
+    if (!listing) return;
+    setPhotoSyncing(true);
+    setPhotoSyncMsg("");
+    try {
+      const res = await api.listings.syncPhotos(listing.id);
+      if (res.skipped) {
+        setPhotoSyncMsg("Photos already synced — no changes made.");
+      } else if (res.photoCount === 0) {
+        setPhotoSyncMsg("Sync ran but no photos were found in the MLS for this listing.");
+      } else {
+        setForm((prev) => ({ ...prev, photoUrls: res.photoUrls }));
+        setPhotoSyncMsg(`${res.photoCount} photo${res.photoCount !== 1 ? "s" : ""} synced from MLS.`);
+      }
+    } catch (err: any) {
+      setPhotoSyncMsg("Sync failed: " + err.message);
+    } finally {
+      setPhotoSyncing(false);
     }
   };
 
@@ -522,6 +545,32 @@ export default function ListingForm({ listing, onSave, onCancel }: Props) {
           {isEdit && (
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
               <h3 className="text-sm font-semibold text-gray-900 mb-5 pb-3 border-b border-gray-100">Photos</h3>
+
+              {/* MLS photo sync button — shown when listing has an MLS ID but no photos */}
+              {listing.mlsId && (form.photoUrls?.length ?? 0) === 0 && (
+                <div className="mb-4 flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-amber-800">No photos yet</p>
+                    <p className="text-xs text-amber-700 mt-0.5">This listing has an MLS ID — pull photos directly from the feed.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSyncPhotos}
+                    disabled={photoSyncing}
+                    className="flex items-center gap-1.5 h-8 px-3 bg-amber-600 text-white text-xs font-medium rounded-lg hover:bg-amber-700 disabled:opacity-50 transition-colors shrink-0"
+                  >
+                    {photoSyncing
+                      ? <Loader2 size={13} className="animate-spin" />
+                      : <RefreshCw size={13} />}
+                    {photoSyncing ? "Syncing…" : "Sync from MLS"}
+                  </button>
+                </div>
+              )}
+              {photoSyncMsg && (
+                <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-4">
+                  {photoSyncMsg}
+                </p>
+              )}
 
               {/* Thumbnails */}
               {(form.photoUrls?.length ?? 0) > 0 && (

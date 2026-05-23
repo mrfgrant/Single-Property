@@ -115,6 +115,11 @@ export const api = {
       request<{ listing: ExampleListing }>(`/api/admin/listings/${id}/photos/${index}`, {
         method: "DELETE",
       }),
+    syncPhotos: (id: string) =>
+      request<{ photoCount: number; photoUrls: string[]; skipped: boolean }>(
+        `/api/admin/listings/${id}/sync-photos`,
+        { method: "POST" },
+      ),
     uploadAsset: async (
       id: string,
       kind: "agent_photo" | "brokerage_logo",

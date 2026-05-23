@@ -118,6 +118,65 @@ async function triggerMlsPhotoSync(exampleListingId: string, mlsId: string): Pro
   }
 }
 
+/* POST /admin/listings/:id/sync-photos
+ * Explicitly pull MLS photos for an example listing that has an MLS ID
+ * but no photos yet. Returns the updated photo list so the form can
+ * refresh immediately. Only runs when the listing currently has no photos
+ * (protects manually-uploaded photos from being overwritten). */
+router.post("/admin/listings/:id/sync-photos", adminAuth, async (req, res) => {
+  const [listing] = await db
+    .select()
+    .from(exampleListingsTable)
+    .where(eq(exampleListingsTable.id, req.params.id))
+    .limit(1);
+
+  if (!listing) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  if (!listing.mlsId) {
+    res.status(400).json({ error: "Listing has no MLS ID — cannot sync photos" });
+    return;
+  }
+  if (listing.photoUrls && listing.photoUrls.length > 0) {
+    res.json({ photoCount: listing.photoUrls.length, photoUrls: listing.photoUrls, skipped: true });
+    return;
+  }
+
+  const listingKey = await resolveListingKey(listing.mlsId);
+  if (!listingKey) {
+    res.status(422).json({ error: `Could not resolve MLS listing key for ID: ${listing.mlsId}` });
+    return;
+  }
+
+  const media = await mlsClient.fetchMediaForListing(listingKey);
+  if (media.length === 0) {
+    res.json({ photoCount: 0, photoUrls: [], skipped: false });
+    return;
+  }
+
+  const stored: string[] = [];
+  for (const m of media.sort((a, b) => (a.Order ?? 0) - (b.Order ?? 0))) {
+    if (!m.MediaURL) continue;
+    const path = await downloadAndStorePhoto(m.MediaURL);
+    if (path) stored.push(path);
+  }
+
+  if (stored.length > 0) {
+    await db
+      .update(exampleListingsTable)
+      .set({ photoUrls: stored, updatedAt: new Date() })
+      .where(eq(exampleListingsTable.id, req.params.id));
+  }
+
+  logger.info(
+    { listingId: req.params.id, mlsId: listing.mlsId, photoCount: stored.length },
+    "Manual MLS photo sync complete",
+  );
+
+  res.json({ photoCount: stored.length, photoUrls: stored, skipped: false });
+});
+
 /* GET /admin/listings */
 router.get("/admin/listings", adminAuth, async (_req, res) => {
   const rows = await db
